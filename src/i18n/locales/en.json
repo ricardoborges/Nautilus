@@ -77,7 +77,10 @@
     "select_connection": "Select a connection",
     "select_connection_desc": "Select a connection to open a terminal.",
     "new_terminal": "New Terminal",
-    "no_terminal_open": "No terminal open"
+    "no_terminal_open": "No terminal open",
+    "send_password": "Send Password",
+    "password_sent": "Password sent to terminal",
+    "no_password_saved": "No password saved for this connection"
   },
   "files": {
     "select_connection": "Select a connection",

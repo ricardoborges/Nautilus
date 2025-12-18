@@ -96,7 +96,7 @@ export const SnippetModal: React.FC<SnippetModalProps> = ({
             okText={isEditing ? t('common.save') : t('common.create')}
             cancelText={t('common.cancel')}
             confirmLoading={isSaving}
-            width={480}
+            width={800}
         >
             <Form
                 form={form}
@@ -124,7 +124,7 @@ export const SnippetModal: React.FC<SnippetModalProps> = ({
                 >
                     <TextArea
                         placeholder={t('snippet.command_placeholder')}
-                        rows={4}
+                        rows={12}
                         style={{ fontFamily: 'monospace' }}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && e.ctrlKey) {

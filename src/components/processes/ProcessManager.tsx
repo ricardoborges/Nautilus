@@ -127,13 +127,13 @@ export const ProcessManager: React.FC = () => {
         return <Tag color="default">{mem}%</Tag>;
     };
 
-    const columns = [
+    const columns: any[] = [
         {
             title: t('processes.pid'),
             dataIndex: 'pid',
             key: 'pid',
             width: 100,
-            render: (pid: string) => (
+            render: (pid: any) => (
                 <Text code style={{ color: '#1677ff' }}>{pid}</Text>
             ),
         },
@@ -148,7 +148,7 @@ export const ProcessManager: React.FC = () => {
             dataIndex: 'cpu',
             key: 'cpu',
             width: 100,
-            render: (cpu: string) => getCpuTag(cpu),
+            render: (cpu: any) => getCpuTag(cpu),
             sorter: (a: ProcessInfo, b: ProcessInfo) => parseFloat(a.cpu) - parseFloat(b.cpu),
         },
         {
@@ -156,7 +156,7 @@ export const ProcessManager: React.FC = () => {
             dataIndex: 'mem',
             key: 'mem',
             width: 100,
-            render: (mem: string) => getMemTag(mem),
+            render: (mem: any) => getMemTag(mem),
             sorter: (a: ProcessInfo, b: ProcessInfo) => parseFloat(a.mem) - parseFloat(b.mem),
         },
         {
@@ -164,7 +164,7 @@ export const ProcessManager: React.FC = () => {
             dataIndex: 'command',
             key: 'command',
             ellipsis: true,
-            render: (command: string) => (
+            render: (command: any) => (
                 <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>
                     {command}
                 </Text>

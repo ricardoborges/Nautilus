@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { List, Button, Tooltip, Space, Typography, Input, Empty, Popconfirm, message } from 'antd';
+import { List, Button, Tooltip, Space, Typography, Input, Empty, Popconfirm, message, theme } from 'antd';
 import {
     PlusOutlined,
     EditOutlined,
@@ -23,6 +23,7 @@ const { Text } = Typography;
 
 export const SnippetSidebar: React.FC = () => {
     const { t } = useTranslation();
+    const { token } = theme.useToken();
     const [snippets, setSnippets] = useState<Snippet[]>([]);
     const [filteredSnippets, setFilteredSnippets] = useState<Snippet[]>([]);
     const [searchText, setSearchText] = useState('');
@@ -92,13 +93,14 @@ export const SnippetSidebar: React.FC = () => {
     return (
         <div style={{ 
             width: 280, 
+            flexShrink: 0,
             height: '100%', 
             display: 'flex', 
             flexDirection: 'column',
-            borderLeft: '1px solid #f0f0f0',
-            background: '#fff'
+            borderLeft: `1px solid ${token.colorBorderSecondary}`,
+            background: token.colorBgContainer
         }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+            <div style={{ padding: '12px 16px', borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <Typography.Title level={5} style={{ margin: 0 }}>
                         <CodeOutlined style={{ marginRight: 8 }} />
@@ -113,7 +115,7 @@ export const SnippetSidebar: React.FC = () => {
                 </div>
                 <Input
                     placeholder={t('common.search')}
-                    prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                    prefix={<SearchOutlined style={{ color: token.colorTextPlaceholder }} />}
                     value={searchText}
                     onChange={e => setSearchText(e.target.value)}
                     size="small"
@@ -201,7 +203,7 @@ export const SnippetSidebar: React.FC = () => {
 
             <style>{`
                 .snippet-item:hover {
-                    background-color: #f5f5f5;
+                    background-color: ${token.colorFillAlter} !important;
                 }
             `}</style>
         </div>

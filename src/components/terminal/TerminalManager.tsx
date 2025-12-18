@@ -11,12 +11,13 @@ import { useConnection } from '../../context/ConnectionContext';
 import { terminalService } from '../../hooks/useTerminal';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
-import { Card, Tabs, Button, Typography, Empty } from 'antd';
+import { Card, Tabs, Button, Typography, Empty, message, Space, theme } from 'antd';
 import {
     PlusOutlined,
     CodeOutlined,
     CloseOutlined,
     LayoutOutlined,
+    KeyOutlined,
 } from '@ant-design/icons';
 import 'xterm/css/xterm.css';
 import { SnippetSidebar } from './SnippetSidebar';
@@ -31,12 +32,30 @@ interface TerminalSession {
 
 export const TerminalManager: React.FC = () => {
     const { t } = useTranslation();
+    const { token } = theme.useToken();
     const { activeConnectionId } = useConnection();
     const [sessions, setSessions] = useState<TerminalSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
     const [showSnippets, setShowSnippets] = useState(true);
     const terminalContainerRef = useRef<HTMLDivElement>(null);
     const sessionsRef = useRef<Map<string, TerminalSession>>(new Map());
+
+    const handleSendPassword = async () => {
+        if (!activeConnectionId) return;
+        
+        try {
+            const password = await window.ssm.getPassword(activeConnectionId);
+            if (password) {
+                terminalService.writeToActive(password + '\n');
+                message.success(t('terminal.password_sent'));
+            } else {
+                message.warning(t('terminal.no_password_saved'));
+            }
+        } catch (error) {
+            console.error('Failed to get password:', error);
+            message.error(t('common.error'));
+        }
+    };
 
     // Generate unique terminal ID
     const generateId = useCallback(() => {
@@ -237,11 +256,11 @@ export const TerminalManager: React.FC = () => {
     }));
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 16, overflow: 'hidden' }}>
             <Card
                 size="small"
-                style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-                bodyStyle={{ flex: 1, padding: 0, display: 'flex', flexDirection: 'column' }}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                bodyStyle={{ flex: 1, padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
             >
                 {/* Terminal Tabs */}
                 <Tabs
@@ -259,25 +278,34 @@ export const TerminalManager: React.FC = () => {
                     style={{ marginBottom: 0 }}
                     tabBarStyle={{ marginBottom: 0, paddingLeft: 8, paddingRight: 8 }}
                     tabBarExtraContent={
-                        <Button
-                            type={showSnippets ? 'primary' : 'default'}
-                            icon={<LayoutOutlined />}
-                            onClick={() => setShowSnippets(!showSnippets)}
-                            title={t('common.snippets')}
-                            style={{ marginRight: 8 }}
-                        >
-                            {t('common.snippets')}
-                        </Button>
+                        <Space>
+                            <Button
+                                icon={<KeyOutlined />}
+                                onClick={handleSendPassword}
+                                title={t('terminal.send_password')}
+                            >
+                                {t('terminal.send_password')}
+                            </Button>
+                            <Button
+                                type={showSnippets ? 'primary' : 'default'}
+                                icon={<LayoutOutlined />}
+                                onClick={() => setShowSnippets(!showSnippets)}
+                                title={t('common.snippets')}
+                                style={{ marginRight: 8 }}
+                            >
+                                {t('common.snippets')}
+                            </Button>
+                        </Space>
                     }
                 />
 
                 {/* Terminal Container */}
                 {sessions.length > 0 ? (
-                    <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+                    <div style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0 }}>
                         <div
                             ref={terminalContainerRef}
                             className="terminal-container"
-                            style={{ flex: 1, minHeight: 0, background: '#1e1e1e', borderRadius: '0 0 0 8px' }}
+                            style={{ flex: 1, minWidth: 0, minHeight: 0, background: '#1e1e1e', borderRadius: '0 0 0 8px' }}
                         />
                         {showSnippets && <SnippetSidebar />}
                     </div>
@@ -287,10 +315,10 @@ export const TerminalManager: React.FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        background: '#fafafa',
+                        background: token.colorBgLayout,
                     }}>
                         <Empty
-                            image={<CodeOutlined style={{ fontSize: 48, color: '#bfbfbf' }} />}
+                            image={<CodeOutlined style={{ fontSize: 48, color: token.colorTextDisabled }} />}
                             description={t('terminal.no_terminal_open')}
                         >
                             <Button
