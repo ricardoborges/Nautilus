@@ -113,7 +113,8 @@ The application combines the best of both worlds: the lightweight and secure Tau
 
 ## 📸 Screenshots
 
-> *Add application screenshots here when available*
+<img src="./01.png" width="50%" alt="Dashboard" />
+<img src="./02.png" width="50%" alt="Terminal and SFTP" />
 
 ---
 
