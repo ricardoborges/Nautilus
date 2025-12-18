@@ -57,7 +57,7 @@ async function getAuthConfig(connData: AuthArgs, useRawPassword: boolean = false
             logger.info(`[Auth] Key auth - reading key from: ${connData.keyPath}`);
             authConfig.privateKey = await fs.readFile(connData.keyPath);
         } catch (error) {
-            throw new Error(`Falha ao ler a chave privada em ${connData.keyPath}`);
+            throw new Error(`Failed to read private key at ${connData.keyPath}`);
         }
     } else {
         logger.warn(`[Auth] No valid auth method configured - method: ${connData.authMethod}, keyPath: ${connData.keyPath}`);

@@ -6,7 +6,7 @@ import type { Snippet } from '../types';
 export const SYSTEM_SNIPPETS: Snippet[] = [
     {
         id: '__SEND_PASSWORD__',
-        name: '🔐 Enviar Senha',
+        name: '🔐 Send Password',
         command: '__SEND_PASSWORD__',
         isSystem: true
     }

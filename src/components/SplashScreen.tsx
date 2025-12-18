@@ -15,7 +15,7 @@ interface SplashScreenProps {
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({
-    message = 'Carregando...',
+    message = 'Loading...',
     progress,
 }) => {
     return (

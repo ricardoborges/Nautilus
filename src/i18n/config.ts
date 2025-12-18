@@ -16,6 +16,7 @@ i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
+    lng: 'en',
     resources: {
       en: { translation: en },
       'pt-BR': { translation: ptBR },
