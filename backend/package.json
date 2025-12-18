@@ -1,0 +1,32 @@
+{
+    "name": "nautilus-backend",
+    "version": "1.0.0",
+    "description": "Nautilus Backend Sidecar",
+    "main": "dist/index.js",
+    "type": "commonjs",
+    "scripts": {
+        "dev": "npx tsx watch src/index.ts",
+        "start": "node dist/index.js",
+        "build:ts": "tsc",
+        "build": "npm run build:ts && npm run build:pkg:win",
+        "build:pkg:win": "pkg dist/index.js --target node18-win-x64 --output ../src-tauri/binaries/nautilus-backend-x86_64-pc-windows-msvc.exe --config pkg.json",
+        "build:pkg:linux": "pkg dist/index.js --target node18-linux-x64 --output ../src-tauri/binaries/nautilus-backend-x86_64-unknown-linux-gnu --config pkg.json",
+        "build:pkg:mac": "pkg dist/index.js --target node18-macos-x64 --output ../src-tauri/binaries/nautilus-backend-x86_64-apple-darwin --config pkg.json",
+        "build:all": "npm run build:ts && npm run build:pkg:win && npm run build:pkg:linux && npm run build:pkg:mac",
+        "typecheck": "tsc --noEmit"
+    },
+    "bin": "dist/index.js",
+    "dependencies": {
+        "keytar": "^7.9.0",
+        "ssh2": "^1.15.0",
+        "winston": "^3.13.0",
+        "winston-daily-rotate-file": "^5.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.0",
+        "@types/ssh2": "^1.15.0",
+        "pkg": "^5.8.1",
+        "tsx": "^4.7.0",
+        "typescript": "^5.3.0"
+    }
+}

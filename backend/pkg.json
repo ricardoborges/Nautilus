@@ -1,0 +1,11 @@
+{
+    "pkg": {
+        "scripts": [
+            "dist/**/*.js"
+        ],
+        "assets": [],
+        "targets": [
+            "node18"
+        ]
+    }
+}

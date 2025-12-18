@@ -1,0 +1,81 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Frontend (Vite)",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev"
+            ],
+            "console": "integratedTerminal",
+            "serverReadyAction": {
+                "pattern": "Local:.*http://localhost:([0-9]+)",
+                "uriFormat": "http://localhost:%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Backend (Node)",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/backend",
+            "program": "${workspaceFolder}/backend/dist/index.js",
+            "outFiles": [
+                "${workspaceFolder}/backend/dist/**/*.js"
+            ],
+            "sourceMaps": true,
+            "console": "integratedTerminal",
+            "env": {
+                "NODE_ENV": "development"
+            }
+        },
+        {
+            "name": "Backend (tsx - hot reload)",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/backend",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": [
+                "tsx",
+                "watch",
+                "src/index.ts"
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "NODE_ENV": "development"
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "🚀 Full Stack (Frontend + Backend)",
+            "configurations": [
+                "Backend (Node)",
+                "Frontend (Vite)"
+            ],
+            "preLaunchTask": "prepare-dev",
+            "stopAll": true,
+            "presentation": {
+                "order": 1,
+                "group": "main"
+            }
+        },
+        {
+            "name": "🔥 Full Stack (Hot Reload)",
+            "configurations": [
+                "Backend (tsx - hot reload)",
+                "Frontend (Vite)"
+            ],
+            "preLaunchTask": "kill-ports",
+            "stopAll": true,
+            "presentation": {
+                "order": 2,
+                "group": "main"
+            }
+        }
+    ]
+}

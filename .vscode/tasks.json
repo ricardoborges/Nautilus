@@ -1,0 +1,64 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "kill-ports",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-Command",
+                "Get-NetTCPConnection -LocalPort 5173,45678 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 1"
+            ],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "build-backend",
+            "type": "npm",
+            "script": "build:ts",
+            "path": "backend",
+            "problemMatcher": [
+                "$tsc"
+            ],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "group": "build"
+        },
+        {
+            "label": "prepare-dev",
+            "dependsOn": [
+                "kill-ports",
+                "build-backend"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        },
+        {
+            "label": "build-frontend",
+            "type": "npm",
+            "script": "build",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "group": "build"
+        },
+        {
+            "label": "build-all",
+            "dependsOn": [
+                "build-backend",
+                "build-frontend"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
