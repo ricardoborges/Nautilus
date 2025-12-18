@@ -755,14 +755,6 @@ See the [LICENSE](LICENSE) file for more details.
 
 ---
 
-## 📞 Contact and Support
-
-- **Developer**: Ricardo Borges
-- **Issues**: [GitHub Issues](https://github.com/your-username/Nautilus/issues)
-- **Powered by**: Kairo
-
----
-
 ## 🙏 Acknowledgments
 
 - [Tauri](https://tauri.app/) - Amazing desktop framework
@@ -778,7 +770,5 @@ See the [LICENSE](LICENSE) file for more details.
 <div align="center">
 
 **⭐ If you liked Nautilus, consider giving the project a star!**
-
-Made with ❤️ by Ricardo Borges
 
 </div>
