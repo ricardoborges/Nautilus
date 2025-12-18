@@ -35,7 +35,12 @@
     "edit": "Editar",
     "delete": "Deletar",
     "delete_connection": "Deletar Conexão",
-    "confirm_delete_connection": "Tem certeza que deseja deletar a conexão \"{{name}}\"?"
+    "confirm_delete_connection": "Tem certeza que deseja deletar a conexão \"{{name}}\"?",
+    "confirm_delete": "Tem certeza que deseja deletar este item?",
+    "search": "Buscar",
+    "no_results": "Nenhum resultado encontrado",
+    "error_loading_snippets": "Erro ao carregar snippets",
+    "deleted_success": "Excluído com sucesso"
   },
   "splash": {
     "starting": "Iniciando...",
@@ -221,6 +226,7 @@
     "command_required": "Informe um comando",
     "save_tip": "Dica: Use Ctrl+Enter para salvar rapidamente",
     "snippet_updated": "Snippet atualizado com sucesso",
-    "snippet_created": "Snippet criado com sucesso"
+    "snippet_created": "Snippet criado com sucesso",
+    "executing": "Executando snippet: {{name}}"
   }
 }

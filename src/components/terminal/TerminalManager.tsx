@@ -16,8 +16,10 @@ import {
     PlusOutlined,
     CodeOutlined,
     CloseOutlined,
+    LayoutOutlined,
 } from '@ant-design/icons';
 import 'xterm/css/xterm.css';
+import { SnippetSidebar } from './SnippetSidebar';
 
 const { Text } = Typography;
 
@@ -32,6 +34,7 @@ export const TerminalManager: React.FC = () => {
     const { activeConnectionId } = useConnection();
     const [sessions, setSessions] = useState<TerminalSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+    const [showSnippets, setShowSnippets] = useState(true);
     const terminalContainerRef = useRef<HTMLDivElement>(null);
     const sessionsRef = useRef<Map<string, TerminalSession>>(new Map());
 
@@ -169,6 +172,18 @@ export const TerminalManager: React.FC = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, [activeSessionId]);
 
+    // Fit terminal when snippets sidebar is toggled
+    useEffect(() => {
+        if (activeSessionId) {
+            const session = sessionsRef.current.get(activeSessionId);
+            if (session) {
+                setTimeout(() => {
+                    session.fitAddon.fit();
+                }, 100);
+            }
+        }
+    }, [showSnippets, activeSessionId]);
+
     // Create first terminal when connection changes
     useEffect(() => {
         // Cleanup old sessions
@@ -243,15 +258,29 @@ export const TerminalManager: React.FC = () => {
                     items={tabItems}
                     style={{ marginBottom: 0 }}
                     tabBarStyle={{ marginBottom: 0, paddingLeft: 8, paddingRight: 8 }}
+                    tabBarExtraContent={
+                        <Button
+                            type={showSnippets ? 'primary' : 'default'}
+                            icon={<LayoutOutlined />}
+                            onClick={() => setShowSnippets(!showSnippets)}
+                            title={t('common.snippets')}
+                            style={{ marginRight: 8 }}
+                        >
+                            {t('common.snippets')}
+                        </Button>
+                    }
                 />
 
                 {/* Terminal Container */}
                 {sessions.length > 0 ? (
-                    <div
-                        ref={terminalContainerRef}
-                        className="terminal-container"
-                        style={{ flex: 1, minHeight: 0, background: '#1e1e1e', borderRadius: '0 0 8px 8px' }}
-                    />
+                    <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+                        <div
+                            ref={terminalContainerRef}
+                            className="terminal-container"
+                            style={{ flex: 1, minHeight: 0, background: '#1e1e1e', borderRadius: '0 0 0 8px' }}
+                        />
+                        {showSnippets && <SnippetSidebar />}
+                    </div>
                 ) : (
                     <div style={{
                         flex: 1,
