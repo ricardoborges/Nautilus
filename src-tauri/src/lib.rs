@@ -1,4 +1,6 @@
 use std::process::{Command, Stdio};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::sync::Arc;
 use tauri::{Manager, WebviewWindow, AppHandle};
 use tokio::sync::Mutex;
@@ -86,7 +88,12 @@ fn start_backend_process(app: &AppHandle) -> Result<std::process::Child, String>
     
     log::info!("Starting backend sidecar: {:?}", sidecar_path);
     
-    Command::new(&sidecar_path)
+    let mut command = Command::new(&sidecar_path);
+    
+    #[cfg(windows)]
+    command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    
+    command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
