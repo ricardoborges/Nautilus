@@ -964,6 +964,16 @@ export const DockerDashboard: React.FC = () => {
             render: (driver: string) => <Tag>{driver}</Tag>,
         },
         {
+            title: t('docker.size'),
+            dataIndex: 'size',
+            key: 'size',
+            width: 100,
+            sorter: (a: DockerVolume, b: DockerVolume) => (a.size || '').localeCompare(b.size || ''),
+            render: (size: string) => (
+                <Text style={{ fontFamily: 'monospace' }}>{size || '-'}</Text>
+            ),
+        },
+        {
             title: t('docker.mountpoint'),
             dataIndex: 'mountpoint',
             key: 'mountpoint',

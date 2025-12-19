@@ -683,6 +683,28 @@ const handlers: HandlerRegistry = {
 
             // Get detailed info for each volume using docker volume inspect
             const inspectResult = await ssh.exec(`docker volume inspect ${volumeNames.join(' ')} --format "{{.Name}}|{{.Driver}}|{{.Mountpoint}}|{{.CreatedAt}}" 2>/dev/null || echo ""`);
+
+            // Get volume sizes using docker system df -v
+            let volumeSizes: Record<string, string> = {};
+            try {
+                const dfResult = await ssh.exec('docker system df -v --format "{{json .}}" 2>/dev/null | grep -A1000 "Volumes" || echo ""');
+                // Parse volume sizes from docker system df output
+                // Try alternative command that gives us volume sizes directly
+                const sizeResult = await ssh.exec('docker system df -v 2>/dev/null | grep -E "^[a-f0-9]{12,}" || echo ""');
+                const sizeLines = sizeResult.stdout.trim().split('\n').filter(line => line.trim());
+                for (const line of sizeLines) {
+                    const parts = line.trim().split(/\s+/);
+                    if (parts.length >= 3) {
+                        // Format: VOLUME NAME   LINKS   SIZE
+                        const volName = parts[0];
+                        const size = parts[parts.length - 1];
+                        volumeSizes[volName] = size;
+                    }
+                }
+            } catch {
+                // Ignore size errors - we'll just not show sizes
+            }
+
             const volumes = inspectResult.stdout.trim().split('\n')
                 .filter(line => line.trim())
                 .map(line => {
@@ -693,11 +715,26 @@ const handlers: HandlerRegistry = {
                     if (dateMatch) {
                         formattedCreated = `${dateMatch[1]} ${dateMatch[2]}`;
                     }
+
+                    // Get size - try exact match first, then partial match
+                    let size = volumeSizes[name] || '';
+                    if (!size) {
+                        // Try partial match for truncated volume names
+                        const shortName = name?.substring(0, 12);
+                        for (const [volName, volSize] of Object.entries(volumeSizes)) {
+                            if (volName.startsWith(shortName) || name?.startsWith(volName)) {
+                                size = volSize;
+                                break;
+                            }
+                        }
+                    }
+
                     return {
                         name: name || '',
                         driver: driver || '',
                         mountpoint: mountpoint || '',
                         created: formattedCreated,
+                        size: size || '-',
                     };
                 });
             return volumes;
