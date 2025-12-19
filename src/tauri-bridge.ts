@@ -299,7 +299,7 @@ const ssm: SSMAPI = {
     dockerListNetworks: (connectionId: string): Promise<DockerNetwork[]> =>
         backendInvoke<DockerNetwork[]>('ssm:docker:networks', { connectionId }),
 
-    dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove'): Promise<void> =>
+    dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill'): Promise<void> =>
         backendInvoke<void>('ssm:docker:action', { connectionId, containerId, action }),
 
     dockerContainerLogs: (connectionId: string, containerId: string, tail?: number): Promise<string> =>

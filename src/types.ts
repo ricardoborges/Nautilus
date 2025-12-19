@@ -155,9 +155,11 @@ export interface DockerContainer {
     name: string;
     image: string;
     status: string;
-    state: 'running' | 'exited' | 'paused' | 'restarting' | 'dead' | 'created';
+    state: 'running' | 'exited' | 'paused' | 'restarting' | 'dead' | 'created' | 'unhealthy';
     ports: string;
     created: string;
+    stack?: string;
+    ipAddress?: string;
 }
 
 export interface DockerImage {
@@ -181,8 +183,13 @@ export interface DockerNetwork {
     name: string;
     driver: string;
     scope: string;
-    ipam?: string;
-    containers?: number;
+    attachable?: boolean;
+    internal?: boolean;
+    ipamDriver?: string;
+    subnet?: string;
+    gateway?: string;
+    stack?: string;
+    isSystem?: boolean;
 }
 
 export interface DockerInfo {
@@ -263,7 +270,7 @@ export interface SSMAPI {
     dockerListImages: (connectionId: string) => Promise<DockerImage[]>;
     dockerListVolumes: (connectionId: string) => Promise<DockerVolume[]>;
     dockerListNetworks: (connectionId: string) => Promise<DockerNetwork[]>;
-    dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove') => Promise<void>;
+    dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill') => Promise<void>;
     dockerContainerLogs: (connectionId: string, containerId: string, tail?: number) => Promise<string>;
     dockerImageAction: (connectionId: string, imageId: string, action: 'remove') => Promise<void>;
 

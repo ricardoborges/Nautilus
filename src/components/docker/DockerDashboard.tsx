@@ -1,11 +1,11 @@
 /**
- * Docker Dashboard Component
+ * Docker Dashboard Component - Portainer Style
  * 
- * Displays Docker containers and images running on the server.
- * Shows container status, image info, ports, and provides basic actions.
+ * Displays Docker containers, images, volumes, and networks.
+ * UI inspired by Portainer for a professional container management experience.
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConnection } from '../../context/ConnectionContext';
 import {
@@ -26,6 +26,8 @@ import {
     Tabs,
     Input,
     Popconfirm,
+    Checkbox,
+    theme,
 } from 'antd';
 import { ProCard } from '@ant-design/pro-components';
 import {
@@ -43,14 +45,248 @@ import {
     DatabaseOutlined,
     GlobalOutlined,
     SearchOutlined,
+    CloseCircleOutlined,
+    LinkOutlined,
+    WarningOutlined,
+    SyncOutlined,
+    CaretRightOutlined,
+    PoweroffOutlined,
 } from '@ant-design/icons';
 import type { DockerContainer, DockerImage, DockerVolume, DockerNetwork } from '../../types';
 
 const { Text, Title } = Typography;
 
+// Status badge component similar to Portainer
+const StatusBadge: React.FC<{ state: string; status: string }> = ({ state, status }) => {
+    const { t } = useTranslation();
+
+    // Check for unhealthy state in status string
+    const isUnhealthy = status.toLowerCase().includes('unhealthy');
+    const effectiveState = isUnhealthy ? 'unhealthy' : state;
+
+    const stateConfig: Record<string, { color: string; bgColor: string; icon: React.ReactNode; label: string }> = {
+        running: {
+            color: '#52c41a',
+            bgColor: 'rgba(82, 196, 26, 0.15)',
+            icon: <CheckCircleOutlined />,
+            label: t('docker.running')
+        },
+        unhealthy: {
+            color: '#faad14',
+            bgColor: 'rgba(250, 173, 20, 0.15)',
+            icon: <WarningOutlined />,
+            label: t('docker.unhealthy')
+        },
+        exited: {
+            color: '#8c8c8c',
+            bgColor: 'rgba(140, 140, 140, 0.15)',
+            icon: <StopOutlined />,
+            label: t('docker.exited')
+        },
+        paused: {
+            color: '#1677ff',
+            bgColor: 'rgba(22, 119, 255, 0.15)',
+            icon: <PauseCircleOutlined />,
+            label: t('docker.paused')
+        },
+        restarting: {
+            color: '#1677ff',
+            bgColor: 'rgba(22, 119, 255, 0.15)',
+            icon: <SyncOutlined spin />,
+            label: t('docker.restarting_state')
+        },
+        dead: {
+            color: '#ff4d4f',
+            bgColor: 'rgba(255, 77, 79, 0.15)',
+            icon: <CloseCircleOutlined />,
+            label: t('docker.dead')
+        },
+        created: {
+            color: '#8c8c8c',
+            bgColor: 'rgba(140, 140, 140, 0.15)',
+            icon: <ClockCircleOutlined />,
+            label: t('docker.created_state')
+        },
+    };
+
+    const config = stateConfig[effectiveState] || stateConfig.exited;
+
+    return (
+        <Tag
+            style={{
+                color: config.color,
+                backgroundColor: config.bgColor,
+                border: 'none',
+                borderRadius: 4,
+                padding: '2px 8px',
+                fontWeight: 500,
+                fontSize: 12,
+            }}
+            icon={config.icon}
+        >
+            {config.label}
+        </Tag>
+    );
+};
+
+// Ports display component
+const PortsDisplay: React.FC<{ ports: string; hostIp: string }> = ({ ports, hostIp }) => {
+    const { t } = useTranslation();
+
+    if (!ports) return <Text type="secondary">-</Text>;
+
+    // Parse port mappings from Docker format: "0.0.0.0:8080->80/tcp, 0.0.0.0:443->443/tcp"
+    const portMappings = ports.split(',').map(p => p.trim());
+    const links: React.ReactNode[] = [];
+
+    portMappings.forEach((mapping, index) => {
+        // Match pattern like "0.0.0.0:8080->80/tcp" or ":::8080->80/tcp"
+        const match = mapping.match(/(?:[\d.:]+:)?(\d+)->(\d+)\/(\w+)/);
+        if (match) {
+            const hostPort = match[1];
+            // containerPort = match[2] - not used in display
+            const protocol = match[3];
+
+            // Only create links for HTTP-compatible protocols (tcp)
+            if (protocol === 'tcp') {
+                links.push(
+                    <Tooltip key={index} title={t('docker.open_in_browser')}>
+                        <a
+                            href={`http://${hostIp}:${hostPort}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                window.ssm.openExternal(`http://${hostIp}:${hostPort}`);
+                            }}
+                            style={{
+                                color: '#1677ff',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                marginRight: 8,
+                            }}
+                        >
+                            <LinkOutlined style={{ fontSize: 12 }} />
+                            {hostPort}
+                        </a>
+                    </Tooltip>
+                );
+            } else {
+                links.push(
+                    <Text key={index} type="secondary" style={{ marginRight: 8 }}>
+                        {hostPort}/{protocol}
+                    </Text>
+                );
+            }
+        } else if (mapping) {
+            // Fallback: just display the raw mapping
+            links.push(
+                <Text key={index} type="secondary" style={{ marginRight: 8 }}>
+                    {mapping}
+                </Text>
+            );
+        }
+    });
+
+    return links.length > 0 ? <>{links}</> : <Text type="secondary">-</Text>;
+};
+
+// Quick Actions component
+const QuickActions: React.FC<{
+    container: DockerContainer;
+    onAction: (id: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill') => void;
+    onLogs: (id: string, name: string) => void;
+    loading: string | null;
+}> = ({ container, onAction, onLogs, loading }) => {
+    const { t } = useTranslation();
+    const isLoading = loading === container.id;
+    const isRunning = container.state === 'running';
+    const isPaused = container.state === 'paused';
+
+    const iconStyle = { fontSize: 14 };
+
+    return (
+        <Space size={4}>
+            {/* Logs button - always visible */}
+            <Tooltip title={t('docker.logs')}>
+                <Button
+                    type="text"
+                    size="small"
+                    icon={<FileTextOutlined style={iconStyle} />}
+                    onClick={() => onLogs(container.id, container.name)}
+                    style={{ padding: '2px 6px' }}
+                />
+            </Tooltip>
+
+            {isRunning && !isPaused && (
+                <>
+                    <Tooltip title={t('docker.stop')}>
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<StopOutlined style={{ ...iconStyle, color: '#ff4d4f' }} />}
+                            loading={isLoading}
+                            onClick={() => onAction(container.id, 'stop')}
+                            style={{ padding: '2px 6px' }}
+                        />
+                    </Tooltip>
+                    <Tooltip title={t('docker.restart')}>
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<ReloadOutlined style={iconStyle} />}
+                            loading={isLoading}
+                            onClick={() => onAction(container.id, 'restart')}
+                            style={{ padding: '2px 6px' }}
+                        />
+                    </Tooltip>
+                    <Tooltip title={t('docker.pause')}>
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<PauseCircleOutlined style={{ ...iconStyle, color: '#1677ff' }} />}
+                            loading={isLoading}
+                            onClick={() => onAction(container.id, 'pause')}
+                            style={{ padding: '2px 6px' }}
+                        />
+                    </Tooltip>
+                </>
+            )}
+
+            {isPaused && (
+                <Tooltip title={t('docker.resume')}>
+                    <Button
+                        type="text"
+                        size="small"
+                        icon={<CaretRightOutlined style={{ ...iconStyle, color: '#52c41a' }} />}
+                        loading={isLoading}
+                        onClick={() => onAction(container.id, 'unpause')}
+                        style={{ padding: '2px 6px' }}
+                    />
+                </Tooltip>
+            )}
+
+            {!isRunning && !isPaused && (
+                <Tooltip title={t('docker.start')}>
+                    <Button
+                        type="text"
+                        size="small"
+                        icon={<PlayCircleOutlined style={{ ...iconStyle, color: '#52c41a' }} />}
+                        loading={isLoading}
+                        onClick={() => onAction(container.id, 'start')}
+                        style={{ padding: '2px 6px' }}
+                    />
+                </Tooltip>
+            )}
+        </Space>
+    );
+};
+
 export const DockerDashboard: React.FC = () => {
     const { t } = useTranslation();
-    const { activeConnectionId, dockerAvailable } = useConnection();
+    const { token } = theme.useToken();
+    const { activeConnectionId, activeConnection, dockerAvailable } = useConnection();
     const [containers, setContainers] = useState<DockerContainer[]>([]);
     const [images, setImages] = useState<DockerImage[]>([]);
     const [volumes, setVolumes] = useState<DockerVolume[]>([]);
@@ -61,15 +297,31 @@ export const DockerDashboard: React.FC = () => {
     const [networksLoading, setNetworksLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+    // Container selection and search state
+    const [selectedContainers, setSelectedContainers] = useState<string[]>([]);
+    const [containerSearchText, setContainerSearchText] = useState('');
+
     // Image selection and search state
     const [selectedImages, setSelectedImages] = useState<string[]>([]);
     const [imageSearchText, setImageSearchText] = useState('');
+
+    // Volume selection and search state
+    const [selectedVolumes, setSelectedVolumes] = useState<string[]>([]);
+    const [volumeSearchText, setVolumeSearchText] = useState('');
+
+    // Network selection and search state
+    const [selectedNetworks, setSelectedNetworks] = useState<string[]>([]);
+    const [networkSearchText, setNetworkSearchText] = useState('');
 
     // Logs modal state
     const [logsModalOpen, setLogsModalOpen] = useState(false);
     const [logsContent, setLogsContent] = useState('');
     const [logsLoading, setLogsLoading] = useState(false);
     const [logsContainerName, setLogsContainerName] = useState('');
+    const [logsContainerId, setLogsContainerId] = useState('');
+
+    // Get host IP for port links
+    const hostIp = activeConnection?.host || 'localhost';
 
     const loadContainers = useCallback(async () => {
         if (!activeConnectionId) return;
@@ -140,17 +392,20 @@ export const DockerDashboard: React.FC = () => {
         }
     }, [activeConnectionId, dockerAvailable, loadContainers, loadImages, loadVolumes, loadNetworks]);
 
-    const handleAction = async (containerId: string, action: 'start' | 'stop' | 'restart' | 'remove') => {
+    const handleAction = async (containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill') => {
         if (!activeConnectionId) return;
 
         setActionLoading(containerId);
         try {
             await window.ssm.dockerContainerAction(activeConnectionId, containerId, action);
-            message.success(t(`docker.${action}_success`));
+            // Map unpause to resume for translation key
+            const translationAction = action === 'unpause' ? 'resume' : action;
+            message.success(t(`docker.${translationAction}_success`));
             await loadContainers();
         } catch (error) {
             const err = error as Error;
-            message.error(t(`docker.${action}_error`, { message: err.message }));
+            const translationAction = action === 'unpause' ? 'resume' : action;
+            message.error(t(`docker.${translationAction}_error`, { message: err.message }));
         } finally {
             setActionLoading(null);
         }
@@ -164,6 +419,33 @@ export const DockerDashboard: React.FC = () => {
             okType: 'danger',
             cancelText: t('common.cancel'),
             onOk: () => handleAction(containerId, 'remove'),
+        });
+    };
+
+    // Bulk action on selected containers
+    const handleBulkAction = async (action: 'start' | 'stop' | 'restart' | 'pause' | 'unpause' | 'kill') => {
+        if (selectedContainers.length === 0) return;
+
+        for (const containerId of selectedContainers) {
+            await handleAction(containerId, action);
+        }
+        setSelectedContainers([]);
+    };
+
+    const handleBulkRemove = () => {
+        if (selectedContainers.length === 0) return;
+        Modal.confirm({
+            title: t('docker.remove_confirm_title'),
+            content: t('docker.remove_selected_count', { count: selectedContainers.length }),
+            okText: t('common.delete'),
+            okType: 'danger',
+            cancelText: t('common.cancel'),
+            onOk: async () => {
+                for (const containerId of selectedContainers) {
+                    await handleAction(containerId, 'remove');
+                }
+                setSelectedContainers([]);
+            },
         });
     };
 
@@ -194,16 +476,28 @@ export const DockerDashboard: React.FC = () => {
         });
     };
 
+    // Filtered containers based on search
+    const filteredContainers = useMemo(() => {
+        if (!containerSearchText) return containers;
+        const search = containerSearchText.toLowerCase();
+        return containers.filter(c =>
+            c.name.toLowerCase().includes(search) ||
+            c.image.toLowerCase().includes(search) ||
+            c.state.toLowerCase().includes(search) ||
+            (c.stack && c.stack.toLowerCase().includes(search))
+        );
+    }, [containers, containerSearchText]);
+
     // Filtered images based on search
-    const filteredImages = images.filter(img => {
-        if (!imageSearchText) return true;
+    const filteredImages = useMemo(() => {
+        if (!imageSearchText) return images;
         const search = imageSearchText.toLowerCase();
-        return (
+        return images.filter(img =>
             img.id.toLowerCase().includes(search) ||
             img.repository.toLowerCase().includes(search) ||
             img.tag.toLowerCase().includes(search)
         );
-    });
+    }, [images, imageSearchText]);
 
     // Handle bulk remove selected images
     const removeSelectedImages = async () => {
@@ -234,10 +528,48 @@ export const DockerDashboard: React.FC = () => {
         }
     };
 
+    // Filtered volumes based on search
+    const filteredVolumes = useMemo(() => {
+        if (!volumeSearchText) return volumes;
+        const search = volumeSearchText.toLowerCase();
+        return volumes.filter(vol =>
+            vol.name.toLowerCase().includes(search) ||
+            vol.driver.toLowerCase().includes(search) ||
+            vol.mountpoint.toLowerCase().includes(search)
+        );
+    }, [volumes, volumeSearchText]);
+
+    // Handle bulk remove selected volumes (placeholder - would need backend support)
+    const removeSelectedVolumes = async () => {
+        if (selectedVolumes.length === 0) return;
+        message.info(t('docker.volume_remove_not_implemented'));
+        setSelectedVolumes([]);
+    };
+
+    // Filtered networks based on search
+    const filteredNetworks = useMemo(() => {
+        if (!networkSearchText) return networks;
+        const search = networkSearchText.toLowerCase();
+        return networks.filter(net =>
+            net.name.toLowerCase().includes(search) ||
+            net.driver.toLowerCase().includes(search) ||
+            (net.stack && net.stack.toLowerCase().includes(search)) ||
+            (net.subnet && net.subnet.toLowerCase().includes(search))
+        );
+    }, [networks, networkSearchText]);
+
+    // Handle bulk remove selected networks (placeholder - would need backend support)
+    const removeSelectedNetworks = async () => {
+        if (selectedNetworks.length === 0) return;
+        message.info(t('docker.network_remove_not_implemented'));
+        setSelectedNetworks([]);
+    };
+
     const openLogs = async (containerId: string, containerName: string) => {
         if (!activeConnectionId) return;
 
         setLogsContainerName(containerName);
+        setLogsContainerId(containerId);
         setLogsContent('');
         setLogsModalOpen(true);
         setLogsLoading(true);
@@ -253,12 +585,12 @@ export const DockerDashboard: React.FC = () => {
         }
     };
 
-    const refreshLogs = async (containerId: string) => {
-        if (!activeConnectionId) return;
+    const refreshLogs = async () => {
+        if (!activeConnectionId || !logsContainerId) return;
 
         setLogsLoading(true);
         try {
-            const logs = await window.ssm.dockerContainerLogs(activeConnectionId, containerId, 500);
+            const logs = await window.ssm.dockerContainerLogs(activeConnectionId, logsContainerId, 500);
             setLogsContent(logs || t('docker.logs_empty'));
         } catch (error) {
             const err = error as Error;
@@ -310,32 +642,6 @@ export const DockerDashboard: React.FC = () => {
         );
     }
 
-    const getStatusTag = (status: string, state: string) => {
-        const stateColors: Record<string, string> = {
-            running: 'success',
-            exited: 'default',
-            paused: 'warning',
-            restarting: 'processing',
-            dead: 'error',
-            created: 'default',
-        };
-
-        const stateIcons: Record<string, React.ReactNode> = {
-            running: <CheckCircleOutlined />,
-            exited: <StopOutlined />,
-            paused: <PauseCircleOutlined />,
-            restarting: <ReloadOutlined spin />,
-            dead: <ExclamationCircleOutlined />,
-            created: <ClockCircleOutlined />,
-        };
-
-        return (
-            <Tag color={stateColors[state] || 'default'} icon={stateIcons[state]}>
-                {status}
-            </Tag>
-        );
-    };
-
     // Statistics
     const runningCount = containers.filter(c => c.state === 'running').length;
     const stoppedCount = containers.filter(c => c.state === 'exited').length;
@@ -344,162 +650,92 @@ export const DockerDashboard: React.FC = () => {
     const volumesCount = volumes.length;
     const networksCount = networks.length;
 
+    // Format created date to be more readable
+    const formatCreatedDate = (created: string): string => {
+        // Docker format: "2025-12-15 17:08:25 -0300 -03"
+        const match = created.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})/);
+        if (match) {
+            return `${match[1]} ${match[2]}`;
+        }
+        return created;
+    };
+
     const containerColumns = [
         {
             title: t('docker.container_name'),
             dataIndex: 'name',
             key: 'name',
-            render: (name: string) => <Text strong>{name}</Text>,
+            sorter: (a: DockerContainer, b: DockerContainer) => a.name.localeCompare(b.name),
+            render: (name: string) => <Text strong style={{ color: token.colorPrimary }}>{name}</Text>,
+        },
+        {
+            title: t('docker.state'),
+            dataIndex: 'state',
+            key: 'state',
+            width: 120,
+            filters: [
+                { text: t('docker.running'), value: 'running' },
+                { text: t('docker.exited'), value: 'exited' },
+                { text: t('docker.paused'), value: 'paused' },
+            ],
+            onFilter: (value: unknown, record: DockerContainer) => record.state === value,
+            render: (_: string, record: DockerContainer) => <StatusBadge state={record.state} status={record.status} />,
+        },
+        {
+            title: t('docker.quick_actions'),
+            key: 'quickActions',
+            width: 140,
+            render: (_: unknown, record: DockerContainer) => (
+                <QuickActions
+                    container={record}
+                    onAction={handleAction}
+                    onLogs={openLogs}
+                    loading={actionLoading}
+                />
+            ),
+        },
+        {
+            title: t('docker.stack'),
+            dataIndex: 'stack',
+            key: 'stack',
+            width: 120,
+            sorter: (a: DockerContainer, b: DockerContainer) => (a.stack || '').localeCompare(b.stack || ''),
+            render: (stack: string) => stack ? <Text>{stack}</Text> : <Text type="secondary">-</Text>,
         },
         {
             title: t('docker.image'),
             dataIndex: 'image',
             key: 'image',
+            ellipsis: true,
+            sorter: (a: DockerContainer, b: DockerContainer) => a.image.localeCompare(b.image),
             render: (image: string) => (
                 <Tooltip title={image}>
-                    <Text style={{ maxWidth: 200 }} ellipsis>
+                    <Text style={{ color: token.colorPrimary, cursor: 'pointer' }} ellipsis>
                         {image}
                     </Text>
                 </Tooltip>
             ),
         },
         {
-            title: t('docker.status'),
-            dataIndex: 'status',
-            key: 'status',
-            render: (status: string, record: DockerContainer) => getStatusTag(status, record.state),
-        },
-        {
-            title: t('docker.ports'),
-            dataIndex: 'ports',
-            key: 'ports',
-            render: (ports: string) => {
-                if (!ports) return '-';
-
-                // Parse port mappings from Docker format: "0.0.0.0:8080->80/tcp, 0.0.0.0:443->443/tcp"
-                const portMappings = ports.split(',').map(p => p.trim());
-                const links: React.ReactNode[] = [];
-
-                portMappings.forEach((mapping, index) => {
-                    // Match pattern like "0.0.0.0:8080->80/tcp" or ":::8080->80/tcp"
-                    const match = mapping.match(/(?:[\d.:]+:)?(\d+)->(\d+)\/(\w+)/);
-                    if (match) {
-                        const hostPort = match[1];
-                        const containerPort = match[2];
-                        const protocol = match[3];
-
-                        // Only create links for HTTP-compatible protocols (tcp)
-                        if (protocol === 'tcp') {
-                            links.push(
-                                <span key={index}>
-                                    {index > 0 && ', '}
-                                    <a
-                                        href={`http://localhost:${hostPort}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            window.ssm.openExternal(`http://localhost:${hostPort}`);
-                                        }}
-                                        style={{ color: '#1677ff' }}
-                                    >
-                                        {hostPort}→{containerPort}
-                                    </a>
-                                </span>
-                            );
-                        } else {
-                            links.push(
-                                <span key={index}>
-                                    {index > 0 && ', '}
-                                    <Text type="secondary">{hostPort}→{containerPort}/{protocol}</Text>
-                                </span>
-                            );
-                        }
-                    } else if (mapping) {
-                        // Fallback: just display the raw mapping
-                        links.push(
-                            <span key={index}>
-                                {index > 0 && ', '}
-                                <Text type="secondary">{mapping}</Text>
-                            </span>
-                        );
-                    }
-                });
-
-                return links.length > 0 ? <>{links}</> : '-';
-            },
-        },
-        {
             title: t('docker.created'),
             dataIndex: 'created',
             key: 'created',
-            width: 150,
+            width: 160,
+            sorter: (a: DockerContainer, b: DockerContainer) => a.created.localeCompare(b.created),
+            render: (created: string) => <Text type="secondary">{formatCreatedDate(created)}</Text>,
         },
         {
-            title: t('docker.actions'),
-            key: 'actions',
-            width: 220,
-            render: (_: unknown, record: DockerContainer) => {
-                const isLoading = actionLoading === record.id;
-                const isRunning = record.state === 'running';
-
-                return (
-                    <Space size="small">
-                        {isRunning ? (
-                            <>
-                                <Tooltip title={t('docker.stop')}>
-                                    <Button
-                                        type="text"
-                                        size="small"
-                                        icon={<StopOutlined />}
-                                        loading={isLoading}
-                                        onClick={() => handleAction(record.id, 'stop')}
-                                        danger
-                                    />
-                                </Tooltip>
-                                <Tooltip title={t('docker.restart')}>
-                                    <Button
-                                        type="text"
-                                        size="small"
-                                        icon={<ReloadOutlined />}
-                                        loading={isLoading}
-                                        onClick={() => handleAction(record.id, 'restart')}
-                                    />
-                                </Tooltip>
-                            </>
-                        ) : (
-                            <Tooltip title={t('docker.start')}>
-                                <Button
-                                    type="text"
-                                    size="small"
-                                    icon={<PlayCircleOutlined />}
-                                    loading={isLoading}
-                                    onClick={() => handleAction(record.id, 'start')}
-                                    style={{ color: '#52c41a' }}
-                                />
-                            </Tooltip>
-                        )}
-                        <Tooltip title={t('docker.logs')}>
-                            <Button
-                                type="text"
-                                size="small"
-                                icon={<FileTextOutlined />}
-                                onClick={() => openLogs(record.id, record.name)}
-                            />
-                        </Tooltip>
-                        <Tooltip title={t('docker.remove')}>
-                            <Button
-                                type="text"
-                                size="small"
-                                icon={<DeleteOutlined />}
-                                loading={isLoading}
-                                onClick={() => confirmRemove(record.id, record.name)}
-                                danger
-                            />
-                        </Tooltip>
-                    </Space>
-                );
-            },
+            title: t('docker.ip_address'),
+            dataIndex: 'ipAddress',
+            key: 'ipAddress',
+            width: 120,
+            render: (ip: string) => ip ? <Text code style={{ fontSize: 12 }}>{ip}</Text> : <Text type="secondary">-</Text>,
+        },
+        {
+            title: t('docker.published_ports'),
+            dataIndex: 'ports',
+            key: 'ports',
+            render: (ports: string) => <PortsDisplay ports={ports} hostIp={hostIp} />,
         },
     ];
 
@@ -508,6 +744,7 @@ export const DockerDashboard: React.FC = () => {
             title: t('docker.image_id'),
             dataIndex: 'id',
             key: 'id',
+            width: 280,
             sorter: (a: DockerImage, b: DockerImage) => a.id.localeCompare(b.id),
             render: (id: string, record: DockerImage) => {
                 const isUnused = record.repository === '<none>' || record.tag === '<none>';
@@ -515,7 +752,7 @@ export const DockerDashboard: React.FC = () => {
                     <Space>
                         <Tooltip title={id}>
                             <Text code style={{ fontSize: 12, color: '#8b8b8b' }}>
-                                {id.startsWith('sha256:') ? id.substring(0, 30) + '...' : id.substring(0, 12)}
+                                {id.startsWith('sha256:') ? id.substring(0, 19) + '...' : id.substring(0, 12)}
                             </Text>
                         </Tooltip>
                         {isUnused && (
@@ -530,6 +767,7 @@ export const DockerDashboard: React.FC = () => {
         {
             title: t('docker.tags'),
             key: 'tags',
+            ellipsis: true,
             sorter: (a: DockerImage, b: DockerImage) => {
                 const aName = `${a.repository}:${a.tag}`;
                 const bName = `${b.repository}:${b.tag}`;
@@ -537,12 +775,15 @@ export const DockerDashboard: React.FC = () => {
             },
             render: (_: unknown, record: DockerImage) => {
                 if (record.repository === '<none>' || record.tag === '<none>') {
-                    return null;
+                    return <Text type="secondary">-</Text>;
                 }
+                const fullTag = `${record.repository}:${record.tag}`;
                 return (
-                    <Tag color="geekblue" style={{ fontSize: 12 }}>
-                        {record.repository}:{record.tag}
-                    </Tag>
+                    <Tooltip title={fullTag}>
+                        <Tag color="geekblue" style={{ fontSize: 12, maxWidth: 350, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {fullTag}
+                        </Tag>
+                    </Tooltip>
                 );
             },
         },
@@ -550,7 +791,7 @@ export const DockerDashboard: React.FC = () => {
             title: t('docker.size'),
             dataIndex: 'size',
             key: 'size',
-            width: 100,
+            width: 110,
             align: 'right' as const,
             sorter: (a: DockerImage, b: DockerImage) => {
                 // Parse size strings like "49 MB", "1.2 GB"
@@ -569,8 +810,9 @@ export const DockerDashboard: React.FC = () => {
             title: t('docker.created'),
             dataIndex: 'created',
             key: 'created',
-            width: 180,
+            width: 200,
             sorter: (a: DockerImage, b: DockerImage) => a.created.localeCompare(b.created),
+            render: (created: string) => <Text style={{ whiteSpace: 'nowrap' }}>{formatCreatedDate(created)}</Text>,
         },
     ];
 
@@ -579,24 +821,45 @@ export const DockerDashboard: React.FC = () => {
             title: t('docker.volume_name'),
             dataIndex: 'name',
             key: 'name',
-            render: (name: string) => <Text strong>{name}</Text>,
+            sorter: (a: DockerVolume, b: DockerVolume) => a.name.localeCompare(b.name),
+            render: (name: string) => (
+                <Text strong style={{ color: token.colorPrimary }}>
+                    {name}
+                </Text>
+            ),
         },
         {
             title: t('docker.driver'),
             dataIndex: 'driver',
             key: 'driver',
+            width: 100,
+            sorter: (a: DockerVolume, b: DockerVolume) => a.driver.localeCompare(b.driver),
             render: (driver: string) => <Tag>{driver}</Tag>,
         },
         {
             title: t('docker.mountpoint'),
             dataIndex: 'mountpoint',
             key: 'mountpoint',
+            ellipsis: true,
+            sorter: (a: DockerVolume, b: DockerVolume) => a.mountpoint.localeCompare(b.mountpoint),
             render: (mp: string) => (
                 <Tooltip title={mp}>
-                    <Text code style={{ fontSize: 11 }} ellipsis>
-                        {mp.length > 40 ? `...${mp.slice(-40)}` : mp}
+                    <Text code style={{ fontSize: 11 }}>
+                        {mp}
                     </Text>
                 </Tooltip>
+            ),
+        },
+        {
+            title: t('docker.created'),
+            dataIndex: 'created',
+            key: 'created',
+            width: 180,
+            sorter: (a: DockerVolume, b: DockerVolume) => (a.created || '').localeCompare(b.created || ''),
+            render: (created: string) => created ? (
+                <Text style={{ whiteSpace: 'nowrap' }}>{created}</Text>
+            ) : (
+                <Text type="secondary">-</Text>
             ),
         },
     ];
@@ -606,33 +869,151 @@ export const DockerDashboard: React.FC = () => {
             title: t('docker.network_name'),
             dataIndex: 'name',
             key: 'name',
-            render: (name: string) => <Text strong>{name}</Text>,
+            sorter: (a: DockerNetwork, b: DockerNetwork) => a.name.localeCompare(b.name),
+            render: (name: string, record: DockerNetwork) => (
+                <Space size={4}>
+                    <Text strong style={{ color: token.colorPrimary }}>
+                        {name}
+                    </Text>
+                    {record.isSystem && (
+                        <Tag color="cyan" style={{ marginLeft: 4, fontSize: 10 }}>
+                            System
+                        </Tag>
+                    )}
+                </Space>
+            ),
         },
         {
-            title: t('docker.network_id'),
-            dataIndex: 'id',
-            key: 'id',
-            render: (id: string) => (
-                <Tooltip title={id}>
-                    <Text code style={{ fontSize: 12 }}>
-                        {id.substring(0, 12)}
-                    </Text>
-                </Tooltip>
-            ),
+            title: t('docker.stack'),
+            dataIndex: 'stack',
+            key: 'stack',
+            width: 120,
+            sorter: (a: DockerNetwork, b: DockerNetwork) => (a.stack || '').localeCompare(b.stack || ''),
+            render: (stack: string) => stack ? <Text>{stack}</Text> : <Text type="secondary">-</Text>,
         },
         {
             title: t('docker.driver'),
             dataIndex: 'driver',
             key: 'driver',
-            render: (driver: string) => <Tag color="blue">{driver}</Tag>,
+            width: 100,
+            sorter: (a: DockerNetwork, b: DockerNetwork) => a.driver.localeCompare(b.driver),
+            render: (driver: string) => <Text>{driver}</Text>,
         },
         {
-            title: t('docker.scope'),
-            dataIndex: 'scope',
-            key: 'scope',
-            render: (scope: string) => <Tag color={scope === 'local' ? 'green' : 'orange'}>{scope}</Tag>,
+            title: t('docker.attachable'),
+            dataIndex: 'attachable',
+            key: 'attachable',
+            width: 100,
+            sorter: (a: DockerNetwork, b: DockerNetwork) => Number(a.attachable) - Number(b.attachable),
+            render: (attachable: boolean) => <Text>{attachable ? 'true' : 'false'}</Text>,
+        },
+        {
+            title: t('docker.ipam_driver'),
+            dataIndex: 'ipamDriver',
+            key: 'ipamDriver',
+            width: 110,
+            render: (ipamDriver: string) => <Text>{ipamDriver || 'default'}</Text>,
+        },
+        {
+            title: t('docker.ipv4_subnet'),
+            dataIndex: 'subnet',
+            key: 'subnet',
+            width: 140,
+            sorter: (a: DockerNetwork, b: DockerNetwork) => (a.subnet || '').localeCompare(b.subnet || ''),
+            render: (subnet: string) => subnet ? <Text code style={{ fontSize: 11 }}>{subnet}</Text> : <Text type="secondary">-</Text>,
+        },
+        {
+            title: t('docker.ipv4_gateway'),
+            dataIndex: 'gateway',
+            key: 'gateway',
+            width: 130,
+            sorter: (a: DockerNetwork, b: DockerNetwork) => (a.gateway || '').localeCompare(b.gateway || ''),
+            render: (gateway: string) => gateway ? <Text code style={{ fontSize: 11 }}>{gateway}</Text> : <Text type="secondary">-</Text>,
         },
     ];
+
+    // Toolbar buttons for bulk actions (Portainer style)
+    const ContainerToolbar = () => (
+        <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+            flexWrap: 'wrap',
+            gap: 12,
+        }}>
+            <Space wrap>
+                <Input
+                    placeholder={t('docker.search_containers')}
+                    prefix={<SearchOutlined style={{ color: '#8b8b8b' }} />}
+                    value={containerSearchText}
+                    onChange={(e) => setContainerSearchText(e.target.value)}
+                    allowClear
+                    style={{ width: 250 }}
+                />
+            </Space>
+            <Space wrap>
+                <Button
+                    icon={<PlayCircleOutlined />}
+                    onClick={() => handleBulkAction('start')}
+                    disabled={selectedContainers.length === 0}
+                >
+                    {t('docker.start')}
+                </Button>
+                <Button
+                    icon={<StopOutlined />}
+                    onClick={() => handleBulkAction('stop')}
+                    disabled={selectedContainers.length === 0}
+                >
+                    {t('docker.stop')}
+                </Button>
+                <Button
+                    icon={<PoweroffOutlined />}
+                    onClick={() => handleBulkAction('kill')}
+                    disabled={selectedContainers.length === 0}
+                >
+                    {t('docker.kill')}
+                </Button>
+                <Button
+                    icon={<ReloadOutlined />}
+                    onClick={() => handleBulkAction('restart')}
+                    disabled={selectedContainers.length === 0}
+                >
+                    {t('docker.restart')}
+                </Button>
+                <Button
+                    icon={<PauseCircleOutlined />}
+                    onClick={() => handleBulkAction('pause')}
+                    disabled={selectedContainers.length === 0}
+                >
+                    {t('docker.pause')}
+                </Button>
+                <Button
+                    icon={<CaretRightOutlined />}
+                    onClick={() => handleBulkAction('unpause')}
+                    disabled={selectedContainers.length === 0}
+                >
+                    {t('docker.resume')}
+                </Button>
+                <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={handleBulkRemove}
+                    disabled={selectedContainers.length === 0}
+                >
+                    {t('docker.remove')}
+                </Button>
+                <Button
+                    type="primary"
+                    icon={<ReloadOutlined />}
+                    onClick={loadContainers}
+                    loading={loading}
+                >
+                    {t('common.refresh')}
+                </Button>
+            </Space>
+        </div>
+    );
 
     return (
         <div style={{ padding: 16, height: '100%', overflow: 'auto' }}>
@@ -695,16 +1076,7 @@ export const DockerDashboard: React.FC = () => {
                             ),
                             children: (
                                 <>
-                                    <div style={{ marginBottom: 16, textAlign: 'right' }}>
-                                        <Button
-                                            type="primary"
-                                            icon={<ReloadOutlined />}
-                                            onClick={loadContainers}
-                                            loading={loading}
-                                        >
-                                            {t('common.refresh')}
-                                        </Button>
-                                    </div>
+                                    <ContainerToolbar />
                                     {loading && containers.length === 0 ? (
                                         <div style={{ textAlign: 'center', padding: 48 }}>
                                             <Spin size="large" />
@@ -712,19 +1084,30 @@ export const DockerDashboard: React.FC = () => {
                                                 {t('docker.loading_containers')}
                                             </Text>
                                         </div>
-                                    ) : containers.length === 0 ? (
+                                    ) : filteredContainers.length === 0 ? (
                                         <Empty
                                             image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                            description={t('docker.no_containers')}
+                                            description={containerSearchText ? t('docker.no_containers_match') : t('docker.no_containers')}
                                         />
                                     ) : (
                                         <Table
-                                            dataSource={containers}
+                                            dataSource={filteredContainers}
                                             columns={containerColumns}
                                             rowKey="id"
-                                            pagination={false}
                                             size="middle"
                                             loading={loading}
+                                            rowSelection={{
+                                                selectedRowKeys: selectedContainers,
+                                                onChange: (keys) => setSelectedContainers(keys as string[]),
+                                            }}
+                                            pagination={{
+                                                pageSize: 10,
+                                                showSizeChanger: true,
+                                                pageSizeOptions: ['10', '25', '50'],
+                                                showTotal: (total, range) =>
+                                                    t('docker.items_range', { start: range[0], end: range[1], total }),
+                                            }}
+                                            scroll={{ x: 1200 }}
                                         />
                                     )}
                                 </>
@@ -833,15 +1216,43 @@ export const DockerDashboard: React.FC = () => {
                             ),
                             children: (
                                 <>
-                                    <div style={{ marginBottom: 16, textAlign: 'right' }}>
-                                        <Button
-                                            type="primary"
-                                            icon={<ReloadOutlined />}
-                                            onClick={loadVolumes}
-                                            loading={volumesLoading}
-                                        >
-                                            {t('common.refresh')}
-                                        </Button>
+                                    {/* Toolbar */}
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        marginBottom: 16,
+                                        gap: 16,
+                                    }}>
+                                        <Input
+                                            placeholder={t('docker.search_volumes')}
+                                            prefix={<SearchOutlined style={{ color: '#8b8b8b' }} />}
+                                            value={volumeSearchText}
+                                            onChange={(e) => setVolumeSearchText(e.target.value)}
+                                            allowClear
+                                            style={{ maxWidth: 300 }}
+                                        />
+                                        <Space>
+                                            <Button
+                                                danger
+                                                icon={<DeleteOutlined />}
+                                                disabled={selectedVolumes.length === 0}
+                                                onClick={removeSelectedVolumes}
+                                            >
+                                                {t('docker.remove')} {selectedVolumes.length > 0 && `(${selectedVolumes.length})`}
+                                            </Button>
+                                            <Button
+                                                type="primary"
+                                                icon={<ReloadOutlined />}
+                                                onClick={() => {
+                                                    setSelectedVolumes([]);
+                                                    loadVolumes();
+                                                }}
+                                                loading={volumesLoading}
+                                            >
+                                                {t('common.refresh')}
+                                            </Button>
+                                        </Space>
                                     </div>
                                     {volumesLoading && volumes.length === 0 ? (
                                         <div style={{ textAlign: 'center', padding: 48 }}>
@@ -850,19 +1261,29 @@ export const DockerDashboard: React.FC = () => {
                                                 {t('docker.loading_volumes')}
                                             </Text>
                                         </div>
-                                    ) : volumes.length === 0 ? (
+                                    ) : filteredVolumes.length === 0 ? (
                                         <Empty
                                             image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                            description={t('docker.no_volumes')}
+                                            description={volumeSearchText ? t('docker.no_volumes_match') : t('docker.no_volumes')}
                                         />
                                     ) : (
                                         <Table
-                                            dataSource={volumes}
+                                            dataSource={filteredVolumes}
                                             columns={volumeColumns}
                                             rowKey="name"
-                                            pagination={false}
                                             size="middle"
                                             loading={volumesLoading}
+                                            rowSelection={{
+                                                selectedRowKeys: selectedVolumes,
+                                                onChange: (keys) => setSelectedVolumes(keys as string[]),
+                                            }}
+                                            pagination={{
+                                                pageSize: 10,
+                                                showSizeChanger: true,
+                                                pageSizeOptions: ['10', '25', '50'],
+                                                showTotal: (total, range) =>
+                                                    t('docker.items_range', { start: range[0], end: range[1], total }),
+                                            }}
                                         />
                                     )}
                                 </>
@@ -878,15 +1299,43 @@ export const DockerDashboard: React.FC = () => {
                             ),
                             children: (
                                 <>
-                                    <div style={{ marginBottom: 16, textAlign: 'right' }}>
-                                        <Button
-                                            type="primary"
-                                            icon={<ReloadOutlined />}
-                                            onClick={loadNetworks}
-                                            loading={networksLoading}
-                                        >
-                                            {t('common.refresh')}
-                                        </Button>
+                                    {/* Toolbar */}
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        marginBottom: 16,
+                                        gap: 16,
+                                    }}>
+                                        <Input
+                                            placeholder={t('docker.search_networks')}
+                                            prefix={<SearchOutlined style={{ color: '#8b8b8b' }} />}
+                                            value={networkSearchText}
+                                            onChange={(e) => setNetworkSearchText(e.target.value)}
+                                            allowClear
+                                            style={{ maxWidth: 300 }}
+                                        />
+                                        <Space>
+                                            <Button
+                                                danger
+                                                icon={<DeleteOutlined />}
+                                                disabled={selectedNetworks.length === 0}
+                                                onClick={removeSelectedNetworks}
+                                            >
+                                                {t('docker.remove')} {selectedNetworks.length > 0 && `(${selectedNetworks.length})`}
+                                            </Button>
+                                            <Button
+                                                type="primary"
+                                                icon={<ReloadOutlined />}
+                                                onClick={() => {
+                                                    setSelectedNetworks([]);
+                                                    loadNetworks();
+                                                }}
+                                                loading={networksLoading}
+                                            >
+                                                {t('common.refresh')}
+                                            </Button>
+                                        </Space>
                                     </div>
                                     {networksLoading && networks.length === 0 ? (
                                         <div style={{ textAlign: 'center', padding: 48 }}>
@@ -895,19 +1344,30 @@ export const DockerDashboard: React.FC = () => {
                                                 {t('docker.loading_networks')}
                                             </Text>
                                         </div>
-                                    ) : networks.length === 0 ? (
+                                    ) : filteredNetworks.length === 0 ? (
                                         <Empty
                                             image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                            description={t('docker.no_networks')}
+                                            description={networkSearchText ? t('docker.no_networks_match') : t('docker.no_networks')}
                                         />
                                     ) : (
                                         <Table
-                                            dataSource={networks}
+                                            dataSource={filteredNetworks}
                                             columns={networkColumns}
                                             rowKey="id"
-                                            pagination={false}
                                             size="middle"
                                             loading={networksLoading}
+                                            rowSelection={{
+                                                selectedRowKeys: selectedNetworks,
+                                                onChange: (keys) => setSelectedNetworks(keys as string[]),
+                                            }}
+                                            pagination={{
+                                                pageSize: 10,
+                                                showSizeChanger: true,
+                                                pageSizeOptions: ['10', '25', '50'],
+                                                showTotal: (total, range) =>
+                                                    t('docker.items_range', { start: range[0], end: range[1], total }),
+                                            }}
+                                            scroll={{ x: 1000 }}
                                         />
                                     )}
                                 </>
@@ -928,6 +1388,9 @@ export const DockerDashboard: React.FC = () => {
                 open={logsModalOpen}
                 onCancel={() => setLogsModalOpen(false)}
                 footer={[
+                    <Button key="refresh" icon={<ReloadOutlined />} onClick={refreshLogs} loading={logsLoading}>
+                        {t('common.refresh')}
+                    </Button>,
                     <Button key="close" onClick={() => setLogsModalOpen(false)}>
                         {t('common.close')}
                     </Button>
