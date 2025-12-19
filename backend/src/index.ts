@@ -460,6 +460,186 @@ const handlers: HandlerRegistry = {
         const { id } = args as { id: string };
         return await snippetManager.remove(id);
     },
+
+    // Docker handlers
+    'ssm:docker:check': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            // Check if docker command exists and is accessible
+            const result = await ssh.exec('docker --version 2>/dev/null && docker info --format "{{.Containers}}" 2>/dev/null');
+            if (result.stdout && result.stdout.includes('Docker version')) {
+                const lines = result.stdout.trim().split('\n');
+                const versionMatch = lines[0].match(/Docker version ([^,]+)/);
+                const containersCount = parseInt(lines[1]) || 0;
+                return {
+                    available: true,
+                    version: versionMatch ? versionMatch[1] : 'unknown',
+                    containers: containersCount,
+                };
+            }
+            return { available: false };
+        } catch {
+            return { available: false };
+        } finally {
+            ssh.end();
+        }
+    },
+
+    'ssm:docker:list': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            // List all containers with JSON format
+            const result = await ssh.exec('docker ps -a --format "{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.State}}|{{.Ports}}|{{.CreatedAt}}"');
+            const containers = result.stdout.trim().split('\n')
+                .filter(line => line.trim())
+                .map(line => {
+                    const [id, name, image, status, state, ports, created] = line.split('|');
+                    return {
+                        id: id || '',
+                        name: name || '',
+                        image: image || '',
+                        status: status || '',
+                        state: state || 'unknown',
+                        ports: ports || '',
+                        created: created || '',
+                    };
+                });
+            return containers;
+        } finally {
+            ssh.end();
+        }
+    },
+
+    'ssm:docker:action': async (args) => {
+        const { connectionId, containerId, action } = args as {
+            connectionId: string;
+            containerId: string;
+            action: 'start' | 'stop' | 'restart' | 'remove';
+        };
+
+        // Validate action
+        const validActions = ['start', 'stop', 'restart', 'remove'];
+        if (!validActions.includes(action)) {
+            throw new Error('Ação inválida');
+        }
+
+        // Validate container ID (alphanumeric only)
+        if (!/^[a-zA-Z0-9]+$/.test(containerId)) {
+            throw new Error('ID de container inválido');
+        }
+
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            const dockerAction = action === 'remove' ? 'rm -f' : action;
+            const result = await ssh.exec(`docker ${dockerAction} ${containerId}`);
+            if (result.stderr && !result.stdout) {
+                throw new Error(result.stderr);
+            }
+            return { success: true };
+        } finally {
+            ssh.end();
+        }
+    },
+
+    'ssm:docker:images': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            // List all images with formatted output
+            const result = await ssh.exec('docker images --format "{{.ID}}|{{.Repository}}|{{.Tag}}|{{.Size}}|{{.CreatedAt}}"');
+            const images = result.stdout.trim().split('\n')
+                .filter(line => line.trim())
+                .map(line => {
+                    const [id, repository, tag, size, created] = line.split('|');
+                    return {
+                        id: id || '',
+                        repository: repository || '',
+                        tag: tag || '',
+                        size: size || '',
+                        created: created || '',
+                    };
+                });
+            return images;
+        } finally {
+            ssh.end();
+        }
+    },
+
+    'ssm:docker:imageAction': async (args) => {
+        const { connectionId, imageId, action } = args as {
+            connectionId: string;
+            imageId: string;
+            action: 'remove';
+        };
+
+        // Validate action
+        if (action !== 'remove') {
+            throw new Error('Ação inválida');
+        }
+
+        // Validate image ID (alphanumeric and colons for tags)
+        if (!/^[a-zA-Z0-9:._\-/]+$/.test(imageId)) {
+            throw new Error('ID de imagem inválido');
+        }
+
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            const result = await ssh.exec(`docker rmi ${imageId}`);
+            if (result.stderr && !result.stdout) {
+                throw new Error(result.stderr);
+            }
+            return { success: true };
+        } finally {
+            ssh.end();
+        }
+    },
+
+    'ssm:docker:logs': async (args) => {
+        const { connectionId, containerId, tail = 200 } = args as {
+            connectionId: string;
+            containerId: string;
+            tail?: number;
+        };
+
+        // Validate container ID (alphanumeric only)
+        if (!/^[a-zA-Z0-9]+$/.test(containerId)) {
+            throw new Error('ID de container inválido');
+        }
+
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            const result = await ssh.exec(`docker logs --tail ${tail} --timestamps ${containerId} 2>&1`);
+            return result.stdout || result.stderr || '';
+        } finally {
+            ssh.end();
+        }
+    },
 };
 
 // Event broadcasting for SSE

@@ -5,7 +5,7 @@
  * Includes sidebar navigation, header, and content area.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     DashboardOutlined,
     CodeOutlined,
@@ -18,6 +18,7 @@ import {
     InfoCircleOutlined,
     BulbOutlined,
     GlobalOutlined,
+    ContainerOutlined,
 } from '@ant-design/icons';
 import { ProLayout, PageContainer } from '@ant-design/pro-components';
 import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select } from 'antd';
@@ -30,13 +31,14 @@ import { TerminalManager } from '../components/terminal/TerminalManager';
 import { FileManager } from '../components/files/FileManager';
 import { ProcessManager } from '../components/processes/ProcessManager';
 import { CronManager } from '../components/cron/CronManager';
+import { DockerDashboard } from '../components/docker/DockerDashboard';
 import { ConnectionModal } from '../components/modals/ConnectionModal';
 import type { Connection } from '../types';
 import splashScreen from '../assets/splash-screen.png';
 
 const { Text } = Typography;
 
-type TabKey = 'dashboard' | 'terminal' | 'files' | 'processes' | 'cron';
+type TabKey = 'dashboard' | 'terminal' | 'files' | 'processes' | 'cron' | 'docker';
 
 export const MainLayout: React.FC = () => {
     const { t, i18n } = useTranslation();
@@ -45,6 +47,7 @@ export const MainLayout: React.FC = () => {
         activeConnectionId,
         selectConnection,
         refreshConnections,
+        dockerAvailable,
     } = useConnection();
 
     const { themeMode, setThemeMode } = useTheme();
@@ -163,6 +166,8 @@ export const MainLayout: React.FC = () => {
                 return <ProcessManager />;
             case 'cron':
                 return <CronManager />;
+            case 'docker':
+                return <DockerDashboard />;
             default:
                 return <Dashboard />;
         }
@@ -292,6 +297,13 @@ export const MainLayout: React.FC = () => {
                                 icon: <ClockCircleOutlined />,
                                 key: 'cron',
                             },
+                            // Docker menu - only shown when Docker is available
+                            ...(dockerAvailable ? [{
+                                path: '/docker',
+                                name: t('common.docker'),
+                                icon: <ContainerOutlined />,
+                                key: 'docker',
+                            }] : []),
                         ],
                     }}
                     menuFooterRender={(props) => {

@@ -22,6 +22,10 @@ interface ConnectionContextType {
     // Metrics
     metrics: SystemMetrics | null;
 
+    // Docker
+    dockerAvailable: boolean;
+    dockerVersion: string | null;
+
     // Actions
     selectConnection: (id: string | null) => Promise<void>;
     refreshConnections: () => Promise<void>;
@@ -48,6 +52,8 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     const [isLoading, setIsLoading] = useState(false);
     const [snippets, setSnippets] = useState<Snippet[]>([]);
     const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
+    const [dockerAvailable, setDockerAvailable] = useState(false);
+    const [dockerVersion, setDockerVersion] = useState<string | null>(null);
 
     // Get active connection from list
     const activeConnection = connections.find(c => c.id === activeConnectionId) || null;
@@ -73,6 +79,21 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         }
     }, []);
 
+    // Check Docker availability
+    const checkDockerAvailability = useCallback(async (connectionId: string) => {
+        try {
+            console.log('[ConnectionContext] Checking Docker availability...');
+            const dockerInfo = await window.ssm.dockerCheckAvailable(connectionId);
+            setDockerAvailable(dockerInfo.available);
+            setDockerVersion(dockerInfo.version || null);
+            console.log('[ConnectionContext] Docker available:', dockerInfo.available, 'version:', dockerInfo.version);
+        } catch (error) {
+            console.error('Failed to check Docker availability:', error);
+            setDockerAvailable(false);
+            setDockerVersion(null);
+        }
+    }, []);
+
     // Select a connection
     const selectConnection = useCallback(async (id: string | null) => {
         // Stop previous metrics
@@ -82,18 +103,24 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
 
         setActiveConnectionId(id);
         setMetrics(null);
+        setDockerAvailable(false);
+        setDockerVersion(null);
 
         if (id) {
             setIsLoading(true);
             try {
+                // Start metrics
                 await window.ssm.startMetrics(id);
+
+                // Check Docker availability in background
+                checkDockerAvailability(id);
             } catch (error) {
                 console.error('Failed to start metrics:', error);
             } finally {
                 setIsLoading(false);
             }
         }
-    }, [activeConnectionId]);
+    }, [activeConnectionId, checkDockerAvailability]);
 
     // Subscribe to metrics updates
     useEffect(() => {
@@ -135,6 +162,8 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         isLoading,
         snippets,
         metrics,
+        dockerAvailable,
+        dockerVersion,
         selectConnection,
         refreshConnections,
         refreshSnippets,
@@ -146,3 +175,4 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         </ConnectionContext.Provider>
     );
 };
+

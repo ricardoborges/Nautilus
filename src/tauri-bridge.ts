@@ -14,7 +14,10 @@ import type {
     SFTPDownloadResult,
     SFTPUploadResult,
     Snippet,
-    TerminalDataPayload
+    TerminalDataPayload,
+    DockerContainer,
+    DockerImage,
+    DockerInfo
 } from './types';
 
 const BACKEND_URL = 'http://127.0.0.1:45678';
@@ -277,6 +280,25 @@ const ssm: SSMAPI = {
     snippetUpdate: (snippet: Snippet): Promise<void> => backendInvoke<void>('ssm:snippets:update', snippet as unknown as Record<string, unknown>),
 
     snippetRemove: (id: string): Promise<void> => backendInvoke<void>('ssm:snippets:remove', { id }),
+
+    // Docker methods
+    dockerCheckAvailable: (connectionId: string): Promise<DockerInfo> =>
+        backendInvoke<DockerInfo>('ssm:docker:check', { connectionId }),
+
+    dockerListContainers: (connectionId: string): Promise<DockerContainer[]> =>
+        backendInvoke<DockerContainer[]>('ssm:docker:list', { connectionId }),
+
+    dockerListImages: (connectionId: string): Promise<DockerImage[]> =>
+        backendInvoke<DockerImage[]>('ssm:docker:images', { connectionId }),
+
+    dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove'): Promise<void> =>
+        backendInvoke<void>('ssm:docker:action', { connectionId, containerId, action }),
+
+    dockerContainerLogs: (connectionId: string, containerId: string, tail?: number): Promise<string> =>
+        backendInvoke<string>('ssm:docker:logs', { connectionId, containerId, tail }),
+
+    dockerImageAction: (connectionId: string, imageId: string, action: 'remove'): Promise<void> =>
+        backendInvoke<void>('ssm:docker:imageAction', { connectionId, imageId, action }),
 
     // Window Controls
     win: {
