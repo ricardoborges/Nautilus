@@ -36,7 +36,9 @@
     "delete": "削除",
     "delete_connection": "接続を削除",
     "confirm_delete_connection": "接続「{{name}}」を削除してもよろしいですか？",
-    "docker": "Docker"
+    "docker": "Docker",
+    "copy": "コピー",
+    "copied": "クリップボードにコピーしました"
   },
   "splash": {
     "starting": "起動中...",
@@ -229,6 +231,9 @@
     "select_connection_desc": "Dockerコンテナを表示するには接続を選択してください。",
     "not_available": "Dockerが利用できません",
     "not_available_desc": "Dockerはこのサーバーにインストールされていないか、アクセスできません。",
+    "engine_not_found": "Docker Engineが見つかりません",
+    "engine_not_found_hint": "このサーバーにDockerがインストールされている場合、ユーザーがDockerにアクセスする権限を持っていることを確認してください。ユーザーを「docker」グループに追加するか、sudo権限を確認してください。",
+    "permission_denied": "Dockerへのアクセスが拒否されました",
     "containers": "コンテナ",
     "container_name": "名前",
     "image": "イメージ",
@@ -332,6 +337,17 @@
     "ipam_driver": "IPAMドライバー",
     "ipv4_subnet": "IPV4サブネット",
     "ipv4_gateway": "IPV4ゲートウェイ",
-    "system": "システム"
+    "system": "システム",
+    "stacks": "スタック",
+    "stack_name": "名前",
+    "type": "タイプ",
+    "control": "制御",
+    "limited_control_desc": "このスタックはPortainer外で作成されたため、管理オプションが制限されています",
+    "loading_stacks": "スタックを読み込み中...",
+    "no_stacks": "スタックが見つかりません",
+    "no_stacks_match": "一致するスタックがありません",
+    "stacks_load_error": "スタックの読み込みエラー",
+    "search_stacks": "検索...",
+    "stack_remove_not_implemented": "スタックの削除はまだ実装されていません"
   }
 }

@@ -192,6 +192,13 @@ export interface DockerNetwork {
     isSystem?: boolean;
 }
 
+export interface DockerStack {
+    name: string;
+    type: string;
+    control: string;
+    created: string;
+}
+
 export interface DockerInfo {
     available: boolean;
     version?: string;
@@ -270,6 +277,7 @@ export interface SSMAPI {
     dockerListImages: (connectionId: string) => Promise<DockerImage[]>;
     dockerListVolumes: (connectionId: string) => Promise<DockerVolume[]>;
     dockerListNetworks: (connectionId: string) => Promise<DockerNetwork[]>;
+    dockerListStacks: (connectionId: string) => Promise<DockerStack[]>;
     dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill') => Promise<void>;
     dockerContainerLogs: (connectionId: string, containerId: string, tail?: number) => Promise<string>;
     dockerImageAction: (connectionId: string, imageId: string, action: 'remove') => Promise<void>;

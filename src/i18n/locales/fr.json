@@ -36,7 +36,9 @@
     "delete": "Supprimer",
     "delete_connection": "Supprimer Connexion",
     "confirm_delete_connection": "Êtes-vous sûr de vouloir supprimer la connexion \"{{name}}\" ?",
-    "docker": "Docker"
+    "docker": "Docker",
+    "copy": "Copier",
+    "copied": "Copié dans le presse-papiers"
   },
   "splash": {
     "starting": "Démarrage...",
@@ -229,6 +231,9 @@
     "select_connection_desc": "Sélectionnez une connexion pour voir les conteneurs Docker.",
     "not_available": "Docker non disponible",
     "not_available_desc": "Docker n'est pas installé ou n'est pas accessible sur ce serveur.",
+    "engine_not_found": "Docker Engine non trouvé",
+    "engine_not_found_hint": "Si ce serveur dispose de Docker, vérifiez que l'utilisateur a les permissions pour accéder à Docker. Essayez d'ajouter l'utilisateur au groupe 'docker' ou vérifiez les privilèges sudo.",
+    "permission_denied": "Accès Docker refusé",
     "containers": "Conteneurs",
     "container_name": "Nom",
     "image": "Image",
@@ -332,6 +337,17 @@
     "ipam_driver": "Pilote IPAM",
     "ipv4_subnet": "Sous-réseau IPV4",
     "ipv4_gateway": "Passerelle IPV4",
-    "system": "Système"
+    "system": "Système",
+    "stacks": "Stacks",
+    "stack_name": "Nom",
+    "type": "Type",
+    "control": "Contrôle",
+    "limited_control_desc": "Ce stack a été créé en dehors de Portainer, options de gestion limitées",
+    "loading_stacks": "Chargement des stacks...",
+    "no_stacks": "Aucun stack trouvé",
+    "no_stacks_match": "Aucun stack ne correspond",
+    "stacks_load_error": "Erreur lors du chargement des stacks",
+    "search_stacks": "Rechercher...",
+    "stack_remove_not_implemented": "La suppression de stacks n'est pas encore implémentée"
   }
 }

@@ -470,12 +470,21 @@ const handlers: HandlerRegistry = {
         const ssh = new SSHClient(authConfig);
         try {
             await ssh.connect();
-            // Check if docker command exists and is accessible
-            const result = await ssh.exec('docker --version 2>/dev/null && docker info --format "{{.Containers}}" 2>/dev/null');
-            if (result.stdout && result.stdout.includes('Docker version')) {
-                const lines = result.stdout.trim().split('\n');
-                const versionMatch = lines[0].match(/Docker version ([^,]+)/);
-                const containersCount = parseInt(lines[1]) || 0;
+
+            // Check if docker command exists
+            const versionResult = await ssh.exec('docker --version 2>/dev/null');
+            if (versionResult.stdout && versionResult.stdout.includes('Docker version')) {
+                const versionMatch = versionResult.stdout.match(/Docker version ([^,]+)/);
+
+                // Try to get containers count
+                let containersCount = 0;
+                try {
+                    const infoResult = await ssh.exec('docker info --format "{{.Containers}}" 2>/dev/null');
+                    containersCount = parseInt(infoResult.stdout.trim()) || 0;
+                } catch {
+                    // Ignore - user may not have permission to run docker info
+                }
+
                 return {
                     available: true,
                     version: versionMatch ? versionMatch[1] : 'unknown',
@@ -779,6 +788,54 @@ const handlers: HandlerRegistry = {
                         };
                     });
             }
+        } finally {
+            ssh.end();
+        }
+    },
+
+    'ssm:docker:stacks': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+
+            // Get all unique compose project names from containers
+            const containersResult = await ssh.exec('docker ps -a --format "{{.Labels}}" 2>/dev/null || echo ""');
+            const projectsMap = new Map<string, { name: string; created: string }>();
+
+            const lines = containersResult.stdout.trim().split('\n').filter(line => line.trim());
+
+            for (const line of lines) {
+                // Parse labels to find com.docker.compose.project
+                const projectMatch = line.match(/com\.docker\.compose\.project=([^,]+)/);
+                if (projectMatch) {
+                    const projectName = projectMatch[1];
+                    if (!projectsMap.has(projectName)) {
+                        // Get the creation time of the oldest container in the stack
+                        const createdResult = await ssh.exec(
+                            `docker ps -a --filter "label=com.docker.compose.project=${projectName}" --format "{{.CreatedAt}}" | head -1 2>/dev/null || echo ""`
+                        );
+                        const createdAt = createdResult.stdout.trim() || '';
+                        projectsMap.set(projectName, {
+                            name: projectName,
+                            created: createdAt,
+                        });
+                    }
+                }
+            }
+
+            // Convert map to array
+            const stacks = Array.from(projectsMap.values()).map(stack => ({
+                name: stack.name,
+                type: 'Compose',
+                control: 'Limited',
+                created: stack.created,
+            }));
+
+            return stacks;
         } finally {
             ssh.end();
         }

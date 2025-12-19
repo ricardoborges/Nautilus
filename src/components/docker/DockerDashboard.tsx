@@ -51,8 +51,10 @@ import {
     SyncOutlined,
     CaretRightOutlined,
     PoweroffOutlined,
+    AppstoreOutlined,
+    ContainerOutlined,
 } from '@ant-design/icons';
-import type { DockerContainer, DockerImage, DockerVolume, DockerNetwork } from '../../types';
+import type { DockerContainer, DockerImage, DockerVolume, DockerNetwork, DockerStack } from '../../types';
 
 const { Text, Title } = Typography;
 
@@ -313,12 +315,28 @@ export const DockerDashboard: React.FC = () => {
     const [selectedNetworks, setSelectedNetworks] = useState<string[]>([]);
     const [networkSearchText, setNetworkSearchText] = useState('');
 
+    // Stacks state
+    const [stacks, setStacks] = useState<DockerStack[]>([]);
+    const [stacksLoading, setStacksLoading] = useState(false);
+    const [selectedStacks, setSelectedStacks] = useState<string[]>([]);
+    const [stackSearchText, setStackSearchText] = useState('');
+
+    // Docker permission error state
+    const [dockerPermissionError, setDockerPermissionError] = useState(false);
+
     // Logs modal state
     const [logsModalOpen, setLogsModalOpen] = useState(false);
     const [logsContent, setLogsContent] = useState('');
     const [logsLoading, setLogsLoading] = useState(false);
     const [logsContainerName, setLogsContainerName] = useState('');
     const [logsContainerId, setLogsContainerId] = useState('');
+
+    // Helper to check for Docker permission errors
+    const isDockerPermissionError = (error: unknown): boolean => {
+        const errorMessage = String(error);
+        return errorMessage.toLowerCase().includes('permission denied') &&
+            errorMessage.toLowerCase().includes('docker');
+    };
 
     // Get host IP for port links
     const hostIp = activeConnection?.host || 'localhost';
@@ -330,9 +348,14 @@ export const DockerDashboard: React.FC = () => {
         try {
             const result = await window.ssm.dockerListContainers(activeConnectionId);
             setContainers(result);
+            setDockerPermissionError(false);
         } catch (error) {
             console.error('Failed to load containers:', error);
-            message.error(t('docker.load_error'));
+            if (isDockerPermissionError(error)) {
+                setDockerPermissionError(true);
+            } else {
+                message.error(t('docker.load_error'));
+            }
         } finally {
             setLoading(false);
         }
@@ -347,7 +370,11 @@ export const DockerDashboard: React.FC = () => {
             setImages(result);
         } catch (error) {
             console.error('Failed to load images:', error);
-            message.error(t('docker.images_load_error'));
+            if (isDockerPermissionError(error)) {
+                setDockerPermissionError(true);
+            } else {
+                message.error(t('docker.images_load_error'));
+            }
         } finally {
             setImagesLoading(false);
         }
@@ -362,7 +389,11 @@ export const DockerDashboard: React.FC = () => {
             setVolumes(result);
         } catch (error) {
             console.error('Failed to load volumes:', error);
-            message.error(t('docker.volumes_load_error'));
+            if (isDockerPermissionError(error)) {
+                setDockerPermissionError(true);
+            } else {
+                message.error(t('docker.volumes_load_error'));
+            }
         } finally {
             setVolumesLoading(false);
         }
@@ -377,9 +408,32 @@ export const DockerDashboard: React.FC = () => {
             setNetworks(result);
         } catch (error) {
             console.error('Failed to load networks:', error);
-            message.error(t('docker.networks_load_error'));
+            if (isDockerPermissionError(error)) {
+                setDockerPermissionError(true);
+            } else {
+                message.error(t('docker.networks_load_error'));
+            }
         } finally {
             setNetworksLoading(false);
+        }
+    }, [activeConnectionId, t]);
+
+    const loadStacks = useCallback(async () => {
+        if (!activeConnectionId) return;
+
+        setStacksLoading(true);
+        try {
+            const data = await window.ssm.dockerListStacks(activeConnectionId);
+            setStacks(data);
+        } catch (error) {
+            console.error('Failed to load stacks:', error);
+            if (isDockerPermissionError(error)) {
+                setDockerPermissionError(true);
+            } else {
+                message.error(t('docker.stacks_load_error'));
+            }
+        } finally {
+            setStacksLoading(false);
         }
     }, [activeConnectionId, t]);
 
@@ -389,8 +443,9 @@ export const DockerDashboard: React.FC = () => {
             loadImages();
             loadVolumes();
             loadNetworks();
+            loadStacks();
         }
-    }, [activeConnectionId, dockerAvailable, loadContainers, loadImages, loadVolumes, loadNetworks]);
+    }, [activeConnectionId, dockerAvailable, loadContainers, loadImages, loadVolumes, loadNetworks, loadStacks]);
 
     const handleAction = async (containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill') => {
         if (!activeConnectionId) return;
@@ -565,6 +620,23 @@ export const DockerDashboard: React.FC = () => {
         setSelectedNetworks([]);
     };
 
+    // Filtered stacks based on search
+    const filteredStacks = useMemo(() => {
+        if (!stackSearchText) return stacks;
+        const search = stackSearchText.toLowerCase();
+        return stacks.filter(stack =>
+            stack.name.toLowerCase().includes(search) ||
+            stack.type.toLowerCase().includes(search)
+        );
+    }, [stacks, stackSearchText]);
+
+    // Handle bulk remove selected stacks (placeholder - would need backend support)
+    const removeSelectedStacks = async () => {
+        if (selectedStacks.length === 0) return;
+        message.info(t('docker.stack_remove_not_implemented'));
+        setSelectedStacks([]);
+    };
+
     const openLogs = async (containerId: string, containerName: string) => {
         if (!activeConnectionId) return;
 
@@ -621,7 +693,18 @@ export const DockerDashboard: React.FC = () => {
         );
     }
 
-    if (!dockerAvailable) {
+    if (!dockerAvailable || dockerPermissionError) {
+        const username = activeConnection?.user || 'your-user';
+        const commands = [
+            `sudo usermod -aG docker ${username}`,
+            'newgrp docker',
+        ];
+
+        const copyCommands = () => {
+            navigator.clipboard.writeText(commands.join('\n'));
+            message.success(t('common.copied'));
+        };
+
         return (
             <div style={{
                 display: 'flex',
@@ -630,14 +713,57 @@ export const DockerDashboard: React.FC = () => {
                 justifyContent: 'center',
                 height: '100%',
                 padding: 48,
+                maxWidth: 600,
+                margin: '0 auto',
+                textAlign: 'center',
             }}>
-                <ExclamationCircleOutlined style={{ fontSize: 64, color: '#faad14', marginBottom: 24 }} />
+                <ContainerOutlined style={{ fontSize: 64, color: '#8b8b8b', marginBottom: 24 }} />
                 <Title level={4} type="secondary">
-                    {t('docker.not_available')}
+                    {dockerPermissionError ? t('docker.permission_denied') : t('docker.engine_not_found')}
                 </Title>
-                <Text type="secondary">
-                    {t('docker.not_available_desc')}
+                <Text type="secondary" style={{ marginTop: 16, marginBottom: 24 }}>
+                    {t('docker.engine_not_found_hint')}
                 </Text>
+
+                {/* Terminal-style command card */}
+                <div style={{
+                    width: '100%',
+                    maxWidth: 500,
+                    background: '#1e1e1e',
+                    border: '1px solid #333',
+                    borderRadius: 8,
+                    position: 'relative',
+                }}>
+                    {/* Copy button */}
+                    <Tooltip title={t('common.copy')}>
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<FileTextOutlined style={{ color: '#888' }} />}
+                            onClick={copyCommands}
+                            style={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                            }}
+                        />
+                    </Tooltip>
+                    {/* Terminal content */}
+                    <div style={{
+                        padding: '16px 40px 16px 16px',
+                        fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                        fontSize: 13,
+                        lineHeight: 1.8,
+                        textAlign: 'left',
+                    }}>
+                        {commands.map((cmd, index) => (
+                            <div key={index}>
+                                <Text style={{ color: '#27ca3f' }}>$ </Text>
+                                <Text style={{ color: '#e0e0e0' }}>{cmd}</Text>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         );
     }
@@ -649,6 +775,7 @@ export const DockerDashboard: React.FC = () => {
     const imagesCount = images.length;
     const volumesCount = volumes.length;
     const networksCount = networks.length;
+    const stacksCount = stacks.length;
 
     // Format created date to be more readable
     const formatCreatedDate = (created: string): string => {
@@ -929,6 +1056,54 @@ export const DockerDashboard: React.FC = () => {
             width: 130,
             sorter: (a: DockerNetwork, b: DockerNetwork) => (a.gateway || '').localeCompare(b.gateway || ''),
             render: (gateway: string) => gateway ? <Text code style={{ fontSize: 11 }}>{gateway}</Text> : <Text type="secondary">-</Text>,
+        },
+    ];
+
+    const stackColumns = [
+        {
+            title: t('docker.stack_name'),
+            dataIndex: 'name',
+            key: 'name',
+            sorter: (a: DockerStack, b: DockerStack) => a.name.localeCompare(b.name),
+            render: (name: string) => (
+                <Text strong style={{ color: token.colorPrimary }}>
+                    {name}
+                </Text>
+            ),
+        },
+        {
+            title: t('docker.type'),
+            dataIndex: 'type',
+            key: 'type',
+            width: 120,
+            sorter: (a: DockerStack, b: DockerStack) => a.type.localeCompare(b.type),
+            render: (type: string) => <Text>{type}</Text>,
+        },
+        {
+            title: t('docker.control'),
+            dataIndex: 'control',
+            key: 'control',
+            width: 120,
+            render: (control: string) => (
+                <Space size={4}>
+                    <Text>{control}</Text>
+                    <Tooltip title={t('docker.limited_control_desc')}>
+                        <ExclamationCircleOutlined style={{ color: '#faad14', fontSize: 12 }} />
+                    </Tooltip>
+                </Space>
+            ),
+        },
+        {
+            title: t('docker.created'),
+            dataIndex: 'created',
+            key: 'created',
+            width: 180,
+            sorter: (a: DockerStack, b: DockerStack) => a.created.localeCompare(b.created),
+            render: (created: string) => created ? (
+                <Text style={{ whiteSpace: 'nowrap' }}>{formatCreatedDate(created)}</Text>
+            ) : (
+                <Text type="secondary">-</Text>
+            ),
         },
     ];
 
@@ -1368,6 +1543,89 @@ export const DockerDashboard: React.FC = () => {
                                                     t('docker.items_range', { start: range[0], end: range[1], total }),
                                             }}
                                             scroll={{ x: 1000 }}
+                                        />
+                                    )}
+                                </>
+                            ),
+                        },
+                        {
+                            key: 'stacks',
+                            label: (
+                                <Space>
+                                    <AppstoreOutlined />
+                                    {t('docker.stacks')} ({stacksCount})
+                                </Space>
+                            ),
+                            children: (
+                                <>
+                                    {/* Toolbar */}
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        marginBottom: 16,
+                                        gap: 16,
+                                    }}>
+                                        <Input
+                                            placeholder={t('docker.search_stacks')}
+                                            prefix={<SearchOutlined style={{ color: '#8b8b8b' }} />}
+                                            value={stackSearchText}
+                                            onChange={(e) => setStackSearchText(e.target.value)}
+                                            allowClear
+                                            style={{ maxWidth: 300 }}
+                                        />
+                                        <Space>
+                                            <Button
+                                                danger
+                                                icon={<DeleteOutlined />}
+                                                disabled={selectedStacks.length === 0}
+                                                onClick={removeSelectedStacks}
+                                            >
+                                                {t('docker.remove')} {selectedStacks.length > 0 && `(${selectedStacks.length})`}
+                                            </Button>
+                                            <Button
+                                                type="primary"
+                                                icon={<ReloadOutlined />}
+                                                onClick={() => {
+                                                    setSelectedStacks([]);
+                                                    loadStacks();
+                                                }}
+                                                loading={stacksLoading}
+                                            >
+                                                {t('common.refresh')}
+                                            </Button>
+                                        </Space>
+                                    </div>
+                                    {stacksLoading && stacks.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: 48 }}>
+                                            <Spin size="large" />
+                                            <Text type="secondary" style={{ display: 'block', marginTop: 16 }}>
+                                                {t('docker.loading_stacks')}
+                                            </Text>
+                                        </div>
+                                    ) : filteredStacks.length === 0 ? (
+                                        <Empty
+                                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                            description={stackSearchText ? t('docker.no_stacks_match') : t('docker.no_stacks')}
+                                        />
+                                    ) : (
+                                        <Table
+                                            dataSource={filteredStacks}
+                                            columns={stackColumns}
+                                            rowKey="name"
+                                            size="middle"
+                                            loading={stacksLoading}
+                                            rowSelection={{
+                                                selectedRowKeys: selectedStacks,
+                                                onChange: (keys) => setSelectedStacks(keys as string[]),
+                                            }}
+                                            pagination={{
+                                                pageSize: 10,
+                                                showSizeChanger: true,
+                                                pageSizeOptions: ['10', '25', '50'],
+                                                showTotal: (total, range) =>
+                                                    t('docker.items_range', { start: range[0], end: range[1], total }),
+                                            }}
                                         />
                                     )}
                                 </>

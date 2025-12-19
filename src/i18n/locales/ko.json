@@ -36,7 +36,9 @@
     "delete": "삭제",
     "delete_connection": "연결 삭제",
     "confirm_delete_connection": "연결 \"{{name}}\"을(를) 삭제하시겠습니까?",
-    "docker": "Docker"
+    "docker": "Docker",
+    "copy": "복사",
+    "copied": "클립보드에 복사됨"
   },
   "splash": {
     "starting": "시작 중...",
@@ -229,6 +231,9 @@
     "select_connection_desc": "Docker 컨테이너를 보려면 연결을 선택하세요.",
     "not_available": "Docker를 사용할 수 없음",
     "not_available_desc": "Docker가 이 서버에 설치되지 않았거나 접근할 수 없습니다.",
+    "engine_not_found": "Docker Engine을 찾을 수 없음",
+    "engine_not_found_hint": "이 서버에 Docker가 설치되어 있다면, 사용자가 Docker에 접근할 권한이 있는지 확인하세요. 사용자를 'docker' 그룹에 추가하거나 sudo 권한을 확인해 보세요.",
+    "permission_denied": "Docker 접근 거부됨",
     "containers": "컨테이너",
     "container_name": "이름",
     "image": "이미지",
@@ -332,6 +337,17 @@
     "ipam_driver": "IPAM 드라이버",
     "ipv4_subnet": "IPV4 서브넷",
     "ipv4_gateway": "IPV4 게이트웨이",
-    "system": "시스템"
+    "system": "시스템",
+    "stacks": "스택",
+    "stack_name": "이름",
+    "type": "유형",
+    "control": "제어",
+    "limited_control_desc": "이 스택은 Portainer 외부에서 생성되어 관리 옵션이 제한됩니다",
+    "loading_stacks": "스택 로딩 중...",
+    "no_stacks": "스택을 찾을 수 없음",
+    "no_stacks_match": "일치하는 스택이 없습니다",
+    "stacks_load_error": "스택 로딩 오류",
+    "search_stacks": "검색...",
+    "stack_remove_not_implemented": "스택 삭제가 아직 구현되지 않았습니다"
   }
 }

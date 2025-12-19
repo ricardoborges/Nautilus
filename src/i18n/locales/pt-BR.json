@@ -41,7 +41,9 @@
     "no_results": "Nenhum resultado encontrado",
     "error_loading_snippets": "Erro ao carregar snippets",
     "deleted_success": "Excluído com sucesso",
-    "docker": "Docker"
+    "docker": "Docker",
+    "copy": "Copiar",
+    "copied": "Copiado para a área de transferência"
   },
   "splash": {
     "starting": "Iniciando...",
@@ -238,6 +240,9 @@
     "select_connection_desc": "Selecione uma conexão para visualizar os containers Docker.",
     "not_available": "Docker não disponível",
     "not_available_desc": "O Docker não está instalado ou não está acessível neste servidor.",
+    "engine_not_found": "Docker Engine não identificado",
+    "engine_not_found_hint": "Se este servidor possui Docker instalado, verifique se o usuário tem permissão para acessar o Docker. Tente adicionar o usuário ao grupo 'docker' ou verifique os privilégios sudo.",
+    "permission_denied": "Acesso ao Docker negado",
     "containers": "Containers",
     "container_name": "Nome",
     "image": "Imagem",
@@ -341,6 +346,17 @@
     "ipam_driver": "Driver IPAM",
     "ipv4_subnet": "Sub-rede IPV4",
     "ipv4_gateway": "Gateway IPV4",
-    "system": "Sistema"
+    "system": "Sistema",
+    "stacks": "Stacks",
+    "stack_name": "Nome",
+    "type": "Tipo",
+    "control": "Controle",
+    "limited_control_desc": "Este stack foi criado fora do Portainer, opções limitadas de gerenciamento",
+    "loading_stacks": "Carregando stacks...",
+    "no_stacks": "Nenhum stack encontrado",
+    "no_stacks_match": "Nenhum stack corresponde à busca",
+    "stacks_load_error": "Erro ao carregar stacks",
+    "search_stacks": "Buscar...",
+    "stack_remove_not_implemented": "Remoção de stacks ainda não implementada"
   }
 }

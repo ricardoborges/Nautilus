@@ -36,7 +36,9 @@
     "delete": "删除",
     "delete_connection": "删除连接",
     "confirm_delete_connection": "确定要删除连接\"{{name}}\"吗？",
-    "docker": "Docker"
+    "docker": "Docker",
+    "copy": "复制",
+    "copied": "已复制到剪贴板"
   },
   "splash": {
     "starting": "启动中...",
@@ -229,6 +231,9 @@
     "select_connection_desc": "选择连接以查看 Docker 容器。",
     "not_available": "Docker 不可用",
     "not_available_desc": "Docker 未在此服务器上安装或无法访问。",
+    "engine_not_found": "未找到 Docker Engine",
+    "engine_not_found_hint": "如果此服务器已安装 Docker，请确保用户有权限访问 Docker。尝试将用户添加到 'docker' 组或验证 sudo 权限。",
+    "permission_denied": "Docker 访问被拒绝",
     "containers": "容器",
     "container_name": "名称",
     "image": "镜像",
@@ -332,6 +337,17 @@
     "ipam_driver": "IPAM驱动",
     "ipv4_subnet": "IPV4子网",
     "ipv4_gateway": "IPV4网关",
-    "system": "系统"
+    "system": "系统",
+    "stacks": "堆栈",
+    "stack_name": "名称",
+    "type": "类型",
+    "control": "控制",
+    "limited_control_desc": "此堆栈在Portainer外部创建，管理选项有限",
+    "loading_stacks": "加载堆栈中...",
+    "no_stacks": "未找到堆栈",
+    "no_stacks_match": "没有匹配的堆栈",
+    "stacks_load_error": "加载堆栈错误",
+    "search_stacks": "搜索...",
+    "stack_remove_not_implemented": "堆栈删除功能尚未实现"
   }
 }

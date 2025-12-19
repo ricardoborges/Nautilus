@@ -19,6 +19,7 @@ import type {
     DockerImage,
     DockerVolume,
     DockerNetwork,
+    DockerStack,
     DockerInfo
 } from './types';
 
@@ -298,6 +299,9 @@ const ssm: SSMAPI = {
 
     dockerListNetworks: (connectionId: string): Promise<DockerNetwork[]> =>
         backendInvoke<DockerNetwork[]>('ssm:docker:networks', { connectionId }),
+
+    dockerListStacks: (connectionId: string): Promise<DockerStack[]> =>
+        backendInvoke<DockerStack[]>('ssm:docker:stacks', { connectionId }),
 
     dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill'): Promise<void> =>
         backendInvoke<void>('ssm:docker:action', { connectionId, containerId, action }),

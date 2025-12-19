@@ -47,7 +47,6 @@ export const MainLayout: React.FC = () => {
         activeConnectionId,
         selectConnection,
         refreshConnections,
-        dockerAvailable,
     } = useConnection();
 
     const { themeMode, setThemeMode } = useTheme();
@@ -297,13 +296,13 @@ export const MainLayout: React.FC = () => {
                                 icon: <ClockCircleOutlined />,
                                 key: 'cron',
                             },
-                            // Docker menu - only shown when Docker is available
-                            ...(dockerAvailable ? [{
+                            // Docker menu - always visible
+                            {
                                 path: '/docker',
                                 name: t('common.docker'),
                                 icon: <ContainerOutlined />,
                                 key: 'docker',
-                            }] : []),
+                            },
                         ],
                     }}
                     menuFooterRender={(props) => {
