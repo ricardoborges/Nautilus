@@ -640,6 +640,58 @@ const handlers: HandlerRegistry = {
             ssh.end();
         }
     },
+
+    'ssm:docker:volumes': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            const result = await ssh.exec('docker volume ls --format "{{.Name}}|{{.Driver}}|{{.Mountpoint}}"');
+            const volumes = result.stdout.trim().split('\n')
+                .filter(line => line.trim())
+                .map(line => {
+                    const [name, driver, mountpoint] = line.split('|');
+                    return {
+                        name: name || '',
+                        driver: driver || '',
+                        mountpoint: mountpoint || '',
+                        created: '',
+                    };
+                });
+            return volumes;
+        } finally {
+            ssh.end();
+        }
+    },
+
+    'ssm:docker:networks': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            const result = await ssh.exec('docker network ls --format "{{.ID}}|{{.Name}}|{{.Driver}}|{{.Scope}}"');
+            const networks = result.stdout.trim().split('\n')
+                .filter(line => line.trim())
+                .map(line => {
+                    const [id, name, driver, scope] = line.split('|');
+                    return {
+                        id: id || '',
+                        name: name || '',
+                        driver: driver || '',
+                        scope: scope || '',
+                    };
+                });
+            return networks;
+        } finally {
+            ssh.end();
+        }
+    },
 };
 
 // Event broadcasting for SSE

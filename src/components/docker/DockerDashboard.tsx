@@ -24,6 +24,8 @@ import {
     Statistic,
     Modal,
     Tabs,
+    Input,
+    Popconfirm,
 } from 'antd';
 import { ProCard } from '@ant-design/pro-components';
 import {
@@ -38,8 +40,11 @@ import {
     ExclamationCircleOutlined,
     PictureOutlined,
     FileTextOutlined,
+    DatabaseOutlined,
+    GlobalOutlined,
+    SearchOutlined,
 } from '@ant-design/icons';
-import type { DockerContainer, DockerImage } from '../../types';
+import type { DockerContainer, DockerImage, DockerVolume, DockerNetwork } from '../../types';
 
 const { Text, Title } = Typography;
 
@@ -48,9 +53,17 @@ export const DockerDashboard: React.FC = () => {
     const { activeConnectionId, dockerAvailable } = useConnection();
     const [containers, setContainers] = useState<DockerContainer[]>([]);
     const [images, setImages] = useState<DockerImage[]>([]);
+    const [volumes, setVolumes] = useState<DockerVolume[]>([]);
+    const [networks, setNetworks] = useState<DockerNetwork[]>([]);
     const [loading, setLoading] = useState(false);
     const [imagesLoading, setImagesLoading] = useState(false);
+    const [volumesLoading, setVolumesLoading] = useState(false);
+    const [networksLoading, setNetworksLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+    // Image selection and search state
+    const [selectedImages, setSelectedImages] = useState<string[]>([]);
+    const [imageSearchText, setImageSearchText] = useState('');
 
     // Logs modal state
     const [logsModalOpen, setLogsModalOpen] = useState(false);
@@ -88,12 +101,44 @@ export const DockerDashboard: React.FC = () => {
         }
     }, [activeConnectionId, t]);
 
+    const loadVolumes = useCallback(async () => {
+        if (!activeConnectionId) return;
+
+        setVolumesLoading(true);
+        try {
+            const result = await window.ssm.dockerListVolumes(activeConnectionId);
+            setVolumes(result);
+        } catch (error) {
+            console.error('Failed to load volumes:', error);
+            message.error(t('docker.volumes_load_error'));
+        } finally {
+            setVolumesLoading(false);
+        }
+    }, [activeConnectionId, t]);
+
+    const loadNetworks = useCallback(async () => {
+        if (!activeConnectionId) return;
+
+        setNetworksLoading(true);
+        try {
+            const result = await window.ssm.dockerListNetworks(activeConnectionId);
+            setNetworks(result);
+        } catch (error) {
+            console.error('Failed to load networks:', error);
+            message.error(t('docker.networks_load_error'));
+        } finally {
+            setNetworksLoading(false);
+        }
+    }, [activeConnectionId, t]);
+
     useEffect(() => {
         if (activeConnectionId && dockerAvailable) {
             loadContainers();
             loadImages();
+            loadVolumes();
+            loadNetworks();
         }
-    }, [activeConnectionId, dockerAvailable, loadContainers, loadImages]);
+    }, [activeConnectionId, dockerAvailable, loadContainers, loadImages, loadVolumes, loadNetworks]);
 
     const handleAction = async (containerId: string, action: 'start' | 'stop' | 'restart' | 'remove') => {
         if (!activeConnectionId) return;
@@ -147,6 +192,46 @@ export const DockerDashboard: React.FC = () => {
             cancelText: t('common.cancel'),
             onOk: () => handleImageAction(imageId, 'remove'),
         });
+    };
+
+    // Filtered images based on search
+    const filteredImages = images.filter(img => {
+        if (!imageSearchText) return true;
+        const search = imageSearchText.toLowerCase();
+        return (
+            img.id.toLowerCase().includes(search) ||
+            img.repository.toLowerCase().includes(search) ||
+            img.tag.toLowerCase().includes(search)
+        );
+    });
+
+    // Handle bulk remove selected images
+    const removeSelectedImages = async () => {
+        if (!activeConnectionId || selectedImages.length === 0) return;
+
+        setActionLoading('bulk');
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const imageId of selectedImages) {
+            try {
+                await window.ssm.dockerImageAction(activeConnectionId, imageId, 'remove');
+                successCount++;
+            } catch {
+                errorCount++;
+            }
+        }
+
+        setSelectedImages([]);
+        setActionLoading(null);
+        await loadImages();
+
+        if (successCount > 0) {
+            message.success(t('docker.images_removed_count', { count: successCount }));
+        }
+        if (errorCount > 0) {
+            message.warning(t('docker.images_remove_errors', { count: errorCount }));
+        }
     };
 
     const openLogs = async (containerId: string, containerName: string) => {
@@ -256,6 +341,8 @@ export const DockerDashboard: React.FC = () => {
     const stoppedCount = containers.filter(c => c.state === 'exited').length;
     const totalCount = containers.length;
     const imagesCount = images.length;
+    const volumesCount = volumes.length;
+    const networksCount = networks.length;
 
     const containerColumns = [
         {
@@ -418,19 +505,111 @@ export const DockerDashboard: React.FC = () => {
 
     const imageColumns = [
         {
-            title: t('docker.repository'),
-            dataIndex: 'repository',
-            key: 'repository',
-            render: (repo: string) => <Text strong>{repo}</Text>,
-        },
-        {
-            title: t('docker.tag'),
-            dataIndex: 'tag',
-            key: 'tag',
-            render: (tag: string) => <Tag color="blue">{tag}</Tag>,
-        },
-        {
             title: t('docker.image_id'),
+            dataIndex: 'id',
+            key: 'id',
+            sorter: (a: DockerImage, b: DockerImage) => a.id.localeCompare(b.id),
+            render: (id: string, record: DockerImage) => {
+                const isUnused = record.repository === '<none>' || record.tag === '<none>';
+                return (
+                    <Space>
+                        <Tooltip title={id}>
+                            <Text code style={{ fontSize: 12, color: '#8b8b8b' }}>
+                                {id.startsWith('sha256:') ? id.substring(0, 30) + '...' : id.substring(0, 12)}
+                            </Text>
+                        </Tooltip>
+                        {isUnused && (
+                            <Tag color="orange" style={{ marginLeft: 8 }}>
+                                {t('docker.unused')}
+                            </Tag>
+                        )}
+                    </Space>
+                );
+            },
+        },
+        {
+            title: t('docker.tags'),
+            key: 'tags',
+            sorter: (a: DockerImage, b: DockerImage) => {
+                const aName = `${a.repository}:${a.tag}`;
+                const bName = `${b.repository}:${b.tag}`;
+                return aName.localeCompare(bName);
+            },
+            render: (_: unknown, record: DockerImage) => {
+                if (record.repository === '<none>' || record.tag === '<none>') {
+                    return null;
+                }
+                return (
+                    <Tag color="geekblue" style={{ fontSize: 12 }}>
+                        {record.repository}:{record.tag}
+                    </Tag>
+                );
+            },
+        },
+        {
+            title: t('docker.size'),
+            dataIndex: 'size',
+            key: 'size',
+            width: 100,
+            align: 'right' as const,
+            sorter: (a: DockerImage, b: DockerImage) => {
+                // Parse size strings like "49 MB", "1.2 GB"
+                const parseSize = (s: string): number => {
+                    const match = s.match(/([\d.]+)\s*(KB|MB|GB|TB)/i);
+                    if (!match) return 0;
+                    const val = parseFloat(match[1]);
+                    const unit = match[2].toUpperCase();
+                    const multipliers: Record<string, number> = { KB: 1, MB: 1024, GB: 1024 * 1024, TB: 1024 * 1024 * 1024 };
+                    return val * (multipliers[unit] || 1);
+                };
+                return parseSize(a.size) - parseSize(b.size);
+            },
+        },
+        {
+            title: t('docker.created'),
+            dataIndex: 'created',
+            key: 'created',
+            width: 180,
+            sorter: (a: DockerImage, b: DockerImage) => a.created.localeCompare(b.created),
+        },
+    ];
+
+    const volumeColumns = [
+        {
+            title: t('docker.volume_name'),
+            dataIndex: 'name',
+            key: 'name',
+            render: (name: string) => <Text strong>{name}</Text>,
+        },
+        {
+            title: t('docker.driver'),
+            dataIndex: 'driver',
+            key: 'driver',
+            render: (driver: string) => <Tag>{driver}</Tag>,
+        },
+        {
+            title: t('docker.mountpoint'),
+            dataIndex: 'mountpoint',
+            key: 'mountpoint',
+            render: (mp: string) => (
+                <Tooltip title={mp}>
+                    <Text code style={{ fontSize: 11 }} ellipsis>
+                        {mp.length > 40 ? `...${mp.slice(-40)}` : mp}
+                    </Text>
+                </Tooltip>
+            ),
+        },
+    ];
+
+    const networkColumns = [
+        {
+            title: t('docker.network_name'),
+            dataIndex: 'name',
+            key: 'name',
+            render: (name: string) => <Text strong>{name}</Text>,
+        },
+        {
+            title: t('docker.network_id'),
             dataIndex: 'id',
             key: 'id',
             render: (id: string) => (
@@ -442,39 +621,16 @@ export const DockerDashboard: React.FC = () => {
             ),
         },
         {
-            title: t('docker.size'),
-            dataIndex: 'size',
-            key: 'size',
+            title: t('docker.driver'),
+            dataIndex: 'driver',
+            key: 'driver',
+            render: (driver: string) => <Tag color="blue">{driver}</Tag>,
         },
         {
-            title: t('docker.created'),
-            dataIndex: 'created',
-            key: 'created',
-            width: 150,
-        },
-        {
-            title: t('docker.actions'),
-            key: 'actions',
-            width: 100,
-            render: (_: unknown, record: DockerImage) => {
-                const isLoading = actionLoading === record.id;
-                const imageName = `${record.repository}:${record.tag}`;
-
-                return (
-                    <Space size="small">
-                        <Tooltip title={t('docker.remove')}>
-                            <Button
-                                type="text"
-                                size="small"
-                                icon={<DeleteOutlined />}
-                                loading={isLoading}
-                                onClick={() => confirmRemoveImage(record.id, imageName)}
-                                danger
-                            />
-                        </Tooltip>
-                    </Space>
-                );
-            },
+            title: t('docker.scope'),
+            dataIndex: 'scope',
+            key: 'scope',
+            render: (scope: string) => <Tag color={scope === 'local' ? 'green' : 'orange'}>{scope}</Tag>,
         },
     ];
 
@@ -584,15 +740,53 @@ export const DockerDashboard: React.FC = () => {
                             ),
                             children: (
                                 <>
-                                    <div style={{ marginBottom: 16, textAlign: 'right' }}>
-                                        <Button
-                                            type="primary"
-                                            icon={<ReloadOutlined />}
-                                            onClick={loadImages}
-                                            loading={imagesLoading}
-                                        >
-                                            {t('common.refresh')}
-                                        </Button>
+                                    {/* Toolbar */}
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        marginBottom: 16,
+                                        gap: 16,
+                                    }}>
+                                        <Input
+                                            placeholder={t('docker.search_images')}
+                                            prefix={<SearchOutlined style={{ color: '#8b8b8b' }} />}
+                                            value={imageSearchText}
+                                            onChange={(e) => setImageSearchText(e.target.value)}
+                                            allowClear
+                                            style={{ maxWidth: 300 }}
+                                        />
+                                        <Space>
+                                            <Popconfirm
+                                                title={t('docker.remove_selected_confirm')}
+                                                description={t('docker.remove_selected_count', { count: selectedImages.length })}
+                                                onConfirm={removeSelectedImages}
+                                                disabled={selectedImages.length === 0}
+                                                okText={t('common.delete')}
+                                                cancelText={t('common.cancel')}
+                                                okButtonProps={{ danger: true }}
+                                            >
+                                                <Button
+                                                    danger
+                                                    icon={<DeleteOutlined />}
+                                                    disabled={selectedImages.length === 0}
+                                                    loading={actionLoading === 'bulk'}
+                                                >
+                                                    {t('docker.remove')} {selectedImages.length > 0 && `(${selectedImages.length})`}
+                                                </Button>
+                                            </Popconfirm>
+                                            <Button
+                                                type="primary"
+                                                icon={<ReloadOutlined />}
+                                                onClick={() => {
+                                                    setSelectedImages([]);
+                                                    loadImages();
+                                                }}
+                                                loading={imagesLoading}
+                                            >
+                                                {t('common.refresh')}
+                                            </Button>
+                                        </Space>
                                     </div>
                                     {imagesLoading && images.length === 0 ? (
                                         <div style={{ textAlign: 'center', padding: 48 }}>
@@ -601,19 +795,119 @@ export const DockerDashboard: React.FC = () => {
                                                 {t('docker.loading_images')}
                                             </Text>
                                         </div>
-                                    ) : images.length === 0 ? (
+                                    ) : filteredImages.length === 0 ? (
                                         <Empty
                                             image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                            description={t('docker.no_images')}
+                                            description={imageSearchText ? t('docker.no_images_match') : t('docker.no_images')}
                                         />
                                     ) : (
                                         <Table
-                                            dataSource={images}
+                                            dataSource={filteredImages}
                                             columns={imageColumns}
+                                            rowKey="id"
+                                            size="middle"
+                                            loading={imagesLoading}
+                                            rowSelection={{
+                                                selectedRowKeys: selectedImages,
+                                                onChange: (keys) => setSelectedImages(keys as string[]),
+                                            }}
+                                            pagination={{
+                                                pageSize: 10,
+                                                showSizeChanger: true,
+                                                pageSizeOptions: ['10', '25', '50'],
+                                                showTotal: (total, range) =>
+                                                    t('docker.items_range', { start: range[0], end: range[1], total }),
+                                            }}
+                                        />
+                                    )}
+                                </>
+                            ),
+                        },
+                        {
+                            key: 'volumes',
+                            label: (
+                                <Space>
+                                    <DatabaseOutlined />
+                                    {t('docker.volumes')} ({volumesCount})
+                                </Space>
+                            ),
+                            children: (
+                                <>
+                                    <div style={{ marginBottom: 16, textAlign: 'right' }}>
+                                        <Button
+                                            type="primary"
+                                            icon={<ReloadOutlined />}
+                                            onClick={loadVolumes}
+                                            loading={volumesLoading}
+                                        >
+                                            {t('common.refresh')}
+                                        </Button>
+                                    </div>
+                                    {volumesLoading && volumes.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: 48 }}>
+                                            <Spin size="large" />
+                                            <Text type="secondary" style={{ display: 'block', marginTop: 16 }}>
+                                                {t('docker.loading_volumes')}
+                                            </Text>
+                                        </div>
+                                    ) : volumes.length === 0 ? (
+                                        <Empty
+                                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                            description={t('docker.no_volumes')}
+                                        />
+                                    ) : (
+                                        <Table
+                                            dataSource={volumes}
+                                            columns={volumeColumns}
+                                            rowKey="name"
+                                            pagination={false}
+                                            size="middle"
+                                            loading={volumesLoading}
+                                        />
+                                    )}
+                                </>
+                            ),
+                        },
+                        {
+                            key: 'networks',
+                            label: (
+                                <Space>
+                                    <GlobalOutlined />
+                                    {t('docker.networks')} ({networksCount})
+                                </Space>
+                            ),
+                            children: (
+                                <>
+                                    <div style={{ marginBottom: 16, textAlign: 'right' }}>
+                                        <Button
+                                            type="primary"
+                                            icon={<ReloadOutlined />}
+                                            onClick={loadNetworks}
+                                            loading={networksLoading}
+                                        >
+                                            {t('common.refresh')}
+                                        </Button>
+                                    </div>
+                                    {networksLoading && networks.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: 48 }}>
+                                            <Spin size="large" />
+                                            <Text type="secondary" style={{ display: 'block', marginTop: 16 }}>
+                                                {t('docker.loading_networks')}
+                                            </Text>
+                                        </div>
+                                    ) : networks.length === 0 ? (
+                                        <Empty
+                                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                            description={t('docker.no_networks')}
+                                        />
+                                    ) : (
+                                        <Table
+                                            dataSource={networks}
+                                            columns={networkColumns}
                                             rowKey="id"
                                             pagination={false}
                                             size="middle"
-                                            loading={imagesLoading}
+                                            loading={networksLoading}
                                         />
                                     )}
                                 </>

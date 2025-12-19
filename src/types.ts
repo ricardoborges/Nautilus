@@ -168,6 +168,23 @@ export interface DockerImage {
     created: string;
 }
 
+export interface DockerVolume {
+    name: string;
+    driver: string;
+    mountpoint: string;
+    created: string;
+    size?: string;
+}
+
+export interface DockerNetwork {
+    id: string;
+    name: string;
+    driver: string;
+    scope: string;
+    ipam?: string;
+    containers?: number;
+}
+
 export interface DockerInfo {
     available: boolean;
     version?: string;
@@ -244,6 +261,8 @@ export interface SSMAPI {
     dockerCheckAvailable: (connectionId: string) => Promise<DockerInfo>;
     dockerListContainers: (connectionId: string) => Promise<DockerContainer[]>;
     dockerListImages: (connectionId: string) => Promise<DockerImage[]>;
+    dockerListVolumes: (connectionId: string) => Promise<DockerVolume[]>;
+    dockerListNetworks: (connectionId: string) => Promise<DockerNetwork[]>;
     dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove') => Promise<void>;
     dockerContainerLogs: (connectionId: string, containerId: string, tail?: number) => Promise<string>;
     dockerImageAction: (connectionId: string, imageId: string, action: 'remove') => Promise<void>;

@@ -17,6 +17,8 @@ import type {
     TerminalDataPayload,
     DockerContainer,
     DockerImage,
+    DockerVolume,
+    DockerNetwork,
     DockerInfo
 } from './types';
 
@@ -290,6 +292,12 @@ const ssm: SSMAPI = {
 
     dockerListImages: (connectionId: string): Promise<DockerImage[]> =>
         backendInvoke<DockerImage[]>('ssm:docker:images', { connectionId }),
+
+    dockerListVolumes: (connectionId: string): Promise<DockerVolume[]> =>
+        backendInvoke<DockerVolume[]>('ssm:docker:volumes', { connectionId }),
+
+    dockerListNetworks: (connectionId: string): Promise<DockerNetwork[]> =>
+        backendInvoke<DockerNetwork[]>('ssm:docker:networks', { connectionId }),
 
     dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove'): Promise<void> =>
         backendInvoke<void>('ssm:docker:action', { connectionId, containerId, action }),
