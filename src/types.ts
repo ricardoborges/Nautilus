@@ -147,6 +147,66 @@ export interface Snippet {
 }
 
 // ========================
+// Docker Types
+// ========================
+
+export interface DockerContainer {
+    id: string;
+    name: string;
+    image: string;
+    status: string;
+    state: 'running' | 'exited' | 'paused' | 'restarting' | 'dead' | 'created' | 'unhealthy';
+    ports: string;
+    created: string;
+    stack?: string;
+    ipAddress?: string;
+}
+
+export interface DockerImage {
+    id: string;
+    repository: string;
+    tag: string;
+    size: string;
+    created: string;
+}
+
+export interface DockerVolume {
+    name: string;
+    driver: string;
+    mountpoint: string;
+    created: string;
+    size?: string;
+}
+
+export interface DockerNetwork {
+    id: string;
+    name: string;
+    driver: string;
+    scope: string;
+    attachable?: boolean;
+    internal?: boolean;
+    ipamDriver?: string;
+    subnet?: string;
+    gateway?: string;
+    stack?: string;
+    isSystem?: boolean;
+}
+
+export interface DockerStack {
+    name: string;
+    type: string;
+    control: string;
+    created: string;
+}
+
+export interface DockerInfo {
+    available: boolean;
+    version?: string;
+    containers?: number;
+    imagesCount?: number;
+}
+
+// ========================
 // SSM API Types
 // ========================
 
@@ -210,6 +270,17 @@ export interface SSMAPI {
     snippetAdd: (snippet: Omit<Snippet, 'id'>) => Promise<Snippet>;
     snippetUpdate: (snippet: Snippet) => Promise<void>;
     snippetRemove: (id: string) => Promise<void>;
+
+    // Docker
+    dockerCheckAvailable: (connectionId: string) => Promise<DockerInfo>;
+    dockerListContainers: (connectionId: string) => Promise<DockerContainer[]>;
+    dockerListImages: (connectionId: string) => Promise<DockerImage[]>;
+    dockerListVolumes: (connectionId: string) => Promise<DockerVolume[]>;
+    dockerListNetworks: (connectionId: string) => Promise<DockerNetwork[]>;
+    dockerListStacks: (connectionId: string) => Promise<DockerStack[]>;
+    dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill') => Promise<void>;
+    dockerContainerLogs: (connectionId: string, containerId: string, tail?: number) => Promise<string>;
+    dockerImageAction: (connectionId: string, imageId: string, action: 'remove') => Promise<void>;
 
     // Window Controls
     win: SSMWindowControls;
