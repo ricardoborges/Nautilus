@@ -18,7 +18,6 @@ import {
     Spin,
     Empty,
     Tooltip,
-    message,
     Row,
     Col,
     Statistic,
@@ -28,6 +27,7 @@ import {
     Popconfirm,
     Checkbox,
     theme,
+    App,
 } from 'antd';
 import { ProCard } from '@ant-design/pro-components';
 import {
@@ -288,6 +288,7 @@ const QuickActions: React.FC<{
 export const DockerDashboard: React.FC = () => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
+    const { modal, message: messageApi } = App.useApp();
     const { activeConnectionId, activeConnection, dockerAvailable } = useConnection();
     const [containers, setContainers] = useState<DockerContainer[]>([]);
     const [images, setImages] = useState<DockerImage[]>([]);
@@ -354,7 +355,7 @@ export const DockerDashboard: React.FC = () => {
             if (isDockerPermissionError(error)) {
                 setDockerPermissionError(true);
             } else {
-                message.error(t('docker.load_error'));
+                messageApi.error(t('docker.load_error'));
             }
         } finally {
             setLoading(false);
@@ -373,7 +374,7 @@ export const DockerDashboard: React.FC = () => {
             if (isDockerPermissionError(error)) {
                 setDockerPermissionError(true);
             } else {
-                message.error(t('docker.images_load_error'));
+                messageApi.error(t('docker.images_load_error'));
             }
         } finally {
             setImagesLoading(false);
@@ -392,7 +393,7 @@ export const DockerDashboard: React.FC = () => {
             if (isDockerPermissionError(error)) {
                 setDockerPermissionError(true);
             } else {
-                message.error(t('docker.volumes_load_error'));
+                messageApi.error(t('docker.volumes_load_error'));
             }
         } finally {
             setVolumesLoading(false);
@@ -411,7 +412,7 @@ export const DockerDashboard: React.FC = () => {
             if (isDockerPermissionError(error)) {
                 setDockerPermissionError(true);
             } else {
-                message.error(t('docker.networks_load_error'));
+                messageApi.error(t('docker.networks_load_error'));
             }
         } finally {
             setNetworksLoading(false);
@@ -430,7 +431,7 @@ export const DockerDashboard: React.FC = () => {
             if (isDockerPermissionError(error)) {
                 setDockerPermissionError(true);
             } else {
-                message.error(t('docker.stacks_load_error'));
+                messageApi.error(t('docker.stacks_load_error'));
             }
         } finally {
             setStacksLoading(false);
@@ -455,19 +456,19 @@ export const DockerDashboard: React.FC = () => {
             await window.ssm.dockerContainerAction(activeConnectionId, containerId, action);
             // Map unpause to resume for translation key
             const translationAction = action === 'unpause' ? 'resume' : action;
-            message.success(t(`docker.${translationAction}_success`));
+            messageApi.success(t(`docker.${translationAction}_success`));
             await loadContainers();
         } catch (error) {
             const err = error as Error;
             const translationAction = action === 'unpause' ? 'resume' : action;
-            message.error(t(`docker.${translationAction}_error`, { message: err.message }));
+            messageApi.error(t(`docker.${translationAction}_error`, { message: err.message }));
         } finally {
             setActionLoading(null);
         }
     };
 
     const confirmRemove = (containerId: string, containerName: string) => {
-        Modal.confirm({
+        modal.confirm({
             title: t('docker.remove_confirm_title'),
             content: t('docker.remove_confirm_content', { name: containerName }),
             okText: t('common.delete'),
@@ -489,7 +490,7 @@ export const DockerDashboard: React.FC = () => {
 
     const handleBulkRemove = () => {
         if (selectedContainers.length === 0) return;
-        Modal.confirm({
+        modal.confirm({
             title: t('docker.remove_confirm_title'),
             content: t('docker.remove_selected_count', { count: selectedContainers.length }),
             okText: t('common.delete'),
@@ -510,18 +511,18 @@ export const DockerDashboard: React.FC = () => {
         setActionLoading(imageId);
         try {
             await window.ssm.dockerImageAction(activeConnectionId, imageId, action);
-            message.success(t(`docker.image_${action}_success`));
+            messageApi.success(t(`docker.image_${action}_success`));
             await loadImages();
         } catch (error) {
             const err = error as Error;
-            message.error(t(`docker.image_${action}_error`, { message: err.message }));
+            messageApi.error(t(`docker.image_${action}_error`, { message: err.message }));
         } finally {
             setActionLoading(null);
         }
     };
 
     const confirmRemoveImage = (imageId: string, imageName: string) => {
-        Modal.confirm({
+        modal.confirm({
             title: t('docker.image_remove_confirm_title'),
             content: t('docker.image_remove_confirm_content', { name: imageName }),
             okText: t('common.delete'),
@@ -560,14 +561,15 @@ export const DockerDashboard: React.FC = () => {
 
         setActionLoading('bulk');
         let successCount = 0;
-        let errorCount = 0;
+        const errors: string[] = [];
 
         for (const imageId of selectedImages) {
             try {
                 await window.ssm.dockerImageAction(activeConnectionId, imageId, 'remove');
                 successCount++;
-            } catch {
-                errorCount++;
+            } catch (error) {
+                const err = error as Error;
+                errors.push(`${imageId.substring(0, 12)}: ${err.message}`);
             }
         }
 
@@ -576,10 +578,13 @@ export const DockerDashboard: React.FC = () => {
         await loadImages();
 
         if (successCount > 0) {
-            message.success(t('docker.images_removed_count', { count: successCount }));
+            messageApi.success(t('docker.images_removed_count', { count: successCount }));
         }
-        if (errorCount > 0) {
-            message.warning(t('docker.images_remove_errors', { count: errorCount }));
+        if (errors.length > 0) {
+            messageApi.error({
+                content: errors.join('\n'),
+                duration: 5,
+            });
         }
     };
 
@@ -594,11 +599,46 @@ export const DockerDashboard: React.FC = () => {
         );
     }, [volumes, volumeSearchText]);
 
-    // Handle bulk remove selected volumes (placeholder - would need backend support)
+    // Handle bulk remove selected volumes
     const removeSelectedVolumes = async () => {
-        if (selectedVolumes.length === 0) return;
-        message.info(t('docker.volume_remove_not_implemented'));
-        setSelectedVolumes([]);
+        if (!activeConnectionId || selectedVolumes.length === 0) return;
+
+        modal.confirm({
+            title: t('docker.volume_remove_confirm_title'),
+            content: t('docker.volume_remove_selected_count', { count: selectedVolumes.length }),
+            okText: t('common.delete'),
+            okType: 'danger',
+            cancelText: t('common.cancel'),
+            onOk: async () => {
+                setActionLoading('bulk-volumes');
+                let successCount = 0;
+                const errors: string[] = [];
+
+                for (const volumeName of selectedVolumes) {
+                    try {
+                        await window.ssm.dockerVolumeAction(activeConnectionId, volumeName, 'remove');
+                        successCount++;
+                    } catch (error) {
+                        const err = error as Error;
+                        errors.push(`${volumeName}: ${err.message}`);
+                    }
+                }
+
+                setSelectedVolumes([]);
+                setActionLoading(null);
+                await loadVolumes();
+
+                if (successCount > 0) {
+                    messageApi.success(t('docker.volumes_removed_count', { count: successCount }));
+                }
+                if (errors.length > 0) {
+                    messageApi.error({
+                        content: errors.join('\n'),
+                        duration: 5,
+                    });
+                }
+            },
+        });
     };
 
     // Filtered networks based on search
@@ -613,11 +653,46 @@ export const DockerDashboard: React.FC = () => {
         );
     }, [networks, networkSearchText]);
 
-    // Handle bulk remove selected networks (placeholder - would need backend support)
+    // Handle bulk remove selected networks
     const removeSelectedNetworks = async () => {
-        if (selectedNetworks.length === 0) return;
-        message.info(t('docker.network_remove_not_implemented'));
-        setSelectedNetworks([]);
+        if (!activeConnectionId || selectedNetworks.length === 0) return;
+
+        modal.confirm({
+            title: t('docker.network_remove_confirm_title'),
+            content: t('docker.network_remove_selected_count', { count: selectedNetworks.length }),
+            okText: t('common.delete'),
+            okType: 'danger',
+            cancelText: t('common.cancel'),
+            onOk: async () => {
+                setActionLoading('bulk-networks');
+                let successCount = 0;
+                const errors: string[] = [];
+
+                for (const networkId of selectedNetworks) {
+                    try {
+                        await window.ssm.dockerNetworkAction(activeConnectionId, networkId, 'remove');
+                        successCount++;
+                    } catch (error) {
+                        const err = error as Error;
+                        errors.push(`${networkId}: ${err.message}`);
+                    }
+                }
+
+                setSelectedNetworks([]);
+                setActionLoading(null);
+                await loadNetworks();
+
+                if (successCount > 0) {
+                    messageApi.success(t('docker.networks_removed_count', { count: successCount }));
+                }
+                if (errors.length > 0) {
+                    messageApi.error({
+                        content: errors.join('\n'),
+                        duration: 5,
+                    });
+                }
+            },
+        });
     };
 
     // Filtered stacks based on search
@@ -633,7 +708,7 @@ export const DockerDashboard: React.FC = () => {
     // Handle bulk remove selected stacks (placeholder - would need backend support)
     const removeSelectedStacks = async () => {
         if (selectedStacks.length === 0) return;
-        message.info(t('docker.stack_remove_not_implemented'));
+        messageApi.info(t('docker.stack_remove_not_implemented'));
         setSelectedStacks([]);
     };
 
@@ -702,7 +777,7 @@ export const DockerDashboard: React.FC = () => {
 
         const copyCommands = () => {
             navigator.clipboard.writeText(commands.join('\n'));
-            message.success(t('common.copied'));
+            messageApi.success(t('common.copied'));
         };
 
         return (

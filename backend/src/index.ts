@@ -557,8 +557,8 @@ const handlers: HandlerRegistry = {
             throw new Error('Ação inválida');
         }
 
-        // Validate container ID (alphanumeric only)
-        if (!/^[a-zA-Z0-9]+$/.test(containerId)) {
+        // Validate container ID/name (alphanumeric, hyphens, underscores, dots)
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(containerId)) {
             throw new Error('ID de container inválido');
         }
 
@@ -647,8 +647,8 @@ const handlers: HandlerRegistry = {
             tail?: number;
         };
 
-        // Validate container ID (alphanumeric only)
-        if (!/^[a-zA-Z0-9]+$/.test(containerId)) {
+        // Validate container ID/name (alphanumeric, hyphens, underscores, dots)
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(containerId)) {
             throw new Error('ID de container inválido');
         }
 
@@ -743,6 +743,39 @@ const handlers: HandlerRegistry = {
         }
     },
 
+    'ssm:docker:volumeAction': async (args) => {
+        const { connectionId, volumeName, action } = args as {
+            connectionId: string;
+            volumeName: string;
+            action: 'remove';
+        };
+
+        // Validate action
+        if (action !== 'remove') {
+            throw new Error('Ação inválida');
+        }
+
+        // Validate volume name (alphanumeric, hyphens, underscores, dots)
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(volumeName)) {
+            throw new Error('Nome de volume inválido');
+        }
+
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            const result = await ssh.exec(`docker volume rm ${volumeName}`);
+            if (result.stderr && !result.stdout) {
+                throw new Error(result.stderr);
+            }
+            return { success: true };
+        } finally {
+            ssh.end();
+        }
+    },
+
     'ssm:docker:networks': async (args) => {
         const { connectionId } = args as { connectionId: string };
         const conn = await connectionManager.get(connectionId);
@@ -825,6 +858,39 @@ const handlers: HandlerRegistry = {
                         };
                     });
             }
+        } finally {
+            ssh.end();
+        }
+    },
+
+    'ssm:docker:networkAction': async (args) => {
+        const { connectionId, networkId, action } = args as {
+            connectionId: string;
+            networkId: string;
+            action: 'remove';
+        };
+
+        // Validate action
+        if (action !== 'remove') {
+            throw new Error('Ação inválida');
+        }
+
+        // Validate network ID/name (alphanumeric, hyphens, underscores, dots)
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(networkId)) {
+            throw new Error('ID de rede inválido');
+        }
+
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            const result = await ssh.exec(`docker network rm ${networkId}`);
+            if (result.stderr && !result.stdout) {
+                throw new Error(result.stderr);
+            }
+            return { success: true };
         } finally {
             ssh.end();
         }

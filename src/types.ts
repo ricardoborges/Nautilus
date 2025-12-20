@@ -281,6 +281,8 @@ export interface SSMAPI {
     dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill') => Promise<void>;
     dockerContainerLogs: (connectionId: string, containerId: string, tail?: number) => Promise<string>;
     dockerImageAction: (connectionId: string, imageId: string, action: 'remove') => Promise<void>;
+    dockerVolumeAction: (connectionId: string, volumeName: string, action: 'remove') => Promise<void>;
+    dockerNetworkAction: (connectionId: string, networkId: string, action: 'remove') => Promise<void>;
 
     // Window Controls
     win: SSMWindowControls;

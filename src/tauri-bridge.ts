@@ -312,6 +312,12 @@ const ssm: SSMAPI = {
     dockerImageAction: (connectionId: string, imageId: string, action: 'remove'): Promise<void> =>
         backendInvoke<void>('ssm:docker:imageAction', { connectionId, imageId, action }),
 
+    dockerVolumeAction: (connectionId: string, volumeName: string, action: 'remove'): Promise<void> =>
+        backendInvoke<void>('ssm:docker:volumeAction', { connectionId, volumeName, action }),
+
+    dockerNetworkAction: (connectionId: string, networkId: string, action: 'remove'): Promise<void> =>
+        backendInvoke<void>('ssm:docker:networkAction', { connectionId, networkId, action }),
+
     // Window Controls
     win: {
         minimize: async (): Promise<void> => {
