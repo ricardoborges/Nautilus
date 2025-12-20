@@ -192,7 +192,13 @@ export const ProcessManager: React.FC = () => {
     ];
 
     return (
-        <div style={{ padding: 16, height: '100%', overflow: 'auto' }}>
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            padding: '8px 16px 16px 16px',
+            overflow: 'hidden'
+        }}>
             <ProTable<ProcessInfo>
                 columns={columns}
                 dataSource={processes}
@@ -201,6 +207,7 @@ export const ProcessManager: React.FC = () => {
                 search={false}
                 dateFormatter="string"
                 headerTitle={t('processes.running_processes')}
+                size="small"
                 toolBarRender={() => [
                     <Button
                         key="refresh"
@@ -236,8 +243,8 @@ export const ProcessManager: React.FC = () => {
                 pagination={{
                     showSizeChanger: true,
                     showQuickJumper: true,
-                    defaultPageSize: 20,
-                    pageSizeOptions: ['10', '20', '50', '100'],
+                    defaultPageSize: 50,
+                    pageSizeOptions: ['20', '50', '100', '200'],
                 }}
                 locale={{
                     emptyText: (
@@ -252,7 +259,10 @@ export const ProcessManager: React.FC = () => {
                     fullScreen: true,
                     reload: loadProcesses,
                 }}
-                scroll={{ x: 800 }}
+                scroll={{ x: 800, y: 'calc(100vh - 280px)' }}
+                cardProps={{
+                    bodyStyle: { padding: 0 },
+                }}
             />
         </div>
     );

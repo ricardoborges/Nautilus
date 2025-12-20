@@ -159,6 +159,7 @@ export const MainLayout: React.FC = () => {
     ];
 
     // Render content based on active tab
+    // Components are kept mounted to preserve state (especially terminal sessions)
     const renderContent = () => {
         if (!activeConnectionId) {
             return (
@@ -192,22 +193,44 @@ export const MainLayout: React.FC = () => {
             );
         }
 
-        switch (activeTab) {
-            case 'dashboard':
-                return <Dashboard />;
-            case 'terminal':
-                return <TerminalManager />;
-            case 'files':
-                return <FileManager />;
-            case 'processes':
-                return <ProcessManager />;
-            case 'cron':
-                return <CronManager />;
-            case 'docker':
-                return <DockerDashboard stacksDirectory={stacksDirectory} onOpenSettings={openSettings} />;
-            default:
-                return <Dashboard />;
-        }
+        // Keep all components mounted to preserve state (especially terminal sessions)
+        // Use CSS visibility/position to show/hide instead of conditional rendering
+        // Position absolute ensures all components take full height without stacking
+        const containerHeight = 'calc(100vh - 56px)'; // Header height is 56px
+
+        const tabStyle = (tab: TabKey): React.CSSProperties => ({
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            overflow: 'auto',
+            visibility: activeTab === tab ? 'visible' : 'hidden',
+            pointerEvents: activeTab === tab ? 'auto' : 'none',
+        });
+
+        return (
+            <div style={{ position: 'relative', height: containerHeight, width: '100%', overflow: 'hidden' }}>
+                <div style={tabStyle('dashboard')}>
+                    <Dashboard />
+                </div>
+                <div style={tabStyle('terminal')}>
+                    <TerminalManager />
+                </div>
+                <div style={tabStyle('files')}>
+                    <FileManager />
+                </div>
+                <div style={tabStyle('processes')}>
+                    <ProcessManager />
+                </div>
+                <div style={tabStyle('cron')}>
+                    <CronManager />
+                </div>
+                <div style={tabStyle('docker')}>
+                    <DockerDashboard stacksDirectory={stacksDirectory} onOpenSettings={openSettings} />
+                </div>
+            </div>
+        );
     };
 
     // About modal
@@ -362,7 +385,7 @@ export const MainLayout: React.FC = () => {
                 >
                     <PageContainer
                         header={{ title: undefined, breadcrumb: {} }}
-                        style={{ padding: 0, height: 'calc(100vh - 48px)', overflow: 'auto' }}
+                        style={{ padding: 0 }}
                     >
                         {renderContent()}
                     </PageContainer>

@@ -42,7 +42,7 @@ export const TerminalManager: React.FC = () => {
 
     const handleSendPassword = async () => {
         if (!activeConnectionId) return;
-        
+
         try {
             const password = await window.ssm.getPassword(activeConnectionId);
             if (password) {
@@ -153,6 +153,8 @@ export const TerminalManager: React.FC = () => {
             const session = sessionsRef.current.get(id);
             if (session) {
                 session.term.write(data);
+                // Scroll to bottom to keep cursor visible
+                session.term.scrollToBottom();
             }
         });
 
@@ -189,6 +191,26 @@ export const TerminalManager: React.FC = () => {
 
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
+    }, [activeSessionId]);
+
+    // Fit terminal when container becomes visible (tab switching)
+    useEffect(() => {
+        if (!terminalContainerRef.current) return;
+
+        const resizeObserver = new ResizeObserver(() => {
+            if (activeSessionId) {
+                const session = sessionsRef.current.get(activeSessionId);
+                if (session && terminalContainerRef.current && terminalContainerRef.current.offsetParent !== null) {
+                    // Container is visible, fit the terminal
+                    setTimeout(() => {
+                        session.fitAddon.fit();
+                    }, 50);
+                }
+            }
+        });
+
+        resizeObserver.observe(terminalContainerRef.current);
+        return () => resizeObserver.disconnect();
     }, [activeSessionId]);
 
     // Fit terminal when snippets sidebar is toggled
@@ -256,11 +278,17 @@ export const TerminalManager: React.FC = () => {
     }));
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 16, overflow: 'hidden' }}>
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: 'calc(100vh - 120px)',
+            padding: '8px 16px 16px 16px',
+            overflow: 'hidden'
+        }}>
             <Card
                 size="small"
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
-                bodyStyle={{ flex: 1, padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                styles={{ body: { flex: 1, padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
             >
                 {/* Terminal Tabs */}
                 <Tabs
@@ -305,7 +333,13 @@ export const TerminalManager: React.FC = () => {
                         <div
                             ref={terminalContainerRef}
                             className="terminal-container"
-                            style={{ flex: 1, minWidth: 0, minHeight: 0, background: '#1e1e1e', borderRadius: '0 0 0 8px' }}
+                            style={{
+                                flex: 1,
+                                minWidth: 0,
+                                minHeight: 0,
+                                background: '#1e1e1e',
+                                borderRadius: '0 0 0 8px'
+                            }}
                         />
                         {showSnippets && <SnippetSidebar />}
                     </div>
