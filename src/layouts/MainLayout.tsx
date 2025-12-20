@@ -19,6 +19,8 @@ import {
     BulbOutlined,
     GlobalOutlined,
     ContainerOutlined,
+    WindowsOutlined,
+    LinuxOutlined,
 } from '@ant-design/icons';
 import { ProLayout, PageContainer } from '@ant-design/pro-components';
 import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input } from 'antd';
@@ -50,7 +52,7 @@ export const MainLayout: React.FC = () => {
     } = useConnection();
 
     const { themeMode, setThemeMode } = useTheme();
-    const { modal } = App.useApp();
+    const { modal, message } = App.useApp();
 
     const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
     const [collapsed, setCollapsed] = useState(false);
@@ -86,7 +88,7 @@ export const MainLayout: React.FC = () => {
         { type: 'divider' },
         ...connections.map(conn => ({
             key: conn.id,
-            icon: <CloudServerOutlined />,
+            icon: conn.connectionType === 'rdp' ? <WindowsOutlined style={{ color: '#0078d4' }} /> : <LinuxOutlined style={{ color: '#f57c00' }} />,
             label: (
                 <Space>
                     <span>{conn.name}</span>
@@ -98,8 +100,33 @@ export const MainLayout: React.FC = () => {
             children: [
                 {
                     key: `${conn.id}-connect`,
-                    label: t('common.connect'),
-                    onClick: () => selectConnection(conn.id),
+                    label: conn.connectionType === 'rdp' ? t('common.launch_rdp') : t('common.connect'),
+                    onClick: async () => {
+                        if (conn.connectionType === 'rdp') {
+                            // RDP - just launch mstsc without changing layout
+                            try {
+                                let password: string | null = null;
+                                if (conn.rdpAuthMethod === 'credentials') {
+                                    password = await window.ssm.getPassword(conn.id);
+                                }
+                                await window.ssm.rdpConnect({
+                                    connectionId: conn.id,
+                                    host: conn.host,
+                                    port: conn.port || 3389,
+                                    username: conn.user,
+                                    password: password || undefined,
+                                    domain: conn.domain,
+                                    useWindowsAuth: conn.rdpAuthMethod === 'windows_auth',
+                                });
+                                message.success(t('rdp.session_launched', { name: conn.name }));
+                            } catch (err) {
+                                message.error(t('rdp.launch_failed', { error: (err as Error).message }));
+                            }
+                        } else {
+                            // SSH - normal connection
+                            selectConnection(conn.id);
+                        }
+                    },
                 },
                 {
                     key: `${conn.id}-edit`,

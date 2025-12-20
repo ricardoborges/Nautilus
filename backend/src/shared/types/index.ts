@@ -26,16 +26,22 @@ export interface ConnectionData {
     host: string;
     port?: number;
     user: string;
+    connectionType: 'ssh' | 'rdp';
     authMethod: 'password' | 'key';
     keyPath?: string | null;
     lastSeen?: string | null;
     monitoredServices?: string[];
     autoConnect?: boolean;
+    // RDP specific fields
+    rdpAuthMethod?: 'credentials' | 'windows_auth';
+    domain?: string;
 }
 
-export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen'>> {
+export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen' | 'rdpAuthMethod' | 'domain'>> {
     keyPath: string | null;
     lastSeen: string | null;
+    rdpAuthMethod?: 'credentials' | 'windows_auth';
+    domain?: string;
 }
 
 // ========================

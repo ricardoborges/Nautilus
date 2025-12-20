@@ -11,15 +11,23 @@ export interface Connection {
     name: string;
     host: string;
     user: string;
+    connectionType: 'ssh' | 'rdp';
     authMethod: 'password' | 'key';
     keyPath?: string;
     monitoredServices?: string[];
     autoConnect?: boolean;
+    // RDP specific fields
+    rdpAuthMethod?: 'credentials' | 'windows_auth';
+    domain?: string;
+    port?: number;
 }
 
 export interface ConnectionFormData extends Omit<Connection, 'id'> {
     id?: string;
     password?: string;
+    // RDP specific
+    rdpAuthMethod?: 'credentials' | 'windows_auth';
+    domain?: string;
 }
 
 // ========================
@@ -210,6 +218,42 @@ export interface DockerInfo {
 // SSM API Types
 // ========================
 
+// ========================
+// RDP Types
+// ========================
+
+export interface RdpConnectOptions {
+    connectionId: string;
+    host: string;
+    port: number;
+    username: string;
+    password?: string;
+    domain?: string;
+    useWindowsAuth: boolean;
+    width?: number;
+    height?: number;
+}
+
+export interface RdpConnectResponse {
+    success: boolean;
+    embedded: boolean;
+    width?: number;
+    height?: number;
+}
+
+export interface RdpBitmapEvent {
+    sessionId: string;
+    destTop: number;
+    destLeft: number;
+    destBottom: number;
+    destRight: number;
+    width: number;
+    height: number;
+    bitsPerPixel: number;
+    isCompress: boolean;
+    data: string; // Base64 encoded
+}
+
 export interface SSMWindowControls {
     minimize: () => Promise<void>;
     maximize: () => Promise<void>;
@@ -285,6 +329,16 @@ export interface SSMAPI {
     dockerNetworkAction: (connectionId: string, networkId: string, action: 'remove') => Promise<void>;
     dockerDeployStack: (connectionId: string, stackName: string, composeContent: string, stacksDirectory: string) => Promise<void>;
     dockerConvertRun: (connectionId: string, dockerRunCommand: string) => Promise<string>;
+
+    // RDP
+    rdpConnect: (options: RdpConnectOptions) => Promise<RdpConnectResponse>;
+    rdpDisconnect: (connectionId: string) => Promise<void>;
+    rdpSendMouse: (connectionId: string, x: number, y: number, button: number, isPressed: boolean) => Promise<void>;
+    rdpSendKeyboard: (connectionId: string, scanCode: number, isPressed: boolean, isExtended: boolean) => Promise<void>;
+    onRdpBitmap: (callback: (event: RdpBitmapEvent) => void) => () => void;
+    onRdpConnected: (callback: (event: { sessionId: string }) => void) => () => void;
+    onRdpClosed: (callback: (event: { sessionId: string }) => void) => () => void;
+    onRdpError: (callback: (event: { sessionId: string; error: string }) => void) => () => void;
 
     // Window Controls
     win: SSMWindowControls;

@@ -1016,6 +1016,152 @@ NAUTILUS_EOF`);
             throw new Error(`Failed to convert docker run command: ${err.message}`);
         }
     },
+
+    // RDP handlers - using native Windows mstsc.exe
+    // Note: node-rdpjs doesn't support NLA (Network Level Authentication)
+    // which is required on modern Windows servers, so we use mstsc.exe instead
+    'ssm:rdp:connect': async (args) => {
+        const { connectionId, host, port, username, password, domain, useWindowsAuth } = args as {
+            connectionId: string;
+            host: string;
+            port: number;
+            username: string;
+            password?: string;
+            domain?: string;
+            useWindowsAuth: boolean;
+        };
+
+        // Validate host
+        if (!host || !/^[a-zA-Z0-9.\-_]+$/.test(host)) {
+            throw new Error('Invalid host');
+        }
+
+        const { spawn } = require('child_process');
+        const portStr = port && port !== 3389 ? `:${port}` : '';
+        const server = `${host}${portStr}`;
+
+        // Store credentials using cmdkey if not using Windows Auth
+        if (!useWindowsAuth && username && password) {
+            const targetName = `TERMSRV/${host}`;
+            const fullUsername = domain ? `${domain}\\${username}` : username;
+
+            // Delete any existing credential first
+            try {
+                await new Promise<void>((resolve) => {
+                    const delProc = spawn('cmdkey', ['/delete', targetName], { shell: true });
+                    delProc.on('close', () => resolve());
+                });
+            } catch {
+                // Ignore errors - credential might not exist
+            }
+
+            // Add new credential
+            await new Promise<void>((resolve, reject) => {
+                const addProc = spawn('cmdkey', [
+                    '/generic', targetName,
+                    '/user', fullUsername,
+                    '/pass', password
+                ], { shell: true });
+
+                addProc.on('close', (code: number) => {
+                    if (code === 0) {
+                        resolve();
+                    } else {
+                        reject(new Error('Failed to store RDP credentials'));
+                    }
+                });
+            });
+        }
+
+        // Launch mstsc.exe
+        const mstscProcess = spawn('mstsc', ['/v:' + server], {
+            detached: true,
+            stdio: 'ignore'
+        });
+        mstscProcess.unref();
+
+        // Store session info
+        const rdpSessions = (global as any).rdpSessions || new Map();
+        rdpSessions.set(connectionId, { host, process: mstscProcess });
+        (global as any).rdpSessions = rdpSessions;
+
+        logger.info(`[RDP] Launched mstsc.exe for ${server}`);
+
+        return { success: true, embedded: false };
+    },
+
+    'ssm:rdp:disconnect': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+
+        const rdpSessions = (global as any).rdpSessions as Map<string, { host: string; process?: any }> | undefined;
+        if (rdpSessions && rdpSessions.has(connectionId)) {
+            const session = rdpSessions.get(connectionId);
+            if (session) {
+                // Clean up stored credentials
+                try {
+                    const { spawn } = require('child_process');
+                    const targetName = `TERMSRV/${session.host}`;
+                    const delProc = spawn('cmdkey', ['/delete', targetName], { shell: true });
+                    await new Promise<void>((resolve) => {
+                        delProc.on('close', () => resolve());
+                    });
+                    logger.info(`[RDP] Cleaned up credentials for ${session.host}`);
+                } catch {
+                    // Ignore errors
+                }
+                rdpSessions.delete(connectionId);
+            }
+        }
+
+        return { success: true };
+    },
+
+    'ssm:rdp:mouse': async (args) => {
+        const { connectionId, x, y, button, isPressed } = args as {
+            connectionId: string;
+            x: number;
+            y: number;
+            button: number;
+            isPressed: boolean;
+        };
+
+        const rdpSessions = (global as any).rdpSessions as Map<string, { client?: any }> | undefined;
+        if (rdpSessions && rdpSessions.has(connectionId)) {
+            const session = rdpSessions.get(connectionId);
+            if (session?.client) {
+                try {
+                    session.client.sendPointerEvent(x, y, button, isPressed);
+                } catch (err) {
+                    logger.error(`[RDP] Error sending mouse event: ${err}`);
+                }
+            }
+        }
+
+        return { success: true };
+    },
+
+    'ssm:rdp:keyboard': async (args) => {
+        const { connectionId, scanCode, isPressed, isExtended } = args as {
+            connectionId: string;
+            scanCode: number;
+            isPressed: boolean;
+            isExtended: boolean;
+        };
+
+        const rdpSessions = (global as any).rdpSessions as Map<string, { client?: any }> | undefined;
+        if (rdpSessions && rdpSessions.has(connectionId)) {
+            const session = rdpSessions.get(connectionId);
+            if (session?.client) {
+                try {
+                    session.client.sendKeyEventScancode(scanCode, isPressed, isExtended);
+                } catch (err) {
+                    logger.error(`[RDP] Error sending keyboard event: ${err}`);
+                }
+            }
+        }
+
+        return { success: true };
+    },
 };
 
 // Event broadcasting for SSE

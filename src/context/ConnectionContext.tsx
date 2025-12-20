@@ -28,6 +28,7 @@ interface ConnectionContextType {
 
     // Actions
     selectConnection: (id: string | null) => Promise<void>;
+    disconnectConnection: () => Promise<void>;
     refreshConnections: () => Promise<void>;
     refreshSnippets: () => Promise<void>;
 }
@@ -122,6 +123,27 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         }
     }, [activeConnectionId, checkDockerAvailability]);
 
+    // Disconnect from connection
+    const disconnectConnection = useCallback(async () => {
+        if (activeConnectionId) {
+            // If it's an RDP connection, disconnect it
+            const conn = connections.find(c => c.id === activeConnectionId);
+            if (conn && conn.connectionType === 'rdp') {
+                try {
+                    await window.ssm.rdpDisconnect(activeConnectionId);
+                } catch (error) {
+                    console.error('Failed to disconnect RDP:', error);
+                }
+            }
+            // Stop metrics
+            await window.ssm.stopMetrics();
+        }
+        setActiveConnectionId(null);
+        setMetrics(null);
+        setDockerAvailable(false);
+        setDockerVersion(null);
+    }, [activeConnectionId, connections]);
+
     // Subscribe to metrics updates
     useEffect(() => {
         const unsubscribe = window.ssm.onMetricsUpdate((data: SystemMetrics) => {
@@ -165,6 +187,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         dockerAvailable,
         dockerVersion,
         selectConnection,
+        disconnectConnection,
         refreshConnections,
         refreshSnippets,
     };

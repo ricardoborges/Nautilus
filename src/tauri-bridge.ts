@@ -20,7 +20,10 @@ import type {
     DockerVolume,
     DockerNetwork,
     DockerStack,
-    DockerInfo
+    DockerInfo,
+    RdpConnectOptions,
+    RdpConnectResponse,
+    RdpBitmapEvent
 } from './types';
 
 const BACKEND_URL = 'http://127.0.0.1:45678';
@@ -323,6 +326,83 @@ const ssm: SSMAPI = {
 
     dockerConvertRun: (connectionId: string, dockerRunCommand: string): Promise<string> =>
         backendInvoke<string>('ssm:docker:convertRun', { connectionId, dockerRunCommand }),
+
+    // RDP methods
+    rdpConnect: (options: RdpConnectOptions): Promise<RdpConnectResponse> =>
+        backendInvoke<RdpConnectResponse>('ssm:rdp:connect', options as unknown as Record<string, unknown>),
+
+    rdpDisconnect: (connectionId: string): Promise<void> =>
+        backendInvoke<void>('ssm:rdp:disconnect', { connectionId }),
+
+    rdpSendMouse: (connectionId: string, x: number, y: number, button: number, isPressed: boolean): Promise<void> =>
+        backendInvoke<void>('ssm:rdp:mouse', { connectionId, x, y, button, isPressed }),
+
+    rdpSendKeyboard: (connectionId: string, scanCode: number, isPressed: boolean, isExtended: boolean): Promise<void> =>
+        backendInvoke<void>('ssm:rdp:keyboard', { connectionId, scanCode, isPressed, isExtended }),
+
+    onRdpBitmap: (callback: (event: RdpBitmapEvent) => void): (() => void) => {
+        const channel = 'ssm:rdp:bitmap';
+        const listeners = eventListeners.get(channel) || [];
+        listeners.push(callback as (data: unknown) => void);
+        eventListeners.set(channel, listeners);
+
+        return () => {
+            const currentListeners = eventListeners.get(channel) || [];
+            const index = currentListeners.indexOf(callback as (data: unknown) => void);
+            if (index > -1) {
+                currentListeners.splice(index, 1);
+                eventListeners.set(channel, currentListeners);
+            }
+        };
+    },
+
+    onRdpConnected: (callback: (event: { sessionId: string }) => void): (() => void) => {
+        const channel = 'ssm:rdp:connected';
+        const listeners = eventListeners.get(channel) || [];
+        listeners.push(callback as (data: unknown) => void);
+        eventListeners.set(channel, listeners);
+
+        return () => {
+            const currentListeners = eventListeners.get(channel) || [];
+            const index = currentListeners.indexOf(callback as (data: unknown) => void);
+            if (index > -1) {
+                currentListeners.splice(index, 1);
+                eventListeners.set(channel, currentListeners);
+            }
+        };
+    },
+
+    onRdpClosed: (callback: (event: { sessionId: string }) => void): (() => void) => {
+        const channel = 'ssm:rdp:closed';
+        const listeners = eventListeners.get(channel) || [];
+        listeners.push(callback as (data: unknown) => void);
+        eventListeners.set(channel, listeners);
+
+        return () => {
+            const currentListeners = eventListeners.get(channel) || [];
+            const index = currentListeners.indexOf(callback as (data: unknown) => void);
+            if (index > -1) {
+                currentListeners.splice(index, 1);
+                eventListeners.set(channel, currentListeners);
+            }
+        };
+    },
+
+    onRdpError: (callback: (event: { sessionId: string; error: string }) => void): (() => void) => {
+        const channel = 'ssm:rdp:error';
+        const listeners = eventListeners.get(channel) || [];
+        listeners.push(callback as (data: unknown) => void);
+        eventListeners.set(channel, listeners);
+
+        return () => {
+            const currentListeners = eventListeners.get(channel) || [];
+            const index = currentListeners.indexOf(callback as (data: unknown) => void);
+            if (index > -1) {
+                currentListeners.splice(index, 1);
+                eventListeners.set(channel, currentListeners);
+            }
+        };
+    },
 
     // Window Controls
     win: {

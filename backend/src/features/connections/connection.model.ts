@@ -7,22 +7,30 @@ export class ConnectionModel implements Connection {
     host: string;
     port: number;
     user: string;
+    connectionType: 'ssh' | 'rdp';
     authMethod: 'password' | 'key';
     keyPath: string | null;
     lastSeen: string | null;
     monitoredServices: string[];
     autoConnect: boolean;
+    // RDP specific fields
+    rdpAuthMethod?: 'credentials' | 'windows_auth';
+    domain?: string;
 
     constructor(data: ConnectionData) {
         this.id = data.id || crypto.randomUUID();
         this.name = data.name;
         this.host = data.host;
-        this.port = data.port ?? 22;
+        this.port = data.port ?? (data.connectionType === 'rdp' ? 3389 : 22);
         this.user = data.user;
+        this.connectionType = data.connectionType || 'ssh';
         this.authMethod = data.authMethod || 'key';
         this.keyPath = data.keyPath ?? null;
         this.lastSeen = data.lastSeen ?? null;
         this.monitoredServices = data.monitoredServices ?? [];
         this.autoConnect = data.autoConnect ?? false;
+        // RDP specific
+        this.rdpAuthMethod = data.rdpAuthMethod;
+        this.domain = data.domain;
     }
 }

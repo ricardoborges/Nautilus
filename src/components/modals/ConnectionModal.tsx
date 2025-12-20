@@ -1,7 +1,7 @@
 /**
  * ConnectionModal Component
  * 
- * Modal for creating and editing SSH connections.
+ * Modal for creating and editing SSH/RDP connections.
  * Uses Ant Design Modal and Form components.
  */
 
@@ -17,6 +17,8 @@ import {
     Space,
     Alert,
     message,
+    Divider,
+    InputNumber,
 } from 'antd';
 import {
     KeyOutlined,
@@ -24,6 +26,9 @@ import {
     ExperimentOutlined,
     CheckCircleOutlined,
     LoadingOutlined,
+    WindowsOutlined,
+    LinuxOutlined,
+    DesktopOutlined,
 } from '@ant-design/icons';
 import type { Connection, ConnectionFormData } from '../../types';
 
@@ -50,6 +55,11 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Watch form values
+    const connectionType = Form.useWatch('connectionType', form);
+    const authMethod = Form.useWatch('authMethod', form);
+    const rdpAuthMethod = Form.useWatch('rdpAuthMethod', form);
+
     // Reset form when modal opens
     useEffect(() => {
         if (isOpen) {
@@ -58,9 +68,13 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     name: connection.name,
                     host: connection.host,
                     user: connection.user,
+                    connectionType: connection.connectionType || 'ssh',
                     authMethod: connection.authMethod,
                     keyPath: connection.keyPath || '',
                     autoConnect: connection.autoConnect || false,
+                    rdpAuthMethod: connection.rdpAuthMethod || 'credentials',
+                    domain: connection.domain || '',
+                    port: connection.port,
                 });
                 // Load password if editing
                 window.ssm.getPassword(connection.id).then(pwd => {
@@ -71,9 +85,13 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     name: '',
                     host: '',
                     user: 'root',
+                    connectionType: 'ssh',
                     authMethod: 'password',
                     keyPath: '',
                     autoConnect: false,
+                    rdpAuthMethod: 'credentials',
+                    domain: '',
+                    port: undefined,
                 });
                 setPassword('');
             }
@@ -82,10 +100,28 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
         }
     }, [isOpen, connection, form]);
 
+    // Update default user when connection type changes
+    useEffect(() => {
+        if (!isEditing && connectionType) {
+            const currentUser = form.getFieldValue('user');
+            if (connectionType === 'ssh' && (!currentUser || currentUser === 'Administrator')) {
+                form.setFieldValue('user', 'root');
+            } else if (connectionType === 'rdp' && (!currentUser || currentUser === 'root')) {
+                form.setFieldValue('user', 'Administrator');
+            }
+        }
+    }, [connectionType, isEditing, form]);
+
     const handleTest = async () => {
         try {
             await form.validateFields(['host', 'user']);
         } catch {
+            return;
+        }
+
+        // Only test SSH connections
+        if (connectionType === 'rdp') {
+            message.info(t('connection.rdp_test_not_available'));
             return;
         }
 
@@ -99,6 +135,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 name: values.name,
                 host: values.host,
                 user: values.user,
+                connectionType: values.connectionType || 'ssh',
                 authMethod: values.authMethod,
                 keyPath: values.keyPath || '',
                 autoConnect: values.autoConnect || false,
@@ -123,12 +160,23 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 name: values.name,
                 host: values.host,
                 user: values.user,
-                authMethod: values.authMethod,
+                connectionType: values.connectionType || 'ssh',
+                authMethod: values.connectionType === 'rdp' ? 'password' : values.authMethod,
                 keyPath: values.keyPath || '',
                 autoConnect: values.autoConnect || false,
+                rdpAuthMethod: values.connectionType === 'rdp' ? values.rdpAuthMethod : undefined,
+                domain: values.connectionType === 'rdp' ? values.domain : undefined,
+                port: values.port,
             };
 
-            if (formData.authMethod === 'password' && !password && !isEditing) {
+            // Validate password for SSH connections with password auth
+            if (values.connectionType === 'ssh' && formData.authMethod === 'password' && !password && !isEditing) {
+                setError(t('connection.password_required'));
+                return;
+            }
+
+            // Validate password for RDP connections with credentials auth
+            if (values.connectionType === 'rdp' && values.rdpAuthMethod === 'credentials' && !password && !isEditing) {
                 setError(t('connection.password_required'));
                 return;
             }
@@ -138,13 +186,21 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
 
             if (isEditing && connection) {
                 await window.ssm.updateConnection(connection.id, formData);
-                if (formData.authMethod === 'password' && password) {
+                // Save password for SSH password auth or RDP credentials auth
+                const shouldSavePassword =
+                    (formData.connectionType === 'ssh' && formData.authMethod === 'password') ||
+                    (formData.connectionType === 'rdp' && formData.rdpAuthMethod === 'credentials');
+                if (shouldSavePassword && password) {
                     await window.ssm.setPassword(connection.id, password);
                 }
                 message.success(t('connection.connection_updated'));
             } else {
                 const newConn = await window.ssm.addConnection(formData);
-                if (formData.authMethod === 'password' && password) {
+                // Save password for SSH password auth or RDP credentials auth
+                const shouldSavePassword =
+                    (formData.connectionType === 'ssh' && formData.authMethod === 'password') ||
+                    (formData.connectionType === 'rdp' && formData.rdpAuthMethod === 'credentials');
+                if (shouldSavePassword && password) {
                     await window.ssm.setPassword(newConn.id, password);
                 }
                 message.success(t('connection.connection_created'));
@@ -162,23 +218,26 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
         }
     };
 
-    const authMethod = Form.useWatch('authMethod', form);
+    // Determine if we should show SSH-specific test button
+    const showTestButton = connectionType !== 'rdp';
 
     return (
         <Modal
             title={isEditing ? t('common.edit_connection') : t('common.new_connection')}
             open={isOpen}
             onCancel={onClose}
-            width={520}
+            width={560}
             footer={[
-                <Button
-                    key="test"
-                    icon={isTesting ? <LoadingOutlined /> : <ExperimentOutlined />}
-                    onClick={handleTest}
-                    loading={isTesting}
-                >
-                    {t('common.test')}
-                </Button>,
+                showTestButton && (
+                    <Button
+                        key="test"
+                        icon={isTesting ? <LoadingOutlined /> : <ExperimentOutlined />}
+                        onClick={handleTest}
+                        loading={isTesting}
+                    >
+                        {t('common.test')}
+                    </Button>
+                ),
                 <Button key="cancel" onClick={onClose}>
                     {t('common.cancel')}
                 </Button>,
@@ -190,17 +249,42 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 >
                     {isEditing ? t('common.save') : t('common.create')}
                 </Button>,
-            ]}
+            ].filter(Boolean)}
         >
             <Form
                 form={form}
                 layout="vertical"
                 initialValues={{
+                    connectionType: 'ssh',
                     authMethod: 'password',
                     user: 'root',
                     autoConnect: false,
+                    rdpAuthMethod: 'credentials',
                 }}
             >
+                {/* Connection Type */}
+                <Form.Item
+                    name="connectionType"
+                    label={t('connection.connection_type')}
+                >
+                    <Radio.Group buttonStyle="solid" optionType="button">
+                        <Radio.Button value="ssh">
+                            <Space>
+                                <LinuxOutlined />
+                                SSH (Linux)
+                            </Space>
+                        </Radio.Button>
+                        <Radio.Button value="rdp">
+                            <Space>
+                                <WindowsOutlined />
+                                RDP (Windows)
+                            </Space>
+                        </Radio.Button>
+                    </Radio.Group>
+                </Form.Item>
+
+                <Divider style={{ margin: '16px 0' }} />
+
                 {/* Name */}
                 <Form.Item
                     name="name"
@@ -210,7 +294,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     <Input placeholder={t('connection.name_placeholder')} />
                 </Form.Item>
 
-                {/* Host & User */}
+                {/* Host & Port */}
                 <Space style={{ display: 'flex' }} align="start">
                     <Form.Item
                         name="host"
@@ -221,52 +305,135 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                         <Input placeholder={t('connection.host_placeholder')} />
                     </Form.Item>
                     <Form.Item
-                        name="user"
-                        label={t('connection.user')}
-                        rules={[{ required: true, message: t('connection.user_required') }]}
-                        style={{ flex: 1 }}
+                        name="port"
+                        label={t('connection.port')}
+                        style={{ width: 100 }}
                     >
-                        <Input placeholder={t('connection.user_placeholder')} />
+                        <InputNumber
+                            placeholder={connectionType === 'rdp' ? '3389' : '22'}
+                            min={1}
+                            max={65535}
+                            style={{ width: '100%' }}
+                        />
                     </Form.Item>
                 </Space>
 
-                {/* Auth Method */}
-                <Form.Item name="authMethod" label={t('connection.auth_method')}>
-                    <Radio.Group>
-                        <Radio value="password">
-                            <Space>
-                                <LockOutlined />
-                                {t('connection.password')}
-                            </Space>
-                        </Radio>
-                        <Radio value="key">
-                            <Space>
-                                <KeyOutlined />
-                                {t('connection.private_key')}
-                            </Space>
-                        </Radio>
-                    </Radio.Group>
-                </Form.Item>
+                {/* SSH specific fields */}
+                {connectionType === 'ssh' && (
+                    <>
+                        {/* User */}
+                        <Form.Item
+                            name="user"
+                            label={t('connection.user')}
+                            rules={[{ required: true, message: t('connection.user_required') }]}
+                        >
+                            <Input placeholder={t('connection.user_placeholder')} />
+                        </Form.Item>
 
-                {/* Password or Key Path */}
-                {authMethod === 'password' ? (
-                    <Form.Item label={isEditing ? t('connection.password') : `${t('connection.password')} *`}>
-                        <Input.Password
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder={isEditing ? t('connection.password_keep') : t('connection.password_ssh')}
-                        />
-                    </Form.Item>
-                ) : (
-                    <Form.Item
-                        name="keyPath"
-                        label={t('connection.key_path')}
-                        rules={[{ required: authMethod === 'key', message: t('connection.key_path_required') }]}
-                    >
-                        <Input placeholder={t('connection.key_path_placeholder')} />
-                    </Form.Item>
+                        {/* Auth Method */}
+                        <Form.Item name="authMethod" label={t('connection.auth_method')}>
+                            <Radio.Group>
+                                <Radio value="password">
+                                    <Space>
+                                        <LockOutlined />
+                                        {t('connection.password')}
+                                    </Space>
+                                </Radio>
+                                <Radio value="key">
+                                    <Space>
+                                        <KeyOutlined />
+                                        {t('connection.private_key')}
+                                    </Space>
+                                </Radio>
+                            </Radio.Group>
+                        </Form.Item>
+
+                        {/* Password or Key Path */}
+                        {authMethod === 'password' ? (
+                            <Form.Item label={isEditing ? t('connection.password') : `${t('connection.password')} *`}>
+                                <Input.Password
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder={isEditing ? t('connection.password_keep') : t('connection.password_ssh')}
+                                />
+                            </Form.Item>
+                        ) : (
+                            <Form.Item
+                                name="keyPath"
+                                label={t('connection.key_path')}
+                                rules={[{ required: authMethod === 'key', message: t('connection.key_path_required') }]}
+                            >
+                                <Input placeholder={t('connection.key_path_placeholder')} />
+                            </Form.Item>
+                        )}
+                    </>
                 )}
 
+                {/* RDP specific fields */}
+                {connectionType === 'rdp' && (
+                    <>
+                        {/* RDP Auth Method */}
+                        <Form.Item name="rdpAuthMethod" label={t('connection.rdp_auth_method')}>
+                            <Radio.Group>
+                                <Radio value="credentials">
+                                    <Space>
+                                        <LockOutlined />
+                                        {t('connection.rdp_credentials')}
+                                    </Space>
+                                </Radio>
+                                <Radio value="windows_auth">
+                                    <Space>
+                                        <DesktopOutlined />
+                                        {t('connection.rdp_windows_auth')}
+                                    </Space>
+                                </Radio>
+                            </Radio.Group>
+                        </Form.Item>
+
+                        {/* Credentials fields for RDP */}
+                        {rdpAuthMethod === 'credentials' && (
+                            <>
+                                {/* Domain & User */}
+                                <Space style={{ display: 'flex' }} align="start">
+                                    <Form.Item
+                                        name="domain"
+                                        label={t('connection.domain')}
+                                        style={{ width: 150 }}
+                                    >
+                                        <Input placeholder={t('connection.domain_placeholder')} />
+                                    </Form.Item>
+                                    <Form.Item
+                                        name="user"
+                                        label={t('connection.user')}
+                                        rules={[{ required: true, message: t('connection.user_required') }]}
+                                        style={{ flex: 1 }}
+                                    >
+                                        <Input placeholder={t('connection.user_placeholder_windows')} />
+                                    </Form.Item>
+                                </Space>
+
+                                {/* Password */}
+                                <Form.Item label={isEditing ? t('connection.password') : `${t('connection.password')} *`}>
+                                    <Input.Password
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder={isEditing ? t('connection.password_keep') : t('connection.password_rdp')}
+                                    />
+                                </Form.Item>
+                            </>
+                        )}
+
+                        {/* Windows Auth info */}
+                        {rdpAuthMethod === 'windows_auth' && (
+                            <Alert
+                                type="info"
+                                message={t('connection.windows_auth_info')}
+                                showIcon
+                                style={{ marginBottom: 16 }}
+                            />
+                        )}
+                    </>
+                )}
 
                 {/* Auto Connect */}
                 <Form.Item name="autoConnect" valuePropName="checked">

@@ -19,6 +19,7 @@
     "dependencies": {
         "composerize": "^1.7.5",
         "keytar": "^7.9.0",
+        "node-rdpjs": "^0.3.0",
         "ssh2": "^1.15.0",
         "winston": "^3.13.0",
         "winston-daily-rotate-file": "^5.0.0"
