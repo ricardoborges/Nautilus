@@ -45,6 +45,10 @@
     "copy": "Copiar",
     "copied": "Copiado para a área de transferência"
   },
+  "settings": {
+    "stacks_directory": "Diretório de Stacks",
+    "stacks_directory_help": "Diretório remoto onde as stacks Docker Compose serão armazenadas"
+  },
   "splash": {
     "starting": "Iniciando...",
     "connecting_backend": "Conectando ao backend...",
@@ -363,6 +367,33 @@
     "no_stacks_match": "Nenhum stack corresponde à busca",
     "stacks_load_error": "Erro ao carregar stacks",
     "search_stacks": "Buscar...",
-    "stack_remove_not_implemented": "Remoção de stacks ainda não implementada"
+    "stack_remove_not_implemented": "Remoção de stacks ainda não implementada",
+    "deploy": {
+      "new_deploy": "Novo Deploy",
+      "title": "Implantar Nova Stack",
+      "stack_editor": "Editor de Stacks",
+      "stack_editor_desc": "Cole o conteúdo do seu docker-compose.yml abaixo para implantar uma nova stack.",
+      "quick_run": "Quick Run",
+      "quick_run_desc": "Cole um comando docker run e converteremos para uma Stack Compose para facilitar o gerenciamento.",
+      "stack_name": "Nome da Stack",
+      "stack_name_placeholder": "meu-app",
+      "stack_name_required": "Nome da stack é obrigatório",
+      "compose_yaml": "Docker Compose YAML",
+      "invalid_yaml": "Formato YAML inválido",
+      "deploy": "Implantar Stack",
+      "deploy_as_stack": "Implantar como Stack",
+      "success": "Stack implantada com sucesso!",
+      "deploy_error": "Falha ao implantar stack",
+      "docker_run_command": "Comando Docker Run",
+      "docker_run_placeholder": "docker run -d -p 8080:80 --name myapp nginx:latest",
+      "docker_run_required": "Comando docker run é obrigatório",
+      "invalid_docker_run": "Comando docker run inválido. Deve começar com 'docker run'.",
+      "convert": "Converter para Compose",
+      "convert_error": "Falha ao converter comando docker run",
+      "converted_compose": "Compose Convertido",
+      "use_in_editor": "Usar no Editor",
+      "no_compose_to_deploy": "Nenhum conteúdo compose para implantar. Converta um comando docker run primeiro.",
+      "deploy_directory": "Diretório de deploy"
+    }
   }
 }

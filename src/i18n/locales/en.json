@@ -45,6 +45,10 @@
     "copy": "Copy",
     "copied": "Copied to clipboard"
   },
+  "settings": {
+    "stacks_directory": "Stacks Directory",
+    "stacks_directory_help": "Remote directory where Docker Compose stacks will be stored"
+  },
   "splash": {
     "starting": "Starting...",
     "connecting_backend": "Connecting to backend...",
@@ -363,6 +367,33 @@
     "no_stacks_match": "No stacks match your search",
     "stacks_load_error": "Error loading stacks",
     "search_stacks": "Search...",
-    "stack_remove_not_implemented": "Stack removal is not yet implemented"
+    "stack_remove_not_implemented": "Stack removal is not yet implemented",
+    "deploy": {
+      "new_deploy": "New Deploy",
+      "title": "Deploy New Stack",
+      "stack_editor": "Stack Editor",
+      "stack_editor_desc": "Paste your docker-compose.yml content below to deploy a new stack.",
+      "quick_run": "Quick Run",
+      "quick_run_desc": "Paste a docker run command and we'll convert it to a Compose stack for easier management.",
+      "stack_name": "Stack Name",
+      "stack_name_placeholder": "my-app",
+      "stack_name_required": "Stack name is required",
+      "compose_yaml": "Docker Compose YAML",
+      "invalid_yaml": "Invalid YAML format",
+      "deploy": "Deploy Stack",
+      "deploy_as_stack": "Deploy as Stack",
+      "success": "Stack deployed successfully!",
+      "deploy_error": "Failed to deploy stack",
+      "docker_run_command": "Docker Run Command",
+      "docker_run_placeholder": "docker run -d -p 8080:80 --name myapp nginx:latest",
+      "docker_run_required": "Docker run command is required",
+      "invalid_docker_run": "Invalid docker run command. It should start with 'docker run'.",
+      "convert": "Convert to Compose",
+      "convert_error": "Failed to convert docker run command",
+      "converted_compose": "Converted Compose",
+      "use_in_editor": "Use in Editor",
+      "no_compose_to_deploy": "No compose content to deploy. Convert a docker run command first.",
+      "deploy_directory": "Deploy directory"
+    }
   }
 }

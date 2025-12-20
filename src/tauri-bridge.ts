@@ -318,6 +318,12 @@ const ssm: SSMAPI = {
     dockerNetworkAction: (connectionId: string, networkId: string, action: 'remove'): Promise<void> =>
         backendInvoke<void>('ssm:docker:networkAction', { connectionId, networkId, action }),
 
+    dockerDeployStack: (connectionId: string, stackName: string, composeContent: string, stacksDirectory: string): Promise<void> =>
+        backendInvoke<void>('ssm:docker:deployStack', { connectionId, stackName, composeContent, stacksDirectory }),
+
+    dockerConvertRun: (connectionId: string, dockerRunCommand: string): Promise<string> =>
+        backendInvoke<string>('ssm:docker:convertRun', { connectionId, dockerRunCommand }),
+
     // Window Controls
     win: {
         minimize: async (): Promise<void> => {

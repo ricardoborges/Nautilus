@@ -17,6 +17,7 @@
     },
     "bin": "dist/index.js",
     "dependencies": {
+        "composerize": "^1.7.5",
         "keytar": "^7.9.0",
         "ssh2": "^1.15.0",
         "winston": "^3.13.0",

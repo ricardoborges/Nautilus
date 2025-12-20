@@ -943,6 +943,79 @@ const handlers: HandlerRegistry = {
             ssh.end();
         }
     },
+
+    'ssm:docker:deployStack': async (args) => {
+        const { connectionId, stackName, composeContent, stacksDirectory } = args as {
+            connectionId: string;
+            stackName: string;
+            composeContent: string;
+            stacksDirectory: string;
+        };
+
+        // Validate stack name (alphanumeric, hyphens, underscores)
+        if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(stackName)) {
+            throw new Error('Invalid stack name. Use alphanumeric characters, hyphens, and underscores only.');
+        }
+
+        // Use provided directory or default
+        const baseDir = stacksDirectory || '/tmp/nautilus-stacks';
+
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Connection not found');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+
+            // Create the stack directory
+            const stackDir = `${baseDir}/${stackName}`;
+            await ssh.exec(`mkdir -p "${stackDir}"`);
+
+            // Write the docker-compose.yml file using heredoc
+            await ssh.exec(`cat > "${stackDir}/docker-compose.yml" << 'NAUTILUS_EOF'
+${composeContent}
+NAUTILUS_EOF`);
+
+            // Try docker compose (plugin) first, fall back to docker-compose (standalone)
+            // This ensures compatibility with both old and new Docker installations
+            const composeCmd = `cd "${stackDir}" && (docker compose -p "${stackName}" up -d 2>&1 || docker-compose -p "${stackName}" up -d 2>&1)`;
+            const result = await ssh.exec(composeCmd);
+
+            // Check for errors in output
+            const output = result.stdout || result.stderr || '';
+            if (output.toLowerCase().includes('error') && !output.toLowerCase().includes('pulling') && !output.toLowerCase().includes('created') && !output.toLowerCase().includes('started')) {
+                throw new Error(output);
+            }
+
+            return { success: true, output: result.stdout };
+        } finally {
+            ssh.end();
+        }
+    },
+
+    'ssm:docker:convertRun': async (args) => {
+        const { connectionId, dockerRunCommand } = args as {
+            connectionId: string;
+            dockerRunCommand: string;
+        };
+
+        // Validate that it's a docker run command
+        const trimmed = dockerRunCommand.trim().toLowerCase();
+        if (!trimmed.startsWith('docker run') && !trimmed.startsWith('docker container run')) {
+            throw new Error('Invalid docker run command');
+        }
+
+        try {
+            // Use composerize to convert docker run to compose
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const composerize = require('composerize');
+            const composeYaml = composerize(dockerRunCommand);
+            return composeYaml;
+        } catch (error) {
+            const err = error as Error;
+            throw new Error(`Failed to convert docker run command: ${err.message}`);
+        }
+    },
 };
 
 // Event broadcasting for SSE

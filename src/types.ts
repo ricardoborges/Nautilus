@@ -283,6 +283,8 @@ export interface SSMAPI {
     dockerImageAction: (connectionId: string, imageId: string, action: 'remove') => Promise<void>;
     dockerVolumeAction: (connectionId: string, volumeName: string, action: 'remove') => Promise<void>;
     dockerNetworkAction: (connectionId: string, networkId: string, action: 'remove') => Promise<void>;
+    dockerDeployStack: (connectionId: string, stackName: string, composeContent: string, stacksDirectory: string) => Promise<void>;
+    dockerConvertRun: (connectionId: string, dockerRunCommand: string) => Promise<string>;
 
     // Window Controls
     win: SSMWindowControls;

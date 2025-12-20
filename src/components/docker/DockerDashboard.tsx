@@ -53,7 +53,9 @@ import {
     PoweroffOutlined,
     AppstoreOutlined,
     ContainerOutlined,
+    RocketOutlined,
 } from '@ant-design/icons';
+import { NewDeployModal } from './NewDeployModal';
 import type { DockerContainer, DockerImage, DockerVolume, DockerNetwork, DockerStack } from '../../types';
 
 const { Text, Title } = Typography;
@@ -285,7 +287,12 @@ const QuickActions: React.FC<{
     );
 };
 
-export const DockerDashboard: React.FC = () => {
+interface DockerDashboardProps {
+    stacksDirectory?: string;
+    onOpenSettings?: () => void;
+}
+
+export const DockerDashboard: React.FC<DockerDashboardProps> = ({ stacksDirectory = '/tmp/nautilus-stacks', onOpenSettings }) => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
     const { modal, message: messageApi } = App.useApp();
@@ -331,6 +338,9 @@ export const DockerDashboard: React.FC = () => {
     const [logsLoading, setLogsLoading] = useState(false);
     const [logsContainerName, setLogsContainerName] = useState('');
     const [logsContainerId, setLogsContainerId] = useState('');
+
+    // New Deploy modal state
+    const [deployModalOpen, setDeployModalOpen] = useState(false);
 
     // Helper to check for Docker permission errors
     const isDockerPermissionError = (error: unknown): boolean => {
@@ -1277,6 +1287,27 @@ export const DockerDashboard: React.FC = () => {
 
     return (
         <div style={{ padding: 16, height: '100%', overflow: 'auto' }}>
+            {/* New Deploy Button - Always visible */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                marginBottom: 16,
+            }}>
+                <Button
+                    type="primary"
+                    icon={<RocketOutlined />}
+                    onClick={() => setDeployModalOpen(true)}
+                    size="large"
+                    style={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        border: 'none',
+                        boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                    }}
+                >
+                    {t('docker.deploy.new_deploy')}
+                </Button>
+            </div>
+
             {/* Statistics */}
             <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
                 <Col xs={12} sm={6}>
@@ -1766,6 +1797,21 @@ export const DockerDashboard: React.FC = () => {
                     </pre>
                 )}
             </Modal>
+
+            {/* New Deploy Modal */}
+            {activeConnectionId && (
+                <NewDeployModal
+                    open={deployModalOpen}
+                    onClose={() => setDeployModalOpen(false)}
+                    connectionId={activeConnectionId}
+                    stacksDirectory={stacksDirectory}
+                    onOpenSettings={onOpenSettings}
+                    onDeploySuccess={() => {
+                        loadContainers();
+                        loadStacks();
+                    }}
+                />
+            )}
         </div>
     );
 };

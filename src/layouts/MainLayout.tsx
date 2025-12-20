@@ -21,7 +21,7 @@ import {
     ContainerOutlined,
 } from '@ant-design/icons';
 import { ProLayout, PageContainer } from '@ant-design/pro-components';
-import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select } from 'antd';
+import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { MenuProps } from 'antd';
 import { useTheme } from '../context/ThemeContext';
@@ -57,6 +57,17 @@ export const MainLayout: React.FC = () => {
     const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
     const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
+    // Docker stacks directory setting
+    const [stacksDirectory, setStacksDirectory] = useState<string>(() => {
+        return localStorage.getItem('nautilus_stacks_dir') || '/tmp/nautilus-stacks';
+    });
+
+    // Save stacks directory to localStorage when it changes
+    const handleStacksDirectoryChange = (value: string) => {
+        setStacksDirectory(value);
+        localStorage.setItem('nautilus_stacks_dir', value);
+    };
 
     // Get active connection info
     const activeConnection = connections.find(c => c.id === activeConnectionId);
@@ -166,7 +177,7 @@ export const MainLayout: React.FC = () => {
             case 'cron':
                 return <CronManager />;
             case 'docker':
-                return <DockerDashboard />;
+                return <DockerDashboard stacksDirectory={stacksDirectory} onOpenSettings={openSettings} />;
             default:
                 return <Dashboard />;
         }
@@ -402,6 +413,24 @@ export const MainLayout: React.FC = () => {
                                 { value: 'zh', label: '中文' },
                                 { value: 'ko', label: '한국어' },
                             ]}
+                        />
+                    </Form.Item>
+
+                    <Divider>{t('common.docker')}</Divider>
+
+                    <Form.Item
+                        label={
+                            <Space>
+                                <ContainerOutlined />
+                                {t('settings.stacks_directory')}
+                            </Space>
+                        }
+                        help={t('settings.stacks_directory_help')}
+                    >
+                        <Input
+                            value={stacksDirectory}
+                            onChange={(e) => handleStacksDirectoryChange(e.target.value)}
+                            placeholder="/tmp/nautilus-stacks"
                         />
                     </Form.Item>
                 </Form>
