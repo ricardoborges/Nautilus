@@ -57,6 +57,12 @@ const AppContent: React.FC = () => {
     // Get current Ant Design locale
     const antdLocale = antdLocales[i18n.language] || enUS;
 
+    // Sync theme mode to body class for CSS styling
+    useEffect(() => {
+        document.body.classList.remove('light-theme', 'dark-theme');
+        document.body.classList.add(`${themeMode}-theme`);
+    }, [themeMode]);
+
     // Initialize the application
     const initializeApp = useCallback(async () => {
         try {
