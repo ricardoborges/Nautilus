@@ -2,17 +2,12 @@
  * Main Layout Component
  * 
  * Uses Ant Design ProLayout for professional application layout.
- * Includes sidebar navigation, header, and content area.
+ * Supports multiple active connections with OnlyOffice-style tabs.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
-    DashboardOutlined,
-    CodeOutlined,
-    FolderOutlined,
     SettingOutlined,
-    ClockCircleOutlined,
-    AppstoreOutlined,
     PlusOutlined,
     CloudServerOutlined,
     InfoCircleOutlined,
@@ -21,42 +16,39 @@ import {
     ContainerOutlined,
     WindowsOutlined,
     LinuxOutlined,
+    DatabaseOutlined,
+    ExportOutlined,
+    ImportOutlined,
 } from '@ant-design/icons';
-import { ProLayout, PageContainer } from '@ant-design/pro-components';
-import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input } from 'antd';
+import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input, Popconfirm, Row, Col } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { MenuProps } from 'antd';
 import { useTheme } from '../context/ThemeContext';
 import { useConnection } from '../context/ConnectionContext';
-import { Dashboard } from '../components/dashboard/Dashboard';
-import { TerminalManager } from '../components/terminal/TerminalManager';
-import { FileManager } from '../components/files/FileManager';
-import { ProcessManager } from '../components/processes/ProcessManager';
-import { CronManager } from '../components/cron/CronManager';
-import { DockerDashboard } from '../components/docker/DockerDashboard';
+import { ConnectionTabs } from '../components/connections/ConnectionTabs';
+import { ConnectionPane } from '../components/connections/ConnectionPane';
 import { ConnectionModal } from '../components/modals/ConnectionModal';
+import { ConnectionManager } from '../components/connections/ConnectionManager';
 import type { Connection } from '../types';
 import splashScreen from '../assets/splash-screen.png';
 
 const { Text } = Typography;
 
-type TabKey = 'dashboard' | 'terminal' | 'files' | 'processes' | 'cron' | 'docker';
-
 export const MainLayout: React.FC = () => {
     const { t, i18n } = useTranslation();
     const {
         connections,
-        activeConnectionId,
-        selectConnection,
+        activeConnectionIds,
+        focusedConnectionId,
+        openConnection,
         refreshConnections,
     } = useConnection();
 
     const { themeMode, setThemeMode } = useTheme();
     const { modal, message } = App.useApp();
 
-    const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
-    const [collapsed, setCollapsed] = useState(false);
     const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
+    const [isConnectionManagerOpen, setIsConnectionManagerOpen] = useState(false);
     const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
@@ -71,104 +63,18 @@ export const MainLayout: React.FC = () => {
         localStorage.setItem('nautilus_stacks_dir', value);
     };
 
-    // Get active connection info
-    const activeConnection = connections.find(c => c.id === activeConnectionId);
 
-    // Connection dropdown menu items
-    const connectionMenuItems: MenuProps['items'] = [
-        {
-            key: 'add',
-            icon: <PlusOutlined />,
-            label: t('common.new_connection'),
-            onClick: () => {
-                setEditingConnection(null);
-                setIsConnectionModalOpen(true);
-            },
-        },
-        { type: 'divider' },
-        ...connections.map(conn => ({
-            key: conn.id,
-            icon: conn.connectionType === 'rdp' ? <WindowsOutlined style={{ color: '#0078d4' }} /> : <LinuxOutlined style={{ color: '#f57c00' }} />,
-            label: (
-                <Space>
-                    <span>{conn.name}</span>
-                    {conn.id === activeConnectionId && (
-                        <Text type="success" style={{ fontSize: 12 }}>●</Text>
-                    )}
-                </Space>
-            ),
-            children: [
-                {
-                    key: `${conn.id}-connect`,
-                    label: conn.connectionType === 'rdp' ? t('common.launch_rdp') : t('common.connect'),
-                    onClick: async () => {
-                        if (conn.connectionType === 'rdp') {
-                            // RDP - just launch mstsc without changing layout
-                            try {
-                                let password: string | null = null;
-                                if (conn.rdpAuthMethod === 'credentials') {
-                                    password = await window.ssm.getPassword(conn.id);
-                                }
-                                await window.ssm.rdpConnect({
-                                    connectionId: conn.id,
-                                    host: conn.host,
-                                    port: conn.port || 3389,
-                                    username: conn.user,
-                                    password: password || undefined,
-                                    domain: conn.domain,
-                                    useWindowsAuth: conn.rdpAuthMethod === 'windows_auth',
-                                });
-                                message.success(t('rdp.session_launched', { name: conn.name }));
-                            } catch (err) {
-                                message.error(t('rdp.launch_failed', { error: (err as Error).message }));
-                            }
-                        } else {
-                            // SSH - normal connection
-                            selectConnection(conn.id);
-                        }
-                    },
-                },
-                {
-                    key: `${conn.id}-edit`,
-                    label: t('common.edit'),
-                    onClick: () => {
-                        setEditingConnection(conn);
-                        setIsConnectionModalOpen(true);
-                    },
-                },
-                {
-                    key: `${conn.id}-delete`,
-                    label: t('common.delete'),
-                    danger: true,
-                    onClick: async () => {
-                        Modal.confirm({
-                            title: t('common.delete_connection'),
-                            content: t('common.confirm_delete_connection', { name: conn.name }),
-                            okText: t('common.delete'),
-                            okType: 'danger',
-                            cancelText: t('common.cancel'),
-                            onOk: async () => {
-                                await window.ssm.removeConnection(conn.id);
-                                refreshConnections();
-                            },
-                        });
-                    },
-                },
-            ],
-        })),
-    ];
 
-    // Render content based on active tab
-    // Components are kept mounted to preserve state (especially terminal sessions)
+    // Render content based on active connections
     const renderContent = () => {
-        if (!activeConnectionId) {
+        if (activeConnectionIds.length === 0) {
             return (
                 <div style={{
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    height: '100%',
+                    height: 'calc(100vh - 32px)',
                     padding: 48,
                 }}>
                     <CloudServerOutlined style={{ fontSize: 64, color: '#bfbfbf', marginBottom: 24 }} />
@@ -193,42 +99,21 @@ export const MainLayout: React.FC = () => {
             );
         }
 
-        // Keep all components mounted to preserve state (especially terminal sessions)
-        // Use CSS visibility/position to show/hide instead of conditional rendering
-        // Position absolute ensures all components take full height without stacking
-        const containerHeight = 'calc(100vh - 56px)'; // Header height is 56px
-
-        const tabStyle = (tab: TabKey): React.CSSProperties => ({
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            overflow: 'auto',
-            visibility: activeTab === tab ? 'visible' : 'hidden',
-            pointerEvents: activeTab === tab ? 'auto' : 'none',
-        });
+        // Render only the focused connection pane
+        // Header (32px) + Tabs (32px)
+        const containerHeight = 'calc(100vh - 32px - 32px)';
 
         return (
-            <div style={{ position: 'relative', height: containerHeight, width: '100%', overflow: 'hidden' }}>
-                <div style={tabStyle('dashboard')}>
-                    <Dashboard />
-                </div>
-                <div style={tabStyle('terminal')}>
-                    <TerminalManager />
-                </div>
-                <div style={tabStyle('files')}>
-                    <FileManager />
-                </div>
-                <div style={tabStyle('processes')}>
-                    <ProcessManager />
-                </div>
-                <div style={tabStyle('cron')}>
-                    <CronManager />
-                </div>
-                <div style={tabStyle('docker')}>
-                    <DockerDashboard stacksDirectory={stacksDirectory} onOpenSettings={openSettings} />
-                </div>
+            <div style={{ height: containerHeight, width: '100%', overflow: 'hidden' }}>
+                {activeConnectionIds.map(connId => (
+                    <ConnectionPane
+                        key={connId}
+                        connectionId={connId}
+                        isVisible={connId === focusedConnectionId}
+                        stacksDirectory={stacksDirectory}
+                        onOpenSettings={openSettings}
+                    />
+                ))}
             </div>
         );
     };
@@ -278,119 +163,62 @@ export const MainLayout: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '0 24px',
-                height: 56,
+                padding: '0 12px',
+                height: 32,
                 background: themeMode === 'dark' ? '#141414' : '#fff',
                 borderBottom: `1px solid ${themeMode === 'dark' ? '#303030' : '#f0f0f0'}`,
             }}>
                 <Space>
-                    <CloudServerOutlined style={{ fontSize: 20, color: '#1677ff' }} />
-                    <Typography.Title level={5} style={{ margin: 0, color: themeMode === 'dark' ? '#fff' : undefined }}>
+                    <CloudServerOutlined style={{ fontSize: 18, color: '#1677ff' }} />
+                    <Typography.Title level={5} style={{ margin: 0, fontSize: 16, color: themeMode === 'dark' ? '#fff' : undefined }}>
                         Nautilus
                     </Typography.Title>
                 </Space>
-                <Space size="middle">
-                    <Dropdown menu={{ items: connectionMenuItems }} placement="bottomRight">
-                        <Button type={activeConnection ? 'primary' : 'default'} size="large">
-                            <Space>
-                                <CloudServerOutlined />
-                                {activeConnection ? activeConnection.name : t('common.select_connection')}
-                            </Space>
-                        </Button>
-                    </Dropdown>
+                <Space size="small">
+                    <Button
+                        type="default"
+                        size="small"
+                        onClick={() => setIsConnectionManagerOpen(true)}
+                    >
+                        <Space>
+                            <CloudServerOutlined />
+                            {t('common.connections')}
+                        </Space>
+                    </Button>
                     <Button
                         type="text"
+                        size="small"
+                        icon={<SettingOutlined />}
+                        onClick={openSettings}
+                    />
+                    <Button
+                        type="text"
+                        size="small"
                         icon={<InfoCircleOutlined />}
                         onClick={showAbout}
                     />
                 </Space>
             </div>
 
-            {/* ProLayout */}
-            <div style={{ paddingTop: 56 }}>
-                <ProLayout
-                    title="Nautilus"
-                    logo={<CloudServerOutlined style={{ fontSize: 24, color: '#1677ff' }} />}
-                    layout="side"
-                    navTheme={themeMode === 'dark' ? 'realDark' : 'light'}
-                    splitMenus={false}
-                    collapsed={collapsed}
-                    onCollapse={setCollapsed}
-                    siderWidth={220}
-                    fixSiderbar
-                    headerRender={false}
-                    menuProps={{
-                        onClick: (info) => {
-                            setActiveTab(info.key as TabKey);
-                        },
-                        selectedKeys: [activeTab],
-                    }}
-                    route={{
-                        routes: [
-                            {
-                                path: '/dashboard',
-                                name: t('common.dashboard'),
-                                icon: <DashboardOutlined />,
-                                key: 'dashboard',
-                            },
-                            {
-                                path: '/terminal',
-                                name: t('common.terminal'),
-                                icon: <CodeOutlined />,
-                                key: 'terminal',
-                            },
-                            {
-                                path: '/files',
-                                name: t('common.files'),
-                                icon: <FolderOutlined />,
-                                key: 'files',
-                            },
-                            {
-                                path: '/processes',
-                                name: t('common.processes'),
-                                icon: <AppstoreOutlined />,
-                                key: 'processes',
-                            },
-                            {
-                                path: '/cron',
-                                name: t('common.cron'),
-                                icon: <ClockCircleOutlined />,
-                                key: 'cron',
-                            },
-                            // Docker menu - always visible
-                            {
-                                path: '/docker',
-                                name: t('common.docker'),
-                                icon: <ContainerOutlined />,
-                                key: 'docker',
-                            },
-                        ],
-                    }}
-                    menuFooterRender={(props) => {
-                        if (props?.collapsed) return undefined;
-                        return (
-                            <div style={{ padding: '12px 16px', borderTop: `1px solid ${themeMode === 'dark' ? '#303030' : '#f0f0f0'}` }}>
-                                <Button
-                                    type="text"
-                                    icon={<SettingOutlined />}
-                                    block
-                                    onClick={openSettings}
-                                    style={{ textAlign: 'left' }}
-                                >
-                                    {t('common.settings')}
-                                </Button>
-                            </div>
-                        );
-                    }}
-                >
-                    <PageContainer
-                        header={{ title: undefined, breadcrumb: {} }}
-                        style={{ padding: 0 }}
-                    >
-                        {renderContent()}
-                    </PageContainer>
-                </ProLayout>
+            {/* Connection Tabs */}
+            <div style={{ paddingTop: 32 }}>
+                <ConnectionTabs />
+                {renderContent()}
             </div>
+
+            {/* Connection Manager */}
+            <ConnectionManager
+                isOpen={isConnectionManagerOpen}
+                onClose={() => setIsConnectionManagerOpen(false)}
+                onEditConnection={(conn) => {
+                    setEditingConnection(conn);
+                    setIsConnectionModalOpen(true);
+                }}
+                onCreateConnection={() => {
+                    setEditingConnection(null);
+                    setIsConnectionModalOpen(true);
+                }}
+            />
 
             {/* Connection Modal */}
             <ConnectionModal
@@ -418,55 +246,58 @@ export const MainLayout: React.FC = () => {
                         {t('common.close')}
                     </Button>,
                 ]}
-                width={400}
+                width={560}
             >
-                <Form layout="vertical" style={{ marginTop: 16 }}>
-                    <Form.Item
-                        label={
-                            <Space>
-                                <BulbOutlined />
-                                {t('common.theme')}
-                            </Space>
-                        }
-                    >
-                        <Radio.Group
-                            value={themeMode}
-                            onChange={(e) => setThemeMode(e.target.value)}
-                            optionType="button"
-                            buttonStyle="solid"
-                        >
-                            <Radio.Button value="light">☀️ {t('common.light')}</Radio.Button>
-                            <Radio.Button value="dark">🌙 {t('common.dark')}</Radio.Button>
-                        </Radio.Group>
-                    </Form.Item>
-
-                    <Form.Item
-                        label={
-                            <Space>
-                                <GlobalOutlined />
-                                {t('common.language')}
-                            </Space>
-                        }
-                    >
-                        <Select
-                            value={i18n.language}
-                            onChange={(value) => i18n.changeLanguage(value)}
-                            style={{ width: '100%' }}
-                            options={[
-                                { value: 'en', label: 'English' },
-                                { value: 'pt-BR', label: 'Português (Brasil)' },
-                                { value: 'es', label: 'Español' },
-                                { value: 'de', label: 'Deutsch' },
-                                { value: 'it', label: 'Italiano' },
-                                { value: 'fr', label: 'Français' },
-                                { value: 'ja', label: '日本語' },
-                                { value: 'zh', label: '中文' },
-                                { value: 'ko', label: '한국어' },
-                            ]}
-                        />
-                    </Form.Item>
-
-                    <Divider>{t('common.docker')}</Divider>
+                <Form layout="vertical" style={{ marginTop: 8 }}>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item
+                                label={
+                                    <Space>
+                                        <BulbOutlined />
+                                        {t('common.theme')}
+                                    </Space>
+                                }
+                            >
+                                <Radio.Group
+                                    value={themeMode}
+                                    onChange={(e) => setThemeMode(e.target.value)}
+                                    optionType="button"
+                                    buttonStyle="solid"
+                                >
+                                    <Radio.Button value="light">☀️ {t('common.light')}</Radio.Button>
+                                    <Radio.Button value="dark">🌙 {t('common.dark')}</Radio.Button>
+                                </Radio.Group>
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item
+                                label={
+                                    <Space>
+                                        <GlobalOutlined />
+                                        {t('common.language')}
+                                    </Space>
+                                }
+                            >
+                                <Select
+                                    value={i18n.language}
+                                    onChange={(value) => i18n.changeLanguage(value)}
+                                    style={{ width: '100%' }}
+                                    options={[
+                                        { value: 'en', label: 'English' },
+                                        { value: 'pt-BR', label: 'Português (Brasil)' },
+                                        { value: 'es', label: 'Español' },
+                                        { value: 'de', label: 'Deutsch' },
+                                        { value: 'it', label: 'Italiano' },
+                                        { value: 'fr', label: 'Français' },
+                                        { value: 'ja', label: '日本語' },
+                                        { value: 'zh', label: '中文' },
+                                        { value: 'ko', label: '한국어' },
+                                    ]}
+                                />
+                            </Form.Item>
+                        </Col>
+                    </Row>
 
                     <Form.Item
                         label={
@@ -476,6 +307,7 @@ export const MainLayout: React.FC = () => {
                             </Space>
                         }
                         help={t('settings.stacks_directory_help')}
+                        style={{ marginBottom: 16 }}
                     >
                         <Input
                             value={stacksDirectory}
@@ -483,6 +315,99 @@ export const MainLayout: React.FC = () => {
                             placeholder="/tmp/nautilus-stacks"
                         />
                     </Form.Item>
+
+                    <Divider style={{ margin: '8px 0 16px' }}>{t('settings.data_management')}</Divider>
+
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                                <Space>
+                                    <DatabaseOutlined />
+                                    <span>{t('settings.export_database')}</span>
+                                </Space>
+                                <Button
+                                    icon={<ExportOutlined />}
+                                    onClick={async () => {
+                                        try {
+                                            const result = await window.ssm.databaseExport();
+                                            const blob = new Blob([result.data], { type: 'application/octet-stream' });
+                                            const url = URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = `nautilus-backup-${new Date().toISOString().split('T')[0]}.ndb`;
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            document.body.removeChild(a);
+                                            URL.revokeObjectURL(url);
+                                            message.success(t('settings.export_success'));
+                                        } catch (error) {
+                                            message.error(t('settings.export_error'));
+                                        }
+                                    }}
+                                    style={{ width: '100%' }}
+                                >
+                                    {t('settings.export_database')}
+                                </Button>
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    {t('settings.export_database_help')}
+                                </Typography.Text>
+                            </Space>
+                        </Col>
+                        <Col span={12}>
+                            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                                <Space>
+                                    <DatabaseOutlined />
+                                    <span>{t('settings.import_database')}</span>
+                                </Space>
+                                <Popconfirm
+                                    title={t('settings.import_database')}
+                                    description={t('settings.import_warning')}
+                                    onConfirm={() => {
+                                        const input = document.createElement('input');
+                                        input.type = 'file';
+                                        input.accept = '.ndb';
+                                        input.onchange = async (e) => {
+                                            const target = e.target as HTMLInputElement;
+                                            const file = target.files?.[0];
+                                            if (!file) return;
+
+                                            try {
+                                                const reader = new FileReader();
+                                                reader.onload = async (event) => {
+                                                    const data = event.target?.result as string;
+                                                    if (!data) {
+                                                        message.error(t('settings.invalid_file'));
+                                                        return;
+                                                    }
+                                                    try {
+                                                        await window.ssm.databaseImport(data);
+                                                        message.success(t('settings.import_success'));
+                                                        refreshConnections();
+                                                        setIsSettingsModalOpen(false);
+                                                    } catch (error) {
+                                                        message.error(t('settings.import_error'));
+                                                    }
+                                                };
+                                                reader.readAsText(file);
+                                            } catch (error) {
+                                                message.error(t('settings.import_error'));
+                                            }
+                                        };
+                                        input.click();
+                                    }}
+                                    okText={t('common.yes')}
+                                    cancelText={t('common.no')}
+                                >
+                                    <Button icon={<ImportOutlined />} style={{ width: '100%' }}>
+                                        {t('settings.import_database')}
+                                    </Button>
+                                </Popconfirm>
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    {t('settings.import_database_help')}
+                                </Typography.Text>
+                            </Space>
+                        </Col>
+                    </Row>
                 </Form>
             </Modal>
         </>

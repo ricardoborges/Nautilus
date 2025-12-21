@@ -11,6 +11,7 @@ export interface Connection {
     name: string;
     host: string;
     user: string;
+    description?: string;
     connectionType: 'ssh' | 'rdp';
     authMethod: 'password' | 'key';
     keyPath?: string;
@@ -24,6 +25,7 @@ export interface Connection {
 
 export interface ConnectionFormData extends Omit<Connection, 'id'> {
     id?: string;
+    description?: string;
     password?: string;
     // RDP specific
     rdpAuthMethod?: 'credentials' | 'windows_auth';
@@ -314,6 +316,10 @@ export interface SSMAPI {
     snippetAdd: (snippet: Omit<Snippet, 'id'>) => Promise<Snippet>;
     snippetUpdate: (snippet: Snippet) => Promise<void>;
     snippetRemove: (id: string) => Promise<void>;
+
+    // Database
+    databaseExport: () => Promise<{ data: string }>;
+    databaseImport: (data: string) => Promise<void>;
 
     // Docker
     dockerCheckAvailable: (connectionId: string) => Promise<DockerInfo>;

@@ -44,11 +44,30 @@
     "deleted_success": "Excluído com sucesso",
     "docker": "Docker",
     "copy": "Copiar",
-    "copied": "Copiado para a área de transferência"
+    "copied": "Copiado para a área de transferência",
+    "no_available_connections": "Nenhuma conexão disponível",
+    "expand": "Expandir",
+    "collapse": "Recolher",
+    "search_connections": "Pesquisar conexões...",
+    "no_connections_yet": "Nenhuma conexão ainda",
+    "connection_deleted": "Conexão excluída com sucesso",
+    "active": "Ativo",
+    "disconnect": "Desconectar"
   },
   "settings": {
     "stacks_directory": "Diretório de Stacks",
-    "stacks_directory_help": "Diretório remoto onde as stacks Docker Compose serão armazenadas"
+    "stacks_directory_help": "Diretório remoto onde as stacks Docker Compose serão armazenadas",
+    "data_management": "Gerenciamento de Dados",
+    "export_database": "Exportar Banco de Dados",
+    "export_database_help": "Exportar todas as conexões e snippets para um arquivo",
+    "import_database": "Importar Banco de Dados",
+    "import_database_help": "Importar conexões e snippets de um arquivo de backup",
+    "export_success": "Banco de dados exportado com sucesso",
+    "export_error": "Erro ao exportar banco de dados",
+    "import_success": "Banco de dados importado com sucesso. Recarregando dados...",
+    "import_error": "Erro ao importar banco de dados",
+    "import_warning": "Atenção: Isso substituirá todos os dados atuais. Tem certeza?",
+    "invalid_file": "Arquivo de backup inválido"
   },
   "splash": {
     "starting": "Iniciando...",
@@ -206,6 +225,8 @@
     "name": "Nome da Conexão",
     "name_placeholder": "Ex: Servidor Produção",
     "name_required": "Informe o nome da conexão",
+    "description": "Descrição",
+    "description_placeholder": "Descrição opcional...",
     "host": "Host",
     "host_placeholder": "192.168.1.100",
     "host_required": "Informe o host",

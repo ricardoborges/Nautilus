@@ -138,10 +138,17 @@ const isMediaFile = (filename: string): 'image' | 'video' | 'audio' | null => {
     return null;
 };
 
-export const FileManager: React.FC = () => {
+interface FileManagerProps {
+    connectionId?: string;
+}
+
+export const FileManager: React.FC<FileManagerProps> = ({ connectionId: propConnectionId }) => {
     const { t } = useTranslation();
-    const { activeConnectionId } = useConnection();
+    const { activeConnectionId: contextConnectionId } = useConnection();
     const { themeMode } = useTheme();
+
+    // Use prop connectionId if provided, otherwise fall back to context
+    const activeConnectionId = propConnectionId ?? contextConnectionId;
     const [currentPath, setCurrentPath] = useState('/');
     const [files, setFiles] = useState<SFTPFile[]>([]);
     const [isLoading, setIsLoading] = useState(false);

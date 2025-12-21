@@ -20,12 +20,14 @@
         "composerize": "^1.7.5",
         "keytar": "^7.9.0",
         "node-rdpjs": "^0.3.0",
+        "sql.js": "^1.13.0",
         "ssh2": "^1.15.0",
         "winston": "^3.13.0",
         "winston-daily-rotate-file": "^5.0.0"
     },
     "devDependencies": {
         "@types/node": "^20.10.0",
+        "@types/sql.js": "^1.4.9",
         "@types/ssh2": "^1.15.0",
         "pkg": "^5.8.1",
         "tsx": "^4.7.0",

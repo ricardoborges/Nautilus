@@ -287,6 +287,11 @@ const ssm: SSMAPI = {
 
     snippetRemove: (id: string): Promise<void> => backendInvoke<void>('ssm:snippets:remove', { id }),
 
+    // Database methods
+    databaseExport: (): Promise<{ data: string }> => backendInvoke<{ data: string }>('ssm:database:export'),
+
+    databaseImport: (data: string): Promise<void> => backendInvoke<void>('ssm:database:import', { data }),
+
     // Docker methods
     dockerCheckAvailable: (connectionId: string): Promise<DockerInfo> =>
         backendInvoke<DockerInfo>('ssm:docker:check', { connectionId }),

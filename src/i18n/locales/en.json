@@ -44,11 +44,30 @@
     "deleted_success": "Deleted successfully",
     "docker": "Docker",
     "copy": "Copy",
-    "copied": "Copied to clipboard"
+    "copied": "Copied to clipboard",
+    "no_available_connections": "No available connections",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "search_connections": "Search connections...",
+    "no_connections_yet": "No connections yet",
+    "connection_deleted": "Connection deleted successfully",
+    "active": "Active",
+    "disconnect": "Disconnect"
   },
   "settings": {
     "stacks_directory": "Stacks Directory",
-    "stacks_directory_help": "Remote directory where Docker Compose stacks will be stored"
+    "stacks_directory_help": "Remote directory where Docker Compose stacks will be stored",
+    "data_management": "Data Management",
+    "export_database": "Export Database",
+    "export_database_help": "Export all connections and snippets to a file",
+    "import_database": "Import Database",
+    "import_database_help": "Import connections and snippets from a backup file",
+    "export_success": "Database exported successfully",
+    "export_error": "Error exporting database",
+    "import_success": "Database imported successfully. Reloading data...",
+    "import_error": "Error importing database",
+    "import_warning": "Warning: This will replace all current data. Are you sure?",
+    "invalid_file": "Invalid backup file"
   },
   "splash": {
     "starting": "Starting...",
@@ -206,6 +225,8 @@
     "name": "Connection Name",
     "name_placeholder": "Ex: Production Server",
     "name_required": "Please enter the connection name",
+    "description": "Description",
+    "description_placeholder": "Optional description...",
     "host": "Host",
     "host_placeholder": "192.168.1.100",
     "host_required": "Please enter the host",

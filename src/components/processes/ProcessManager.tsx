@@ -36,9 +36,16 @@ const parseProcessList = (output: string): ProcessInfo[] => {
     }).filter(p => p.pid && p.command);
 };
 
-export const ProcessManager: React.FC = () => {
+interface ProcessManagerProps {
+    connectionId?: string;
+}
+
+export const ProcessManager: React.FC<ProcessManagerProps> = ({ connectionId: propConnectionId }) => {
     const { t } = useTranslation();
-    const { activeConnectionId } = useConnection();
+    const { activeConnectionId: contextConnectionId } = useConnection();
+
+    // Use prop connectionId if provided, otherwise fall back to context
+    const activeConnectionId = propConnectionId ?? contextConnectionId;
     const [processes, setProcesses] = useState<ProcessInfo[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [selectedPid, setSelectedPid] = useState<string | null>(null);

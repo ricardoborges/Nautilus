@@ -75,9 +75,16 @@ const extractLogPath = (command: string): string | null => {
     return matches ? matches[1] : null;
 };
 
-export const CronManager: React.FC = () => {
+interface CronManagerProps {
+    connectionId?: string;
+}
+
+export const CronManager: React.FC<CronManagerProps> = ({ connectionId: propConnectionId }) => {
     const { t, i18n } = useTranslation();
-    const { activeConnectionId } = useConnection();
+    const { activeConnectionId: contextConnectionId } = useConnection();
+
+    // Use prop connectionId if provided, otherwise fall back to context
+    const activeConnectionId = propConnectionId ?? contextConnectionId;
     const [jobs, setJobs] = useState<CronJob[]>([]);
     const [rawContent, setRawContent] = useState('');
     const [isLoading, setIsLoading] = useState(false);

@@ -74,22 +74,32 @@ body {
 }
 
 
-/* Pro Layout adjustments */
-.ant-pro-layout {
-    min-height: 100vh;
+/* Layout adjustments */
+.ant-layout {
+    background: transparent !important;
 }
 
-.ant-pro-layout .ant-layout-content {
+.ant-layout-content {
     padding: 0 !important;
 }
 
-/* Page container adjustments */
-.ant-pro-page-container {
-    padding: 0 !important;
+/* Sidebar menu styling */
+.ant-layout-sider .ant-menu {
+    border-inline-end: none !important;
 }
 
-.ant-pro-page-container .ant-pro-page-container-children-content {
-    padding: 16px !important;
+.ant-layout-sider .ant-menu-item {
+    margin: 2px 4px !important;
+    border-radius: 6px !important;
+}
+
+.ant-layout-sider .ant-menu-inline-collapsed .ant-menu-item {
+    padding-inline: calc(50% - 14px) !important;
+}
+
+/* Compact connection tabs */
+.ant-tabs-small>.ant-tabs-nav .ant-tabs-tab {
+    padding: 4px 12px !important;
 }
 
 /* Card hover effects */
@@ -213,4 +223,80 @@ body {
     font-size: 64px;
     margin-bottom: 16px;
     color: #bfbfbf;
+}
+
+/* =============================================
+   Dark Theme Styles
+   ============================================= */
+
+/* Body dark theme background */
+body.dark-theme {
+    background-color: #141414;
+}
+
+/* Scrollbar for dark theme */
+body.dark-theme ::-webkit-scrollbar-track {
+    background: #1f1f1f;
+}
+
+body.dark-theme ::-webkit-scrollbar-thumb {
+    background: #434343;
+}
+
+body.dark-theme ::-webkit-scrollbar-thumb:hover {
+    background: #5a5a5a;
+}
+
+/* ProCard/Card dark theme fixes */
+body.dark-theme .statistic-card {
+    background: #242424 !important;
+    border-color: #424242 !important;
+}
+
+body.dark-theme .statistic-card:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    border-color: #505050 !important;
+}
+
+body.dark-theme .ant-card {
+    background: #242424;
+    border-color: #424242;
+}
+
+body.dark-theme .ant-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border-color: #505050;
+}
+
+body.dark-theme .ant-pro-card {
+    background: #242424 !important;
+    border-color: #424242 !important;
+}
+
+/* File manager tree dark theme */
+body.dark-theme .file-manager-tree .ant-tree-node-content-wrapper:hover {
+    background-color: #303030;
+}
+
+/* Process table dark theme */
+body.dark-theme .process-table .ant-table-row:hover {
+    background-color: #262626;
+}
+
+/* Loading overlay dark theme */
+body.dark-theme .loading-overlay {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+/* Descriptions dark theme */
+body.dark-theme .ant-descriptions {
+    background: transparent;
+}
+
+body.dark-theme .ant-descriptions-item-label {
+    color: rgba(255, 255, 255, 0.65);
+}
+
+body.dark-theme .ant-descriptions-item-content {
+    color: rgba(255, 255, 255, 0.85);
 }

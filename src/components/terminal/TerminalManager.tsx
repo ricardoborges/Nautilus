@@ -30,10 +30,17 @@ interface TerminalSession {
     fitAddon: FitAddon;
 }
 
-export const TerminalManager: React.FC = () => {
+interface TerminalManagerProps {
+    connectionId?: string;
+}
+
+export const TerminalManager: React.FC<TerminalManagerProps> = ({ connectionId: propConnectionId }) => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
-    const { activeConnectionId } = useConnection();
+    const { activeConnectionId: contextConnectionId } = useConnection();
+
+    // Use prop connectionId if provided, otherwise fall back to context
+    const activeConnectionId = propConnectionId ?? contextConnectionId;
     const [sessions, setSessions] = useState<TerminalSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
     const [showSnippets, setShowSnippets] = useState(true);
@@ -228,20 +235,27 @@ export const TerminalManager: React.FC = () => {
     // Create first terminal when connection changes
     useEffect(() => {
         // Cleanup old sessions
-        sessionsRef.current.forEach((session, id) => {
-            session.term.dispose();
-            terminalService.unregister(id);
-            window.ssm.terminalStop(id);
-        });
-        sessionsRef.current.clear();
-        setSessions([]);
-        setActiveSessionId(null);
-        terminalService.setActive(null);
+        const cleanup = () => {
+            sessionsRef.current.forEach((session, id) => {
+                session.term.dispose();
+                terminalService.unregister(id);
+                window.ssm.terminalStop(id);
+            });
+            sessionsRef.current.clear();
+            setSessions([]);
+            setActiveSessionId(null);
+            terminalService.setActive(null);
+        };
+
+        cleanup();
 
         // Create new session if connected
         if (activeConnectionId) {
             createSession();
         }
+
+        // Return cleanup function for component unmount
+        return cleanup;
     }, [activeConnectionId, createSession]);
 
     if (!activeConnectionId) {

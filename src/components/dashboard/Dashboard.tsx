@@ -26,9 +26,16 @@ Chart.register(...registerables);
 
 const { Title, Text } = Typography;
 
-export const Dashboard: React.FC = () => {
+interface DashboardProps {
+    connectionId?: string;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ connectionId: propConnectionId }) => {
     const { t } = useTranslation();
-    const { activeConnectionId, metrics, isLoading } = useConnection();
+    const { activeConnectionId: contextConnectionId, metrics, isLoading } = useConnection();
+
+    // Use prop connectionId if provided, otherwise fall back to context
+    const activeConnectionId = propConnectionId ?? contextConnectionId;
 
     const cpuChartRef = useRef<HTMLCanvasElement>(null);
     const memChartRef = useRef<HTMLCanvasElement>(null);
