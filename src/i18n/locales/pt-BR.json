@@ -51,7 +51,8 @@
     "search_connections": "Pesquisar conexões...",
     "no_connections_yet": "Nenhuma conexão ainda",
     "connection_deleted": "Conexão excluída com sucesso",
-    "active": "Ativo"
+    "active": "Ativo",
+    "disconnect": "Desconectar"
   },
   "settings": {
     "stacks_directory": "Diretório de Stacks",

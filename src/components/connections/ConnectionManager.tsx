@@ -27,6 +27,7 @@ import {
     EditOutlined,
     DeleteOutlined,
     LoginOutlined,
+    LogoutOutlined,
     CheckCircleFilled
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -54,6 +55,7 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
         connections,
         activeConnectionIds,
         openConnection,
+        closeConnection,
         refreshConnections
     } = useConnection();
     const { message } = App.useApp();
@@ -208,19 +210,26 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                                     )}
 
                                     <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '1px solid var(--ant-color-border-secondary)', display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-                                        <Tooltip title={t('common.connect')}>
+                                        <Tooltip title={isActive ? t('common.disconnect') : t('common.connect')}>
                                             <Button
-                                                type="primary"
-                                                ghost
+                                                type="default"
+                                                danger={isActive}
                                                 size="small"
-                                                icon={<LoginOutlined style={{ fontSize: 12 }} />}
+                                                icon={isActive
+                                                    ? <LogoutOutlined style={{ fontSize: 12 }} />
+                                                    : <LoginOutlined style={{ fontSize: 12 }} />
+                                                }
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleConnect(item);
+                                                    if (isActive) {
+                                                        closeConnection(item.id);
+                                                    } else {
+                                                        handleConnect(item);
+                                                    }
                                                 }}
                                                 style={{ height: 24, padding: '0 8px', fontSize: 12 }}
                                             >
-                                                {t('common.connect')}
+                                                {isActive ? t('common.disconnect') : t('common.connect')}
                                             </Button>
                                         </Tooltip>
                                         <Tooltip title={t('common.edit')}>
