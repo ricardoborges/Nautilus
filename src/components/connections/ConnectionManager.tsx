@@ -31,6 +31,7 @@ import {
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useConnection } from '../../context/ConnectionContext';
+import { useTheme } from '../../context/ThemeContext';
 import { Connection } from '../../types';
 
 const { Text } = Typography;
@@ -56,8 +57,12 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
         refreshConnections
     } = useConnection();
     const { message } = App.useApp();
+    const { themeMode } = useTheme();
 
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Define border color based on theme
+    const borderColor = themeMode === 'dark' ? '#434343' : '#d9d9d9';
 
     // Filter connections based on search term
     const filteredConnections = useMemo(() => {
@@ -154,7 +159,7 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                             <List.Item>
                                 <div
                                     style={{
-                                        border: `1px solid ${isActive ? '#1677ff' : 'var(--ant-color-border-secondary)'}`,
+                                        border: `1px solid ${isActive ? '#1677ff' : borderColor}`,
                                         borderRadius: 6,
                                         padding: 10,
                                         cursor: 'pointer',
@@ -163,15 +168,16 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                                         height: '100%',
                                         display: 'flex',
                                         flexDirection: 'column',
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
                                     }}
                                     className="connection-card"
                                     onMouseEnter={(e) => {
                                         e.currentTarget.style.borderColor = '#1677ff';
-                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor = isActive ? '#1677ff' : 'var(--ant-color-border-secondary)';
-                                        e.currentTarget.style.boxShadow = 'none';
+                                        e.currentTarget.style.borderColor = isActive ? '#1677ff' : borderColor;
+                                        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.06)';
                                     }}
                                     onDoubleClick={() => handleConnect(item)}
                                 >
