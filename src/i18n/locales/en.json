@@ -45,7 +45,9 @@
     "docker": "Docker",
     "copy": "Copy",
     "copied": "Copied to clipboard",
-    "no_available_connections": "No available connections"
+    "no_available_connections": "No available connections",
+    "expand": "Expand",
+    "collapse": "Collapse"
   },
   "settings": {
     "stacks_directory": "Stacks Directory",

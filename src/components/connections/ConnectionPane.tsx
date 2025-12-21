@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { ProLayout, PageContainer } from '@ant-design/pro-components';
+import { Layout, Menu, Button, Tooltip } from 'antd';
 import {
     DashboardOutlined,
     CodeOutlined,
@@ -15,9 +15,9 @@ import {
     AppstoreOutlined,
     ContainerOutlined,
     SettingOutlined,
-    CloudServerOutlined,
+    MenuFoldOutlined,
+    MenuUnfoldOutlined,
 } from '@ant-design/icons';
-import { Button } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { Dashboard } from '../dashboard/Dashboard';
@@ -26,6 +26,8 @@ import { FileManager } from '../files/FileManager';
 import { ProcessManager } from '../processes/ProcessManager';
 import { CronManager } from '../cron/CronManager';
 import { DockerDashboard } from '../docker/DockerDashboard';
+
+const { Sider, Content } = Layout;
 
 type TabKey = 'dashboard' | 'terminal' | 'files' | 'processes' | 'cron' | 'docker';
 
@@ -47,134 +49,150 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
     const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
     const [collapsed, setCollapsed] = useState(false);
 
-    // Container height calculation
-    const containerHeight = 'calc(100vh - 56px - 40px)'; // Header + tabs height
+    const isDark = themeMode === 'dark';
+
+    const menuItems = [
+        {
+            key: 'dashboard',
+            icon: <DashboardOutlined />,
+            label: t('common.dashboard'),
+        },
+        {
+            key: 'terminal',
+            icon: <CodeOutlined />,
+            label: t('common.terminal'),
+        },
+        {
+            key: 'files',
+            icon: <FolderOutlined />,
+            label: t('common.files'),
+        },
+        {
+            key: 'processes',
+            icon: <AppstoreOutlined />,
+            label: t('common.processes'),
+        },
+        {
+            key: 'cron',
+            icon: <ClockCircleOutlined />,
+            label: t('common.cron'),
+        },
+        {
+            key: 'docker',
+            icon: <ContainerOutlined />,
+            label: t('common.docker'),
+        },
+    ];
 
     const tabStyle = (tab: TabKey): React.CSSProperties => ({
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        display: activeTab === tab ? 'flex' : 'none',
+        flexDirection: 'column',
+        height: '100%',
         overflow: 'auto',
-        visibility: activeTab === tab ? 'visible' : 'hidden',
-        pointerEvents: activeTab === tab ? 'auto' : 'none',
     });
 
+    if (!isVisible) {
+        return null;
+    }
+
     return (
-        <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            visibility: isVisible ? 'visible' : 'hidden',
-            pointerEvents: isVisible ? 'auto' : 'none',
-        }}>
-            <ProLayout
-                title="Nautilus"
-                logo={<CloudServerOutlined style={{ fontSize: 24, color: '#1677ff' }} />}
-                layout="side"
-                navTheme={themeMode === 'dark' ? 'realDark' : 'light'}
-                splitMenus={false}
+        <Layout style={{ height: '100%', background: 'transparent' }}>
+            <Sider
+                collapsible
                 collapsed={collapsed}
                 onCollapse={setCollapsed}
-                siderWidth={220}
-                fixSiderbar
-                headerRender={false}
-                menuProps={{
-                    onClick: (info) => {
-                        setActiveTab(info.key as TabKey);
-                    },
-                    selectedKeys: [activeTab],
+                width={200}
+                collapsedWidth={48}
+                theme={isDark ? 'dark' : 'light'}
+                trigger={null}
+                style={{
+                    background: isDark ? '#141414' : '#fff',
+                    borderRight: `1px solid ${isDark ? '#303030' : '#f0f0f0'}`,
+                    display: 'flex',
+                    flexDirection: 'column',
                 }}
-                route={{
-                    routes: [
-                        {
-                            path: '/dashboard',
-                            name: t('common.dashboard'),
-                            icon: <DashboardOutlined />,
-                            key: 'dashboard',
-                        },
-                        {
-                            path: '/terminal',
-                            name: t('common.terminal'),
-                            icon: <CodeOutlined />,
-                            key: 'terminal',
-                        },
-                        {
-                            path: '/files',
-                            name: t('common.files'),
-                            icon: <FolderOutlined />,
-                            key: 'files',
-                        },
-                        {
-                            path: '/processes',
-                            name: t('common.processes'),
-                            icon: <AppstoreOutlined />,
-                            key: 'processes',
-                        },
-                        {
-                            path: '/cron',
-                            name: t('common.cron'),
-                            icon: <ClockCircleOutlined />,
-                            key: 'cron',
-                        },
-                        {
-                            path: '/docker',
-                            name: t('common.docker'),
-                            icon: <ContainerOutlined />,
-                            key: 'docker',
-                        },
-                    ],
-                }}
-                menuFooterRender={(props) => {
-                    if (props?.collapsed) return undefined;
-                    return (
-                        <div style={{ padding: '12px 16px', borderTop: `1px solid ${themeMode === 'dark' ? '#303030' : '#f0f0f0'}` }}>
+            >
+                <div style={{ flex: 1, overflow: 'auto' }}>
+                    <Menu
+                        mode="inline"
+                        selectedKeys={[activeTab]}
+                        onClick={(info) => setActiveTab(info.key as TabKey)}
+                        items={menuItems}
+                        theme={isDark ? 'dark' : 'light'}
+                        style={{
+                            border: 'none',
+                            background: 'transparent',
+                        }}
+                    />
+                </div>
+
+                {/* Footer with Settings and Collapse */}
+                <div style={{
+                    borderTop: `1px solid ${isDark ? '#303030' : '#f0f0f0'}`,
+                    padding: collapsed ? '8px 0' : '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                }}>
+                    {!collapsed && (
+                        <Button
+                            type="text"
+                            icon={<SettingOutlined />}
+                            block
+                            onClick={onOpenSettings}
+                            style={{ textAlign: 'left', justifyContent: 'flex-start' }}
+                        >
+                            {t('common.settings')}
+                        </Button>
+                    )}
+                    {collapsed && (
+                        <Tooltip title={t('common.settings')} placement="right">
                             <Button
                                 type="text"
                                 icon={<SettingOutlined />}
-                                block
                                 onClick={onOpenSettings}
-                                style={{ textAlign: 'left' }}
-                            >
-                                {t('common.settings')}
-                            </Button>
-                        </div>
-                    );
-                }}
-            >
-                <PageContainer
-                    header={{ title: undefined, breadcrumb: {} }}
-                    style={{ padding: 0 }}
-                >
-                    <div style={{ position: 'relative', height: containerHeight, width: '100%', overflow: 'hidden' }}>
-                        <div style={tabStyle('dashboard')}>
-                            <Dashboard connectionId={connectionId} />
-                        </div>
-                        <div style={tabStyle('terminal')}>
-                            <TerminalManager connectionId={connectionId} />
-                        </div>
-                        <div style={tabStyle('files')}>
-                            <FileManager connectionId={connectionId} />
-                        </div>
-                        <div style={tabStyle('processes')}>
-                            <ProcessManager connectionId={connectionId} />
-                        </div>
-                        <div style={tabStyle('cron')}>
-                            <CronManager connectionId={connectionId} />
-                        </div>
-                        <div style={tabStyle('docker')}>
-                            <DockerDashboard
-                                connectionId={connectionId}
-                                stacksDirectory={stacksDirectory}
-                                onOpenSettings={onOpenSettings}
+                                style={{ width: '100%' }}
                             />
-                        </div>
-                    </div>
-                </PageContainer>
-            </ProLayout>
-        </div>
+                        </Tooltip>
+                    )}
+                    <Tooltip title={collapsed ? t('common.expand') : t('common.collapse')} placement="right">
+                        <Button
+                            type="text"
+                            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                            onClick={() => setCollapsed(!collapsed)}
+                            style={{ width: '100%' }}
+                        />
+                    </Tooltip>
+                </div>
+            </Sider>
+
+            <Content style={{
+                overflow: 'hidden',
+                background: isDark ? '#1f1f1f' : '#f5f5f5',
+            }}>
+                <div style={tabStyle('dashboard')}>
+                    <Dashboard connectionId={connectionId} />
+                </div>
+                <div style={tabStyle('terminal')}>
+                    <TerminalManager connectionId={connectionId} />
+                </div>
+                <div style={tabStyle('files')}>
+                    <FileManager connectionId={connectionId} />
+                </div>
+                <div style={tabStyle('processes')}>
+                    <ProcessManager connectionId={connectionId} />
+                </div>
+                <div style={tabStyle('cron')}>
+                    <CronManager connectionId={connectionId} />
+                </div>
+                <div style={tabStyle('docker')}>
+                    <DockerDashboard
+                        connectionId={connectionId}
+                        stacksDirectory={stacksDirectory}
+                        onOpenSettings={onOpenSettings}
+                    />
+                </div>
+            </Content>
+        </Layout>
     );
 };

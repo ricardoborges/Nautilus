@@ -86,17 +86,46 @@ export const ConnectionTabs: React.FC = () => {
         }
     };
 
-    if (activeConnectionIds.length === 0) {
-        return null; // Don't render if no connections are active
+    // Don't render if no connections are active AND no connection is focused
+    if (activeConnectionIds.length === 0 && !focusedConnectionId) {
+        return null;
     }
 
+    const isDark = themeMode === 'dark';
+
+    // Colors based on theme - tab active matches content background
+    const tabActiveBackground = isDark ? '#1f1f1f' : '#f5f5f5';
+    const tabInactiveBackground = isDark ? '#141414' : '#e8e8e8';
+    const borderColor = isDark ? '#303030' : '#d9d9d9';
+
     return (
-        <div style={{
-            background: themeMode === 'dark' ? '#1f1f1f' : '#fafafa',
-            borderBottom: `1px solid ${themeMode === 'dark' ? '#303030' : '#f0f0f0'}`,
-            paddingLeft: 8,
-            paddingRight: 8,
-        }}>
+        <div
+            className={`connection-tabs-container ${isDark ? 'dark-theme' : 'light-theme'}`}
+            style={{
+                background: isDark ? '#141414' : '#fff',
+                borderBottom: `1px solid ${borderColor}`,
+                paddingLeft: 0,
+                paddingRight: 0,
+                height: 32,
+                display: 'flex',
+                alignItems: 'flex-end',
+            }}
+        >
+            <style>{`
+                .connection-tabs-container .ant-tabs .ant-tabs-nav .ant-tabs-tab {
+                    background: ${tabInactiveBackground} !important;
+                    border-color: ${borderColor} !important;
+                    transition: all 0.2s ease;
+                }
+                .connection-tabs-container .ant-tabs .ant-tabs-nav .ant-tabs-tab.ant-tabs-tab-active {
+                    background: ${tabActiveBackground} !important;
+                    border-color: ${borderColor} !important;
+                    border-bottom-color: ${tabActiveBackground} !important;
+                }
+                .connection-tabs-container .ant-tabs .ant-tabs-nav .ant-tabs-tab:hover:not(.ant-tabs-tab-active) {
+                    background: ${isDark ? '#252525' : '#e0e0e0'} !important;
+                }
+            `}</style>
             <Tabs
                 type="editable-card"
                 activeKey={focusedConnectionId || undefined}
@@ -105,24 +134,14 @@ export const ConnectionTabs: React.FC = () => {
                 items={tabItems}
                 hideAdd
                 size="small"
-                tabBarStyle={{ marginBottom: 0 }}
-                tabBarExtraContent={{
-                    right: (
-                        <Dropdown
-                            menu={{ items: dropdownItems }}
-                            trigger={['click']}
-                            open={dropdownOpen}
-                            onOpenChange={setDropdownOpen}
-                            placement="bottomRight"
-                        >
-                            <Button
-                                type="text"
-                                size="small"
-                                icon={<PlusOutlined />}
-                                style={{ marginLeft: 8 }}
-                            />
-                        </Dropdown>
-                    ),
+                tabBarStyle={{
+                    marginBottom: 0,
+                    borderBottom: 'none',
+                    margin: 0,
+                }}
+                style={{
+                    marginBottom: 0,
+                    width: '100%',
                 }}
             />
         </div>

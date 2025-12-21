@@ -45,7 +45,9 @@
     "docker": "Docker",
     "copy": "Copiar",
     "copied": "Copiado para a área de transferência",
-    "no_available_connections": "Nenhuma conexão disponível"
+    "no_available_connections": "Nenhuma conexão disponível",
+    "expand": "Expandir",
+    "collapse": "Recolher"
   },
   "settings": {
     "stacks_directory": "Diretório de Stacks",

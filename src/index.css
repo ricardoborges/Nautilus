@@ -74,22 +74,32 @@ body {
 }
 
 
-/* Pro Layout adjustments */
-.ant-pro-layout {
-    min-height: 100vh;
+/* Layout adjustments */
+.ant-layout {
+    background: transparent !important;
 }
 
-.ant-pro-layout .ant-layout-content {
+.ant-layout-content {
     padding: 0 !important;
 }
 
-/* Page container adjustments */
-.ant-pro-page-container {
-    padding: 0 !important;
+/* Sidebar menu styling */
+.ant-layout-sider .ant-menu {
+    border-inline-end: none !important;
 }
 
-.ant-pro-page-container .ant-pro-page-container-children-content {
-    padding: 16px !important;
+.ant-layout-sider .ant-menu-item {
+    margin: 2px 4px !important;
+    border-radius: 6px !important;
+}
+
+.ant-layout-sider .ant-menu-inline-collapsed .ant-menu-item {
+    padding-inline: calc(50% - 14px) !important;
+}
+
+/* Compact connection tabs */
+.ant-tabs-small>.ant-tabs-nav .ant-tabs-tab {
+    padding: 4px 12px !important;
 }
 
 /* Card hover effects */

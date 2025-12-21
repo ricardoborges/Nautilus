@@ -151,7 +151,7 @@ export const MainLayout: React.FC = () => {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    height: 'calc(100vh - 56px)',
+                    height: 'calc(100vh - 32px)',
                     padding: 48,
                 }}>
                     <CloudServerOutlined style={{ fontSize: 64, color: '#bfbfbf', marginBottom: 24 }} />
@@ -176,21 +176,21 @@ export const MainLayout: React.FC = () => {
             );
         }
 
-        // Render a ConnectionPane for each active connection
-        // Only the focused one is visible (others hidden with CSS)
-        const containerHeight = 'calc(100vh - 56px - 40px)'; // Header + tabs height
+        // Render only the focused connection pane
+        // Header (32px) + Tabs (32px)
+        const containerHeight = 'calc(100vh - 32px - 32px)';
 
         return (
-            <div style={{ position: 'relative', height: containerHeight, width: '100%', overflow: 'hidden' }}>
-                {activeConnectionIds.map(connId => (
+            <div style={{ height: containerHeight, width: '100%', overflow: 'hidden' }}>
+                {focusedConnectionId && (
                     <ConnectionPane
-                        key={connId}
-                        connectionId={connId}
-                        isVisible={connId === focusedConnectionId}
+                        key={focusedConnectionId}
+                        connectionId={focusedConnectionId}
+                        isVisible={true}
                         stacksDirectory={stacksDirectory}
                         onOpenSettings={openSettings}
                     />
-                ))}
+                )}
             </div>
         );
     };
@@ -240,20 +240,20 @@ export const MainLayout: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '0 24px',
-                height: 56,
+                padding: '0 12px',
+                height: 32,
                 background: themeMode === 'dark' ? '#141414' : '#fff',
                 borderBottom: `1px solid ${themeMode === 'dark' ? '#303030' : '#f0f0f0'}`,
             }}>
                 <Space>
-                    <CloudServerOutlined style={{ fontSize: 20, color: '#1677ff' }} />
-                    <Typography.Title level={5} style={{ margin: 0, color: themeMode === 'dark' ? '#fff' : undefined }}>
+                    <CloudServerOutlined style={{ fontSize: 18, color: '#1677ff' }} />
+                    <Typography.Title level={5} style={{ margin: 0, fontSize: 16, color: themeMode === 'dark' ? '#fff' : undefined }}>
                         Nautilus
                     </Typography.Title>
                 </Space>
-                <Space size="middle">
+                <Space size="small">
                     <Dropdown menu={{ items: connectionMenuItems }} placement="bottomRight">
-                        <Button type="default" size="large">
+                        <Button type="default" size="small">
                             <Space>
                                 <CloudServerOutlined />
                                 {t('common.connections')}
@@ -262,11 +262,13 @@ export const MainLayout: React.FC = () => {
                     </Dropdown>
                     <Button
                         type="text"
+                        size="small"
                         icon={<SettingOutlined />}
                         onClick={openSettings}
                     />
                     <Button
                         type="text"
+                        size="small"
                         icon={<InfoCircleOutlined />}
                         onClick={showAbout}
                     />
@@ -274,7 +276,7 @@ export const MainLayout: React.FC = () => {
             </div>
 
             {/* Connection Tabs */}
-            <div style={{ paddingTop: 56 }}>
+            <div style={{ paddingTop: 32 }}>
                 <ConnectionTabs />
                 {renderContent()}
             </div>
