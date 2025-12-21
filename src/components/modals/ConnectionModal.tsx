@@ -66,6 +66,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
             if (connection) {
                 form.setFieldsValue({
                     name: connection.name,
+                    description: connection.description,
                     host: connection.host,
                     user: connection.user,
                     connectionType: connection.connectionType || 'ssh',
@@ -83,6 +84,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
             } else {
                 form.setFieldsValue({
                     name: '',
+                    description: '',
                     host: '',
                     user: 'root',
                     connectionType: 'ssh',
@@ -133,6 +135,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
             const values = form.getFieldsValue();
             const formData: ConnectionFormData = {
                 name: values.name,
+                description: values.description,
                 host: values.host,
                 user: values.user,
                 connectionType: values.connectionType || 'ssh',
@@ -158,6 +161,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
 
             const formData: ConnectionFormData = {
                 name: values.name,
+                description: values.description,
                 host: values.host,
                 user: values.user,
                 connectionType: values.connectionType || 'ssh',
@@ -292,6 +296,14 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     rules={[{ required: true, message: t('connection.name_required') }]}
                 >
                     <Input placeholder={t('connection.name_placeholder')} />
+                </Form.Item>
+
+                {/* Description */}
+                <Form.Item
+                    name="description"
+                    label={t('connection.description')}
+                >
+                    <Input.TextArea placeholder={t('connection.description_placeholder')} rows={2} />
                 </Form.Item>
 
                 {/* Host & Port */}

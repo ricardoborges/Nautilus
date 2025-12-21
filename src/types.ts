@@ -11,6 +11,7 @@ export interface Connection {
     name: string;
     host: string;
     user: string;
+    description?: string;
     connectionType: 'ssh' | 'rdp';
     authMethod: 'password' | 'key';
     keyPath?: string;
@@ -24,6 +25,7 @@ export interface Connection {
 
 export interface ConnectionFormData extends Omit<Connection, 'id'> {
     id?: string;
+    description?: string;
     password?: string;
     // RDP specific
     rdpAuthMethod?: 'credentials' | 'windows_auth';

@@ -46,8 +46,12 @@
     "copy": "Copiar",
     "copied": "Copiado para a área de transferência",
     "no_available_connections": "Nenhuma conexão disponível",
-    "expand": "Expandir",
-    "collapse": "Recolher"
+    "expand": "Expand",
+    "collapse": "Recolher",
+    "search_connections": "Pesquisar conexões...",
+    "no_connections_yet": "Nenhuma conexão ainda",
+    "connection_deleted": "Conexão excluída com sucesso",
+    "active": "Ativo"
   },
   "settings": {
     "stacks_directory": "Diretório de Stacks",
@@ -209,6 +213,8 @@
     "name": "Nome da Conexão",
     "name_placeholder": "Ex: Servidor Produção",
     "name_required": "Informe o nome da conexão",
+    "description": "Descrição",
+    "description_placeholder": "Descrição opcional...",
     "host": "Host",
     "host_placeholder": "192.168.1.100",
     "host_required": "Informe o host",

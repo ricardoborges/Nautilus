@@ -25,6 +25,7 @@ import { useConnection } from '../context/ConnectionContext';
 import { ConnectionTabs } from '../components/connections/ConnectionTabs';
 import { ConnectionPane } from '../components/connections/ConnectionPane';
 import { ConnectionModal } from '../components/modals/ConnectionModal';
+import { ConnectionManager } from '../components/connections/ConnectionManager';
 import type { Connection } from '../types';
 import splashScreen from '../assets/splash-screen.png';
 
@@ -44,6 +45,7 @@ export const MainLayout: React.FC = () => {
     const { modal, message } = App.useApp();
 
     const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
+    const [isConnectionManagerOpen, setIsConnectionManagerOpen] = useState(false);
     const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
@@ -58,89 +60,7 @@ export const MainLayout: React.FC = () => {
         localStorage.setItem('nautilus_stacks_dir', value);
     };
 
-    // Connection dropdown menu items
-    const connectionMenuItems: MenuProps['items'] = [
-        {
-            key: 'add',
-            icon: <PlusOutlined />,
-            label: t('common.new_connection'),
-            onClick: () => {
-                setEditingConnection(null);
-                setIsConnectionModalOpen(true);
-            },
-        },
-        { type: 'divider' },
-        ...connections.map(conn => ({
-            key: conn.id,
-            icon: conn.connectionType === 'rdp' ? <WindowsOutlined style={{ color: '#0078d4' }} /> : <LinuxOutlined style={{ color: '#f57c00' }} />,
-            label: (
-                <Space>
-                    <span>{conn.name}</span>
-                    {activeConnectionIds.includes(conn.id) && (
-                        <Text type="success" style={{ fontSize: 12 }}>●</Text>
-                    )}
-                </Space>
-            ),
-            children: [
-                {
-                    key: `${conn.id}-connect`,
-                    label: conn.connectionType === 'rdp' ? t('common.launch_rdp') : t('common.connect'),
-                    onClick: async () => {
-                        if (conn.connectionType === 'rdp') {
-                            // RDP - just launch mstsc without changing layout
-                            try {
-                                let password: string | null = null;
-                                if (conn.rdpAuthMethod === 'credentials') {
-                                    password = await window.ssm.getPassword(conn.id);
-                                }
-                                await window.ssm.rdpConnect({
-                                    connectionId: conn.id,
-                                    host: conn.host,
-                                    port: conn.port || 3389,
-                                    username: conn.user,
-                                    password: password || undefined,
-                                    domain: conn.domain,
-                                    useWindowsAuth: conn.rdpAuthMethod === 'windows_auth',
-                                });
-                                message.success(t('rdp.session_launched', { name: conn.name }));
-                            } catch (err) {
-                                message.error(t('rdp.launch_failed', { error: (err as Error).message }));
-                            }
-                        } else {
-                            // SSH - open connection in new tab
-                            openConnection(conn.id);
-                        }
-                    },
-                },
-                {
-                    key: `${conn.id}-edit`,
-                    label: t('common.edit'),
-                    onClick: () => {
-                        setEditingConnection(conn);
-                        setIsConnectionModalOpen(true);
-                    },
-                },
-                {
-                    key: `${conn.id}-delete`,
-                    label: t('common.delete'),
-                    danger: true,
-                    onClick: async () => {
-                        Modal.confirm({
-                            title: t('common.delete_connection'),
-                            content: t('common.confirm_delete_connection', { name: conn.name }),
-                            okText: t('common.delete'),
-                            okType: 'danger',
-                            cancelText: t('common.cancel'),
-                            onOk: async () => {
-                                await window.ssm.removeConnection(conn.id);
-                                refreshConnections();
-                            },
-                        });
-                    },
-                },
-            ],
-        })),
-    ];
+
 
     // Render content based on active connections
     const renderContent = () => {
@@ -252,14 +172,16 @@ export const MainLayout: React.FC = () => {
                     </Typography.Title>
                 </Space>
                 <Space size="small">
-                    <Dropdown menu={{ items: connectionMenuItems }} placement="bottomRight">
-                        <Button type="default" size="small">
-                            <Space>
-                                <CloudServerOutlined />
-                                {t('common.connections')}
-                            </Space>
-                        </Button>
-                    </Dropdown>
+                    <Button
+                        type="default"
+                        size="small"
+                        onClick={() => setIsConnectionManagerOpen(true)}
+                    >
+                        <Space>
+                            <CloudServerOutlined />
+                            {t('common.connections')}
+                        </Space>
+                    </Button>
                     <Button
                         type="text"
                         size="small"
@@ -280,6 +202,20 @@ export const MainLayout: React.FC = () => {
                 <ConnectionTabs />
                 {renderContent()}
             </div>
+
+            {/* Connection Manager */}
+            <ConnectionManager
+                isOpen={isConnectionManagerOpen}
+                onClose={() => setIsConnectionManagerOpen(false)}
+                onEditConnection={(conn) => {
+                    setEditingConnection(conn);
+                    setIsConnectionModalOpen(true);
+                }}
+                onCreateConnection={() => {
+                    setEditingConnection(null);
+                    setIsConnectionModalOpen(true);
+                }}
+            />
 
             {/* Connection Modal */}
             <ConnectionModal

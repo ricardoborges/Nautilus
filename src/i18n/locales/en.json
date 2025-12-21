@@ -47,7 +47,11 @@
     "copied": "Copied to clipboard",
     "no_available_connections": "No available connections",
     "expand": "Expand",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "search_connections": "Search connections...",
+    "no_connections_yet": "No connections yet",
+    "connection_deleted": "Connection deleted successfully",
+    "active": "Active"
   },
   "settings": {
     "stacks_directory": "Stacks Directory",
@@ -209,6 +213,8 @@
     "name": "Connection Name",
     "name_placeholder": "Ex: Production Server",
     "name_required": "Please enter the connection name",
+    "description": "Description",
+    "description_placeholder": "Optional description...",
     "host": "Host",
     "host_placeholder": "192.168.1.100",
     "host_required": "Please enter the host",
