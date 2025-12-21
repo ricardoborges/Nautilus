@@ -182,15 +182,15 @@ export const MainLayout: React.FC = () => {
 
         return (
             <div style={{ height: containerHeight, width: '100%', overflow: 'hidden' }}>
-                {focusedConnectionId && (
+                {activeConnectionIds.map(connId => (
                     <ConnectionPane
-                        key={focusedConnectionId}
-                        connectionId={focusedConnectionId}
-                        isVisible={true}
+                        key={connId}
+                        connectionId={connId}
+                        isVisible={connId === focusedConnectionId}
                         stacksDirectory={stacksDirectory}
                         onOpenSettings={openSettings}
                     />
-                )}
+                ))}
             </div>
         );
     };

@@ -235,20 +235,27 @@ export const TerminalManager: React.FC<TerminalManagerProps> = ({ connectionId: 
     // Create first terminal when connection changes
     useEffect(() => {
         // Cleanup old sessions
-        sessionsRef.current.forEach((session, id) => {
-            session.term.dispose();
-            terminalService.unregister(id);
-            window.ssm.terminalStop(id);
-        });
-        sessionsRef.current.clear();
-        setSessions([]);
-        setActiveSessionId(null);
-        terminalService.setActive(null);
+        const cleanup = () => {
+            sessionsRef.current.forEach((session, id) => {
+                session.term.dispose();
+                terminalService.unregister(id);
+                window.ssm.terminalStop(id);
+            });
+            sessionsRef.current.clear();
+            setSessions([]);
+            setActiveSessionId(null);
+            terminalService.setActive(null);
+        };
+
+        cleanup();
 
         // Create new session if connected
         if (activeConnectionId) {
             createSession();
         }
+
+        // Return cleanup function for component unmount
+        return cleanup;
     }, [activeConnectionId, createSession]);
 
     if (!activeConnectionId) {

@@ -91,12 +91,12 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
         overflow: 'auto',
     });
 
-    if (!isVisible) {
-        return null;
-    }
-
     return (
-        <Layout style={{ height: '100%', background: 'transparent' }}>
+        <Layout style={{
+            height: '100%',
+            background: 'transparent',
+            display: isVisible ? 'flex' : 'none'
+        }}>
             <Sider
                 collapsible
                 collapsed={collapsed}
