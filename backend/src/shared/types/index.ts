@@ -23,6 +23,7 @@ export interface SSHConfig {
 export interface ConnectionData {
     id?: string;
     name: string;
+    description?: string;
     host: string;
     port?: number;
     user: string;
@@ -37,11 +38,12 @@ export interface ConnectionData {
     domain?: string;
 }
 
-export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen' | 'rdpAuthMethod' | 'domain'>> {
+export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen' | 'rdpAuthMethod' | 'domain' | 'description'>> {
     keyPath: string | null;
     lastSeen: string | null;
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
+    description?: string;
 }
 
 // ========================

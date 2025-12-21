@@ -121,8 +121,8 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                 </Button>
             ]}
             width="90%"
-            style={{ maxWidth: 1000 }}
-            styles={{ body: { height: '60vh', overflowY: 'auto' } }}
+            style={{ maxWidth: 1000, paddingBottom: 0 }}
+            styles={{ body: { height: '60vh', overflowY: 'auto', overflowX: 'hidden', paddingRight: 8 } }}
         >
             <Input
                 placeholder={t('common.search_connections')}

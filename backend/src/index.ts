@@ -13,6 +13,7 @@ import { SFTPClient, SSHClient, TerminalSession } from './features/terminal';
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
 import logger from './shared/utils/logger';
+import { initializeDatabase, closeDatabase, exportDatabase, importDatabase } from './shared/database';
 import type {
     SSHConfig,
     ConnectionData,
@@ -459,6 +460,17 @@ const handlers: HandlerRegistry = {
     'ssm:snippets:remove': async (args) => {
         const { id } = args as { id: string };
         return await snippetManager.remove(id);
+    },
+
+    // Database handlers
+    'ssm:database:export': async () => {
+        return { data: exportDatabase() };
+    },
+
+    'ssm:database:import': async (args) => {
+        const { data } = args as { data: string };
+        await importDatabase(data);
+        return { success: true };
     },
 
     // Docker handlers
@@ -1270,11 +1282,23 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
 
 const PORT = parseInt(process.env.NAUTILUS_BACKEND_PORT || '45678', 10);
 
-server.listen(PORT, '127.0.0.1', () => {
-    logger.info(`Nautilus Backend running on http://127.0.0.1:${PORT}`);
-    // Print port to stdout for Tauri to capture
-    console.log(`PORT:${PORT}`);
-});
+// Start the server after database initialization
+async function startServer(): Promise<void> {
+    try {
+        // Initialize SQLite database
+        await initializeDatabase();
+        logger.info('Database initialized successfully');
+
+        server.listen(PORT, '127.0.0.1', () => {
+            logger.info(`Nautilus Backend running on http://127.0.0.1:${PORT}`);
+            // Print port to stdout for Tauri to capture
+            console.log(`PORT:${PORT}`);
+        });
+    } catch (error) {
+        logger.error('Failed to initialize database:', error);
+        process.exit(1);
+    }
+}
 
 // Handle process exit
 process.on('SIGTERM', () => {
@@ -1292,7 +1316,11 @@ function cleanup(): void {
         activeSystemMonitor.stopPolling();
     }
     activeTerminals.forEach((service) => service.stop());
+    closeDatabase();
     server.close(() => {
         process.exit(0);
     });
 }
+
+// Start the application
+startServer();

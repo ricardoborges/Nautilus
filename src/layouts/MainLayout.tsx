@@ -16,8 +16,11 @@ import {
     ContainerOutlined,
     WindowsOutlined,
     LinuxOutlined,
+    DatabaseOutlined,
+    ExportOutlined,
+    ImportOutlined,
 } from '@ant-design/icons';
-import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input } from 'antd';
+import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input, Popconfirm, Row, Col } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { MenuProps } from 'antd';
 import { useTheme } from '../context/ThemeContext';
@@ -243,55 +246,58 @@ export const MainLayout: React.FC = () => {
                         {t('common.close')}
                     </Button>,
                 ]}
-                width={400}
+                width={560}
             >
-                <Form layout="vertical" style={{ marginTop: 16 }}>
-                    <Form.Item
-                        label={
-                            <Space>
-                                <BulbOutlined />
-                                {t('common.theme')}
-                            </Space>
-                        }
-                    >
-                        <Radio.Group
-                            value={themeMode}
-                            onChange={(e) => setThemeMode(e.target.value)}
-                            optionType="button"
-                            buttonStyle="solid"
-                        >
-                            <Radio.Button value="light">☀️ {t('common.light')}</Radio.Button>
-                            <Radio.Button value="dark">🌙 {t('common.dark')}</Radio.Button>
-                        </Radio.Group>
-                    </Form.Item>
-
-                    <Form.Item
-                        label={
-                            <Space>
-                                <GlobalOutlined />
-                                {t('common.language')}
-                            </Space>
-                        }
-                    >
-                        <Select
-                            value={i18n.language}
-                            onChange={(value) => i18n.changeLanguage(value)}
-                            style={{ width: '100%' }}
-                            options={[
-                                { value: 'en', label: 'English' },
-                                { value: 'pt-BR', label: 'Português (Brasil)' },
-                                { value: 'es', label: 'Español' },
-                                { value: 'de', label: 'Deutsch' },
-                                { value: 'it', label: 'Italiano' },
-                                { value: 'fr', label: 'Français' },
-                                { value: 'ja', label: '日本語' },
-                                { value: 'zh', label: '中文' },
-                                { value: 'ko', label: '한국어' },
-                            ]}
-                        />
-                    </Form.Item>
-
-                    <Divider>{t('common.docker')}</Divider>
+                <Form layout="vertical" style={{ marginTop: 8 }}>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item
+                                label={
+                                    <Space>
+                                        <BulbOutlined />
+                                        {t('common.theme')}
+                                    </Space>
+                                }
+                            >
+                                <Radio.Group
+                                    value={themeMode}
+                                    onChange={(e) => setThemeMode(e.target.value)}
+                                    optionType="button"
+                                    buttonStyle="solid"
+                                >
+                                    <Radio.Button value="light">☀️ {t('common.light')}</Radio.Button>
+                                    <Radio.Button value="dark">🌙 {t('common.dark')}</Radio.Button>
+                                </Radio.Group>
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item
+                                label={
+                                    <Space>
+                                        <GlobalOutlined />
+                                        {t('common.language')}
+                                    </Space>
+                                }
+                            >
+                                <Select
+                                    value={i18n.language}
+                                    onChange={(value) => i18n.changeLanguage(value)}
+                                    style={{ width: '100%' }}
+                                    options={[
+                                        { value: 'en', label: 'English' },
+                                        { value: 'pt-BR', label: 'Português (Brasil)' },
+                                        { value: 'es', label: 'Español' },
+                                        { value: 'de', label: 'Deutsch' },
+                                        { value: 'it', label: 'Italiano' },
+                                        { value: 'fr', label: 'Français' },
+                                        { value: 'ja', label: '日本語' },
+                                        { value: 'zh', label: '中文' },
+                                        { value: 'ko', label: '한국어' },
+                                    ]}
+                                />
+                            </Form.Item>
+                        </Col>
+                    </Row>
 
                     <Form.Item
                         label={
@@ -301,6 +307,7 @@ export const MainLayout: React.FC = () => {
                             </Space>
                         }
                         help={t('settings.stacks_directory_help')}
+                        style={{ marginBottom: 16 }}
                     >
                         <Input
                             value={stacksDirectory}
@@ -308,6 +315,99 @@ export const MainLayout: React.FC = () => {
                             placeholder="/tmp/nautilus-stacks"
                         />
                     </Form.Item>
+
+                    <Divider style={{ margin: '8px 0 16px' }}>{t('settings.data_management')}</Divider>
+
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                                <Space>
+                                    <DatabaseOutlined />
+                                    <span>{t('settings.export_database')}</span>
+                                </Space>
+                                <Button
+                                    icon={<ExportOutlined />}
+                                    onClick={async () => {
+                                        try {
+                                            const result = await window.ssm.databaseExport();
+                                            const blob = new Blob([result.data], { type: 'application/octet-stream' });
+                                            const url = URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = `nautilus-backup-${new Date().toISOString().split('T')[0]}.ndb`;
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            document.body.removeChild(a);
+                                            URL.revokeObjectURL(url);
+                                            message.success(t('settings.export_success'));
+                                        } catch (error) {
+                                            message.error(t('settings.export_error'));
+                                        }
+                                    }}
+                                    style={{ width: '100%' }}
+                                >
+                                    {t('settings.export_database')}
+                                </Button>
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    {t('settings.export_database_help')}
+                                </Typography.Text>
+                            </Space>
+                        </Col>
+                        <Col span={12}>
+                            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                                <Space>
+                                    <DatabaseOutlined />
+                                    <span>{t('settings.import_database')}</span>
+                                </Space>
+                                <Popconfirm
+                                    title={t('settings.import_database')}
+                                    description={t('settings.import_warning')}
+                                    onConfirm={() => {
+                                        const input = document.createElement('input');
+                                        input.type = 'file';
+                                        input.accept = '.ndb';
+                                        input.onchange = async (e) => {
+                                            const target = e.target as HTMLInputElement;
+                                            const file = target.files?.[0];
+                                            if (!file) return;
+
+                                            try {
+                                                const reader = new FileReader();
+                                                reader.onload = async (event) => {
+                                                    const data = event.target?.result as string;
+                                                    if (!data) {
+                                                        message.error(t('settings.invalid_file'));
+                                                        return;
+                                                    }
+                                                    try {
+                                                        await window.ssm.databaseImport(data);
+                                                        message.success(t('settings.import_success'));
+                                                        refreshConnections();
+                                                        setIsSettingsModalOpen(false);
+                                                    } catch (error) {
+                                                        message.error(t('settings.import_error'));
+                                                    }
+                                                };
+                                                reader.readAsText(file);
+                                            } catch (error) {
+                                                message.error(t('settings.import_error'));
+                                            }
+                                        };
+                                        input.click();
+                                    }}
+                                    okText={t('common.yes')}
+                                    cancelText={t('common.no')}
+                                >
+                                    <Button icon={<ImportOutlined />} style={{ width: '100%' }}>
+                                        {t('settings.import_database')}
+                                    </Button>
+                                </Popconfirm>
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    {t('settings.import_database_help')}
+                                </Typography.Text>
+                            </Space>
+                        </Col>
+                    </Row>
                 </Form>
             </Modal>
         </>

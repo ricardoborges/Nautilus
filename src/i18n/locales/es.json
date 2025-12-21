@@ -45,6 +45,21 @@
     "copy": "Copiar",
     "copied": "Copiado al portapapeles"
   },
+  "settings": {
+    "stacks_directory": "Directorio de Stacks",
+    "stacks_directory_help": "Directorio remoto donde se almacenarán las stacks de Docker Compose",
+    "data_management": "Gestión de Datos",
+    "export_database": "Exportar Base de Datos",
+    "export_database_help": "Exportar todas las conexiones y snippets a un archivo",
+    "import_database": "Importar Base de Datos",
+    "import_database_help": "Importar conexiones y snippets desde un archivo de respaldo",
+    "export_success": "Base de datos exportada con éxito",
+    "export_error": "Error al exportar base de datos",
+    "import_success": "Base de datos importada con éxito. Recargando datos...",
+    "import_error": "Error al importar base de datos",
+    "import_warning": "Advertencia: Esto reemplazará todos los datos actuales. ¿Está seguro?",
+    "invalid_file": "Archivo de respaldo inválido"
+  },
   "splash": {
     "starting": "Iniciando...",
     "connecting_backend": "Conectando al backend...",

@@ -40,6 +40,21 @@
     "copy": "复制",
     "copied": "已复制到剪贴板"
   },
+  "settings": {
+    "stacks_directory": "堆栈目录",
+    "stacks_directory_help": "存储 Docker Compose 堆栈的远程目录",
+    "data_management": "数据管理",
+    "export_database": "导出数据库",
+    "export_database_help": "将所有连接和代码片段导出到文件",
+    "import_database": "导入数据库",
+    "import_database_help": "从备份文件导入连接和代码片段",
+    "export_success": "数据库导出成功",
+    "export_error": "导出数据库错误",
+    "import_success": "数据库导入成功。正在重新加载数据...",
+    "import_error": "导入数据库错误",
+    "import_warning": "警告：这将替换所有当前数据。确定吗？",
+    "invalid_file": "无效的备份文件"
+  },
   "splash": {
     "starting": "启动中...",
     "connecting_backend": "连接后端...",

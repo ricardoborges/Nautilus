@@ -317,6 +317,10 @@ export interface SSMAPI {
     snippetUpdate: (snippet: Snippet) => Promise<void>;
     snippetRemove: (id: string) => Promise<void>;
 
+    // Database
+    databaseExport: () => Promise<{ data: string }>;
+    databaseImport: (data: string) => Promise<void>;
+
     // Docker
     dockerCheckAvailable: (connectionId: string) => Promise<DockerInfo>;
     dockerListContainers: (connectionId: string) => Promise<DockerContainer[]>;

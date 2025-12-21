@@ -40,6 +40,21 @@
     "copy": "コピー",
     "copied": "クリップボードにコピーしました"
   },
+  "settings": {
+    "stacks_directory": "スタックディレクトリ",
+    "stacks_directory_help": "Docker Composeスタックが保存されるリモートディレクトリ",
+    "data_management": "データ管理",
+    "export_database": "データベースをエクスポート",
+    "export_database_help": "すべての接続とスニペットをファイルにエクスポート",
+    "import_database": "データベースをインポート",
+    "import_database_help": "バックアップファイルから接続とスニペットをインポート",
+    "export_success": "データベースをエクスポートしました",
+    "export_error": "データベースのエクスポートエラー",
+    "import_success": "データベースをインポートしました。データを再読み込み中...",
+    "import_error": "データベースのインポートエラー",
+    "import_warning": "警告：これにより現在のすべてのデータが置き換えられます。よろしいですか？",
+    "invalid_file": "無効なバックアップファイル"
+  },
   "splash": {
     "starting": "起動中...",
     "connecting_backend": "バックエンドに接続中...",

@@ -40,6 +40,21 @@
     "copy": "Kopieren",
     "copied": "In Zwischenablage kopiert"
   },
+  "settings": {
+    "stacks_directory": "Stacks-Verzeichnis",
+    "stacks_directory_help": "Entferntes Verzeichnis, in dem Docker Compose Stacks gespeichert werden",
+    "data_management": "Datenverwaltung",
+    "export_database": "Datenbank exportieren",
+    "export_database_help": "Alle Verbindungen und Snippets in eine Datei exportieren",
+    "import_database": "Datenbank importieren",
+    "import_database_help": "Verbindungen und Snippets aus einer Sicherungsdatei importieren",
+    "export_success": "Datenbank erfolgreich exportiert",
+    "export_error": "Fehler beim Exportieren der Datenbank",
+    "import_success": "Datenbank erfolgreich importiert. Daten werden neu geladen...",
+    "import_error": "Fehler beim Importieren der Datenbank",
+    "import_warning": "Warnung: Dies ersetzt alle aktuellen Daten. Sind Sie sicher?",
+    "invalid_file": "Ungültige Sicherungsdatei"
+  },
   "splash": {
     "starting": "Starten...",
     "connecting_backend": "Verbindung zum Backend...",

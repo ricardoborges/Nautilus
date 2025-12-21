@@ -55,7 +55,18 @@
   },
   "settings": {
     "stacks_directory": "Stacks Directory",
-    "stacks_directory_help": "Remote directory where Docker Compose stacks will be stored"
+    "stacks_directory_help": "Remote directory where Docker Compose stacks will be stored",
+    "data_management": "Data Management",
+    "export_database": "Export Database",
+    "export_database_help": "Export all connections and snippets to a file",
+    "import_database": "Import Database",
+    "import_database_help": "Import connections and snippets from a backup file",
+    "export_success": "Database exported successfully",
+    "export_error": "Error exporting database",
+    "import_success": "Database imported successfully. Reloading data...",
+    "import_error": "Error importing database",
+    "import_warning": "Warning: This will replace all current data. Are you sure?",
+    "invalid_file": "Invalid backup file"
   },
   "splash": {
     "starting": "Starting...",
