@@ -14,7 +14,6 @@ import {
     ClockCircleOutlined,
     AppstoreOutlined,
     ContainerOutlined,
-    SettingOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
 } from '@ant-design/icons';
@@ -97,22 +96,21 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
             background: 'transparent',
             display: isVisible ? 'flex' : 'none'
         }}>
-            <Sider
-                collapsible
-                collapsed={collapsed}
-                onCollapse={setCollapsed}
-                width={200}
-                collapsedWidth={48}
-                theme={isDark ? 'dark' : 'light'}
-                trigger={null}
-                style={{
-                    background: isDark ? '#141414' : '#fff',
-                    borderRight: `1px solid ${isDark ? '#303030' : '#f0f0f0'}`,
-                    display: 'flex',
-                    flexDirection: 'column',
-                }}
-            >
-                <div style={{ flex: 1, overflow: 'auto' }}>
+            <div style={{ position: 'relative' }}>
+                <Sider
+                    collapsible
+                    collapsed={collapsed}
+                    onCollapse={setCollapsed}
+                    width={200}
+                    collapsedWidth={48}
+                    theme={isDark ? 'dark' : 'light'}
+                    trigger={null}
+                    style={{
+                        background: isDark ? '#141414' : '#fff',
+                        borderRight: `1px solid ${isDark ? '#303030' : '#f0f0f0'}`,
+                        height: '100%',
+                    }}
+                >
                     <Menu
                         mode="inline"
                         selectedKeys={[activeTab]}
@@ -124,47 +122,36 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
                             background: 'transparent',
                         }}
                     />
-                </div>
+                </Sider>
 
-                {/* Footer with Settings and Collapse */}
-                <div style={{
-                    borderTop: `1px solid ${isDark ? '#303030' : '#f0f0f0'}`,
-                    padding: collapsed ? '8px 0' : '8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 4,
-                }}>
-                    {!collapsed && (
-                        <Button
-                            type="text"
-                            icon={<SettingOutlined />}
-                            block
-                            onClick={onOpenSettings}
-                            style={{ textAlign: 'left', justifyContent: 'flex-start' }}
-                        >
-                            {t('common.settings')}
-                        </Button>
-                    )}
-                    {collapsed && (
-                        <Tooltip title={t('common.settings')} placement="right">
-                            <Button
-                                type="text"
-                                icon={<SettingOutlined />}
-                                onClick={onOpenSettings}
-                                style={{ width: '100%' }}
-                            />
-                        </Tooltip>
-                    )}
-                    <Tooltip title={collapsed ? t('common.expand') : t('common.collapse')} placement="right">
-                        <Button
-                            type="text"
-                            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                            onClick={() => setCollapsed(!collapsed)}
-                            style={{ width: '100%' }}
-                        />
-                    </Tooltip>
-                </div>
-            </Sider>
+                {/* Collapse toggle button on the edge */}
+                <Tooltip title={collapsed ? t('common.expand') : t('common.collapse')} placement="right">
+                    <Button
+                        type="text"
+                        size="small"
+                        icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                        onClick={() => setCollapsed(!collapsed)}
+                        style={{
+                            position: 'absolute',
+                            right: -12,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            zIndex: 10,
+                            width: 24,
+                            height: 24,
+                            minWidth: 24,
+                            padding: 0,
+                            borderRadius: '50%',
+                            background: isDark ? '#303030' : '#fff',
+                            border: `1px solid ${isDark ? '#434343' : '#d9d9d9'}`,
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    />
+                </Tooltip>
+            </div>
 
             <Content style={{
                 overflow: 'hidden',
