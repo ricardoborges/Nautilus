@@ -2,17 +2,12 @@
  * Main Layout Component
  * 
  * Uses Ant Design ProLayout for professional application layout.
- * Includes sidebar navigation, header, and content area.
+ * Supports multiple active connections with OnlyOffice-style tabs.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
-    DashboardOutlined,
-    CodeOutlined,
-    FolderOutlined,
     SettingOutlined,
-    ClockCircleOutlined,
-    AppstoreOutlined,
     PlusOutlined,
     CloudServerOutlined,
     InfoCircleOutlined,
@@ -22,40 +17,32 @@ import {
     WindowsOutlined,
     LinuxOutlined,
 } from '@ant-design/icons';
-import { ProLayout, PageContainer } from '@ant-design/pro-components';
 import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { MenuProps } from 'antd';
 import { useTheme } from '../context/ThemeContext';
 import { useConnection } from '../context/ConnectionContext';
-import { Dashboard } from '../components/dashboard/Dashboard';
-import { TerminalManager } from '../components/terminal/TerminalManager';
-import { FileManager } from '../components/files/FileManager';
-import { ProcessManager } from '../components/processes/ProcessManager';
-import { CronManager } from '../components/cron/CronManager';
-import { DockerDashboard } from '../components/docker/DockerDashboard';
+import { ConnectionTabs } from '../components/connections/ConnectionTabs';
+import { ConnectionPane } from '../components/connections/ConnectionPane';
 import { ConnectionModal } from '../components/modals/ConnectionModal';
 import type { Connection } from '../types';
 import splashScreen from '../assets/splash-screen.png';
 
 const { Text } = Typography;
 
-type TabKey = 'dashboard' | 'terminal' | 'files' | 'processes' | 'cron' | 'docker';
-
 export const MainLayout: React.FC = () => {
     const { t, i18n } = useTranslation();
     const {
         connections,
-        activeConnectionId,
-        selectConnection,
+        activeConnectionIds,
+        focusedConnectionId,
+        openConnection,
         refreshConnections,
     } = useConnection();
 
     const { themeMode, setThemeMode } = useTheme();
     const { modal, message } = App.useApp();
 
-    const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
-    const [collapsed, setCollapsed] = useState(false);
     const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
     const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -70,9 +57,6 @@ export const MainLayout: React.FC = () => {
         setStacksDirectory(value);
         localStorage.setItem('nautilus_stacks_dir', value);
     };
-
-    // Get active connection info
-    const activeConnection = connections.find(c => c.id === activeConnectionId);
 
     // Connection dropdown menu items
     const connectionMenuItems: MenuProps['items'] = [
@@ -92,7 +76,7 @@ export const MainLayout: React.FC = () => {
             label: (
                 <Space>
                     <span>{conn.name}</span>
-                    {conn.id === activeConnectionId && (
+                    {activeConnectionIds.includes(conn.id) && (
                         <Text type="success" style={{ fontSize: 12 }}>●</Text>
                     )}
                 </Space>
@@ -123,8 +107,8 @@ export const MainLayout: React.FC = () => {
                                 message.error(t('rdp.launch_failed', { error: (err as Error).message }));
                             }
                         } else {
-                            // SSH - normal connection
-                            selectConnection(conn.id);
+                            // SSH - open connection in new tab
+                            openConnection(conn.id);
                         }
                     },
                 },
@@ -158,17 +142,16 @@ export const MainLayout: React.FC = () => {
         })),
     ];
 
-    // Render content based on active tab
-    // Components are kept mounted to preserve state (especially terminal sessions)
+    // Render content based on active connections
     const renderContent = () => {
-        if (!activeConnectionId) {
+        if (activeConnectionIds.length === 0) {
             return (
                 <div style={{
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    height: '100%',
+                    height: 'calc(100vh - 56px)',
                     padding: 48,
                 }}>
                     <CloudServerOutlined style={{ fontSize: 64, color: '#bfbfbf', marginBottom: 24 }} />
@@ -193,42 +176,21 @@ export const MainLayout: React.FC = () => {
             );
         }
 
-        // Keep all components mounted to preserve state (especially terminal sessions)
-        // Use CSS visibility/position to show/hide instead of conditional rendering
-        // Position absolute ensures all components take full height without stacking
-        const containerHeight = 'calc(100vh - 56px)'; // Header height is 56px
-
-        const tabStyle = (tab: TabKey): React.CSSProperties => ({
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            overflow: 'auto',
-            visibility: activeTab === tab ? 'visible' : 'hidden',
-            pointerEvents: activeTab === tab ? 'auto' : 'none',
-        });
+        // Render a ConnectionPane for each active connection
+        // Only the focused one is visible (others hidden with CSS)
+        const containerHeight = 'calc(100vh - 56px - 40px)'; // Header + tabs height
 
         return (
             <div style={{ position: 'relative', height: containerHeight, width: '100%', overflow: 'hidden' }}>
-                <div style={tabStyle('dashboard')}>
-                    <Dashboard />
-                </div>
-                <div style={tabStyle('terminal')}>
-                    <TerminalManager />
-                </div>
-                <div style={tabStyle('files')}>
-                    <FileManager />
-                </div>
-                <div style={tabStyle('processes')}>
-                    <ProcessManager />
-                </div>
-                <div style={tabStyle('cron')}>
-                    <CronManager />
-                </div>
-                <div style={tabStyle('docker')}>
-                    <DockerDashboard stacksDirectory={stacksDirectory} onOpenSettings={openSettings} />
-                </div>
+                {activeConnectionIds.map(connId => (
+                    <ConnectionPane
+                        key={connId}
+                        connectionId={connId}
+                        isVisible={connId === focusedConnectionId}
+                        stacksDirectory={stacksDirectory}
+                        onOpenSettings={openSettings}
+                    />
+                ))}
             </div>
         );
     };
@@ -291,13 +253,18 @@ export const MainLayout: React.FC = () => {
                 </Space>
                 <Space size="middle">
                     <Dropdown menu={{ items: connectionMenuItems }} placement="bottomRight">
-                        <Button type={activeConnection ? 'primary' : 'default'} size="large">
+                        <Button type="default" size="large">
                             <Space>
                                 <CloudServerOutlined />
-                                {activeConnection ? activeConnection.name : t('common.select_connection')}
+                                {t('common.connections')}
                             </Space>
                         </Button>
                     </Dropdown>
+                    <Button
+                        type="text"
+                        icon={<SettingOutlined />}
+                        onClick={openSettings}
+                    />
                     <Button
                         type="text"
                         icon={<InfoCircleOutlined />}
@@ -306,90 +273,10 @@ export const MainLayout: React.FC = () => {
                 </Space>
             </div>
 
-            {/* ProLayout */}
+            {/* Connection Tabs */}
             <div style={{ paddingTop: 56 }}>
-                <ProLayout
-                    title="Nautilus"
-                    logo={<CloudServerOutlined style={{ fontSize: 24, color: '#1677ff' }} />}
-                    layout="side"
-                    navTheme={themeMode === 'dark' ? 'realDark' : 'light'}
-                    splitMenus={false}
-                    collapsed={collapsed}
-                    onCollapse={setCollapsed}
-                    siderWidth={220}
-                    fixSiderbar
-                    headerRender={false}
-                    menuProps={{
-                        onClick: (info) => {
-                            setActiveTab(info.key as TabKey);
-                        },
-                        selectedKeys: [activeTab],
-                    }}
-                    route={{
-                        routes: [
-                            {
-                                path: '/dashboard',
-                                name: t('common.dashboard'),
-                                icon: <DashboardOutlined />,
-                                key: 'dashboard',
-                            },
-                            {
-                                path: '/terminal',
-                                name: t('common.terminal'),
-                                icon: <CodeOutlined />,
-                                key: 'terminal',
-                            },
-                            {
-                                path: '/files',
-                                name: t('common.files'),
-                                icon: <FolderOutlined />,
-                                key: 'files',
-                            },
-                            {
-                                path: '/processes',
-                                name: t('common.processes'),
-                                icon: <AppstoreOutlined />,
-                                key: 'processes',
-                            },
-                            {
-                                path: '/cron',
-                                name: t('common.cron'),
-                                icon: <ClockCircleOutlined />,
-                                key: 'cron',
-                            },
-                            // Docker menu - always visible
-                            {
-                                path: '/docker',
-                                name: t('common.docker'),
-                                icon: <ContainerOutlined />,
-                                key: 'docker',
-                            },
-                        ],
-                    }}
-                    menuFooterRender={(props) => {
-                        if (props?.collapsed) return undefined;
-                        return (
-                            <div style={{ padding: '12px 16px', borderTop: `1px solid ${themeMode === 'dark' ? '#303030' : '#f0f0f0'}` }}>
-                                <Button
-                                    type="text"
-                                    icon={<SettingOutlined />}
-                                    block
-                                    onClick={openSettings}
-                                    style={{ textAlign: 'left' }}
-                                >
-                                    {t('common.settings')}
-                                </Button>
-                            </div>
-                        );
-                    }}
-                >
-                    <PageContainer
-                        header={{ title: undefined, breadcrumb: {} }}
-                        style={{ padding: 0 }}
-                    >
-                        {renderContent()}
-                    </PageContainer>
-                </ProLayout>
+                <ConnectionTabs />
+                {renderContent()}
             </div>
 
             {/* Connection Modal */}

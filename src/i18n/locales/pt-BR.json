@@ -44,7 +44,8 @@
     "deleted_success": "Excluído com sucesso",
     "docker": "Docker",
     "copy": "Copiar",
-    "copied": "Copiado para a área de transferência"
+    "copied": "Copiado para a área de transferência",
+    "no_available_connections": "Nenhuma conexão disponível"
   },
   "settings": {
     "stacks_directory": "Diretório de Stacks",

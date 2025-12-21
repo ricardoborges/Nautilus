@@ -30,10 +30,17 @@ interface TerminalSession {
     fitAddon: FitAddon;
 }
 
-export const TerminalManager: React.FC = () => {
+interface TerminalManagerProps {
+    connectionId?: string;
+}
+
+export const TerminalManager: React.FC<TerminalManagerProps> = ({ connectionId: propConnectionId }) => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
-    const { activeConnectionId } = useConnection();
+    const { activeConnectionId: contextConnectionId } = useConnection();
+
+    // Use prop connectionId if provided, otherwise fall back to context
+    const activeConnectionId = propConnectionId ?? contextConnectionId;
     const [sessions, setSessions] = useState<TerminalSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
     const [showSnippets, setShowSnippets] = useState(true);

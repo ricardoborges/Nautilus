@@ -1,7 +1,7 @@
 /**
  * Connection Context
  * 
- * Provides global state management for the active connection
+ * Provides global state management for multiple active connections
  * and connection-related operations.
  */
 
@@ -9,28 +9,40 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import type { Connection, Snippet, SystemMetrics } from '../types';
 import { SYSTEM_SNIPPETS } from '../utils/constants';
 
+// Per-connection state
+interface ConnectionState {
+    metrics: SystemMetrics | null;
+    dockerAvailable: boolean;
+    dockerVersion: string | null;
+    isLoading: boolean;
+}
+
 interface ConnectionContextType {
     // Connection state
     connections: Connection[];
-    activeConnection: Connection | null;
-    activeConnectionId: string | null;
-    isLoading: boolean;
+    activeConnectionIds: string[];  // All open connections
+    focusedConnectionId: string | null;  // Currently visible connection
 
     // Snippets
     snippets: Snippet[];
 
-    // Metrics
-    metrics: SystemMetrics | null;
-
-    // Docker
-    dockerAvailable: boolean;
-    dockerVersion: string | null;
+    // Per-connection state accessor
+    getConnectionState: (connectionId: string) => ConnectionState | null;
 
     // Actions
-    selectConnection: (id: string | null) => Promise<void>;
-    disconnectConnection: () => Promise<void>;
+    openConnection: (id: string) => Promise<void>;
+    closeConnection: (id: string) => Promise<void>;
+    focusConnection: (id: string) => void;
     refreshConnections: () => Promise<void>;
     refreshSnippets: () => Promise<void>;
+
+    // For backwards compatibility with components that need the focused connection
+    activeConnectionId: string | null;
+    activeConnection: Connection | null;
+    isLoading: boolean;
+    metrics: SystemMetrics | null;
+    dockerAvailable: boolean;
+    dockerVersion: string | null;
 }
 
 const ConnectionContext = createContext<ConnectionContextType | null>(null);
@@ -49,15 +61,23 @@ interface ConnectionProviderProps {
 
 export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children }) => {
     const [connections, setConnections] = useState<Connection[]>([]);
-    const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [activeConnectionIds, setActiveConnectionIds] = useState<string[]>([]);
+    const [focusedConnectionId, setFocusedConnectionId] = useState<string | null>(null);
     const [snippets, setSnippets] = useState<Snippet[]>([]);
-    const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
-    const [dockerAvailable, setDockerAvailable] = useState(false);
-    const [dockerVersion, setDockerVersion] = useState<string | null>(null);
 
-    // Get active connection from list
-    const activeConnection = connections.find(c => c.id === activeConnectionId) || null;
+    // Per-connection state map
+    const [connectionStates, setConnectionStates] = useState<Record<string, ConnectionState>>({});
+
+    // Get active connection from list (for backwards compatibility)
+    const activeConnection = connections.find(c => c.id === focusedConnectionId) || null;
+
+    // Get state for a specific connection
+    const getConnectionState = useCallback((connectionId: string): ConnectionState | null => {
+        return connectionStates[connectionId] || null;
+    }, [connectionStates]);
+
+    // Get focused connection state (for backwards compatibility)
+    const focusedState = focusedConnectionId ? connectionStates[focusedConnectionId] : null;
 
     // Load connections
     const refreshConnections = useCallback(async () => {
@@ -80,86 +100,157 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         }
     }, []);
 
-    // Check Docker availability
+    // Check Docker availability for a connection
     const checkDockerAvailability = useCallback(async (connectionId: string) => {
         try {
-            console.log('[ConnectionContext] Checking Docker availability...');
+            console.log('[ConnectionContext] Checking Docker availability for:', connectionId);
             const dockerInfo = await window.ssm.dockerCheckAvailable(connectionId);
-            setDockerAvailable(dockerInfo.available);
-            setDockerVersion(dockerInfo.version || null);
+            setConnectionStates(prev => ({
+                ...prev,
+                [connectionId]: {
+                    ...prev[connectionId],
+                    dockerAvailable: dockerInfo.available,
+                    dockerVersion: dockerInfo.version || null,
+                }
+            }));
             console.log('[ConnectionContext] Docker available:', dockerInfo.available, 'version:', dockerInfo.version);
         } catch (error) {
             console.error('Failed to check Docker availability:', error);
-            setDockerAvailable(false);
-            setDockerVersion(null);
+            setConnectionStates(prev => ({
+                ...prev,
+                [connectionId]: {
+                    ...prev[connectionId],
+                    dockerAvailable: false,
+                    dockerVersion: null,
+                }
+            }));
         }
     }, []);
 
-    // Select a connection
-    const selectConnection = useCallback(async (id: string | null) => {
-        // Stop previous metrics
-        if (activeConnectionId) {
-            await window.ssm.stopMetrics();
+    // Open a connection (add to active list)
+    const openConnection = useCallback(async (id: string) => {
+        // Check if already open
+        if (activeConnectionIds.includes(id)) {
+            // Just focus it
+            setFocusedConnectionId(id);
+            return;
         }
 
-        setActiveConnectionId(id);
-        setMetrics(null);
-        setDockerAvailable(false);
-        setDockerVersion(null);
+        // Initialize connection state
+        setConnectionStates(prev => ({
+            ...prev,
+            [id]: {
+                metrics: null,
+                dockerAvailable: false,
+                dockerVersion: null,
+                isLoading: true,
+            }
+        }));
 
-        if (id) {
-            setIsLoading(true);
+        // Add to active list and focus
+        setActiveConnectionIds(prev => [...prev, id]);
+        setFocusedConnectionId(id);
+
+        try {
+            // Start metrics for this connection
+            await window.ssm.startMetrics(id);
+
+            // Check Docker availability in background
+            checkDockerAvailability(id);
+        } catch (error) {
+            console.error('Failed to start metrics:', error);
+        } finally {
+            setConnectionStates(prev => ({
+                ...prev,
+                [id]: {
+                    ...prev[id],
+                    isLoading: false,
+                }
+            }));
+        }
+    }, [activeConnectionIds, checkDockerAvailability]);
+
+    // Close a connection (remove from active list)
+    const closeConnection = useCallback(async (id: string) => {
+        const conn = connections.find(c => c.id === id);
+        if (conn && conn.connectionType === 'rdp') {
             try {
-                // Start metrics
-                await window.ssm.startMetrics(id);
-
-                // Check Docker availability in background
-                checkDockerAvailability(id);
+                await window.ssm.rdpDisconnect(id);
             } catch (error) {
-                console.error('Failed to start metrics:', error);
-            } finally {
-                setIsLoading(false);
+                console.error('Failed to disconnect RDP:', error);
             }
         }
-    }, [activeConnectionId, checkDockerAvailability]);
 
-    // Disconnect from connection
-    const disconnectConnection = useCallback(async () => {
-        if (activeConnectionId) {
-            // If it's an RDP connection, disconnect it
-            const conn = connections.find(c => c.id === activeConnectionId);
-            if (conn && conn.connectionType === 'rdp') {
-                try {
-                    await window.ssm.rdpDisconnect(activeConnectionId);
-                } catch (error) {
-                    console.error('Failed to disconnect RDP:', error);
+        // Stop metrics for this connection
+        // Note: Current backend only supports one metrics stream, 
+        // we'll need to handle this differently if we want concurrent metrics
+        try {
+            await window.ssm.stopMetrics();
+        } catch (error) {
+            console.error('Failed to stop metrics:', error);
+        }
+
+        // Remove from active list
+        setActiveConnectionIds(prev => {
+            const newList = prev.filter(cid => cid !== id);
+
+            // If we closed the focused connection, focus another one
+            if (focusedConnectionId === id) {
+                const newFocused = newList.length > 0 ? newList[newList.length - 1] : null;
+                setFocusedConnectionId(newFocused);
+
+                // Start metrics for newly focused connection
+                if (newFocused) {
+                    window.ssm.startMetrics(newFocused);
                 }
             }
-            // Stop metrics
-            await window.ssm.stopMetrics();
+
+            return newList;
+        });
+
+        // Clean up connection state
+        setConnectionStates(prev => {
+            const { [id]: removed, ...rest } = prev;
+            return rest;
+        });
+    }, [connections, focusedConnectionId]);
+
+    // Focus a connection (switch visible tab)
+    const focusConnection = useCallback((id: string) => {
+        if (activeConnectionIds.includes(id)) {
+            // Stop metrics for previous connection
+            if (focusedConnectionId && focusedConnectionId !== id) {
+                window.ssm.stopMetrics();
+            }
+
+            setFocusedConnectionId(id);
+
+            // Start metrics for newly focused connection
+            window.ssm.startMetrics(id);
         }
-        setActiveConnectionId(null);
-        setMetrics(null);
-        setDockerAvailable(false);
-        setDockerVersion(null);
-    }, [activeConnectionId, connections]);
+    }, [activeConnectionIds, focusedConnectionId]);
 
     // Subscribe to metrics updates
     useEffect(() => {
         const unsubscribe = window.ssm.onMetricsUpdate((data: SystemMetrics) => {
-            if (activeConnectionId) {
-                setMetrics(data);
-                setIsLoading(false);
+            if (focusedConnectionId) {
+                setConnectionStates(prev => ({
+                    ...prev,
+                    [focusedConnectionId]: {
+                        ...prev[focusedConnectionId],
+                        metrics: data,
+                        isLoading: false,
+                    }
+                }));
             }
         });
 
         return () => {
             unsubscribe();
         };
-    }, [activeConnectionId]);
+    }, [focusedConnectionId]);
 
-    // Initial load - backend is already ready when this component mounts
-    // (App.tsx waits for ssm-ready before showing MainLayout)
+    // Initial load
     useEffect(() => {
         const init = async () => {
             await refreshConnections();
@@ -169,27 +260,31 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             const list = await window.ssm.listConnections();
             const autoConnectConn = list.find(c => c.autoConnect);
             if (autoConnectConn) {
-                selectConnection(autoConnectConn.id);
+                openConnection(autoConnectConn.id);
             }
         };
 
-        // Initialize immediately since backend is ready
         init();
     }, []);  // Only run once on mount
 
     const value: ConnectionContextType = {
         connections,
-        activeConnection,
-        activeConnectionId,
-        isLoading,
+        activeConnectionIds,
+        focusedConnectionId,
         snippets,
-        metrics,
-        dockerAvailable,
-        dockerVersion,
-        selectConnection,
-        disconnectConnection,
+        getConnectionState,
+        openConnection,
+        closeConnection,
+        focusConnection,
         refreshConnections,
         refreshSnippets,
+        // Backwards compatibility - expose focused connection state
+        activeConnectionId: focusedConnectionId,
+        activeConnection,
+        isLoading: focusedState?.isLoading ?? false,
+        metrics: focusedState?.metrics ?? null,
+        dockerAvailable: focusedState?.dockerAvailable ?? false,
+        dockerVersion: focusedState?.dockerVersion ?? null,
     };
 
     return (
@@ -198,4 +293,3 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         </ConnectionContext.Provider>
     );
 };
-

@@ -44,7 +44,8 @@
     "deleted_success": "Deleted successfully",
     "docker": "Docker",
     "copy": "Copy",
-    "copied": "Copied to clipboard"
+    "copied": "Copied to clipboard",
+    "no_available_connections": "No available connections"
   },
   "settings": {
     "stacks_directory": "Stacks Directory",

@@ -288,15 +288,23 @@ const QuickActions: React.FC<{
 };
 
 interface DockerDashboardProps {
+    connectionId?: string;
     stacksDirectory?: string;
     onOpenSettings?: () => void;
 }
 
-export const DockerDashboard: React.FC<DockerDashboardProps> = ({ stacksDirectory = '/tmp/nautilus-stacks', onOpenSettings }) => {
+export const DockerDashboard: React.FC<DockerDashboardProps> = ({
+    connectionId: propConnectionId,
+    stacksDirectory = '/tmp/nautilus-stacks',
+    onOpenSettings
+}) => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
     const { modal, message: messageApi } = App.useApp();
-    const { activeConnectionId, activeConnection, dockerAvailable } = useConnection();
+    const { activeConnectionId: contextConnectionId, activeConnection, dockerAvailable } = useConnection();
+
+    // Use prop connectionId if provided, otherwise fall back to context
+    const activeConnectionId = propConnectionId ?? contextConnectionId;
     const [containers, setContainers] = useState<DockerContainer[]>([]);
     const [images, setImages] = useState<DockerImage[]>([]);
     const [volumes, setVolumes] = useState<DockerVolume[]>([]);
