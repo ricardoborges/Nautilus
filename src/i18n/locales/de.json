@@ -57,6 +57,10 @@
   "settings": {
     "stacks_directory": "Stacks-Verzeichnis",
     "stacks_directory_help": "Entferntes Verzeichnis, in dem Docker Compose Stacks gespeichert werden",
+    "terminal_font": "Terminal-Schriftart",
+    "terminal_font_help": "Im Terminal verwendete Schriftart",
+    "terminal_font_size": "Schriftgröße",
+    "terminal_font_size_help": "Terminal-Schriftgröße in Pixel",
     "data_management": "Datenverwaltung",
     "export_database": "Datenbank exportieren",
     "export_database_help": "Alle Verbindungen und Snippets in eine Datei exportieren",
@@ -441,5 +445,19 @@
     "session_info": "Die Remote-Desktop-Sitzung wurde in einem separaten Fenster geöffnet.",
     "session_launched": "Remote-Desktop-Sitzung für {{name}} gestartet",
     "launch_failed": "Fehler beim Starten des Remote-Desktops: {{error}}"
+  },
+  "lzy_cli": {
+    "title": "Lzy-CLI",
+    "description": "Lzy-CLI ist ein schlankes Kommandozeilen-Tool, das wiederkehrende Aufgaben auf Linux-Servern automatisiert — Dienste verwalten, Deployments, Log-Analyse und mehr — über kurze, leicht zu merkende Befehle.",
+    "what_it_does": "Damit kannst du",
+    "feature_1": "Häufige Admin-Aufgaben mit kürzeren, freundlicheren Befehlen ausführen",
+    "feature_2": "Dienste, Prozesse und Logs aus einer einzigen CLI verwalten",
+    "feature_3": "Routinen auf den über Nautilus verbundenen Servern beschleunigen",
+    "install_command": "Installationsbefehl",
+    "install_hint": "Beim Klick auf Installieren wechselt die Ansicht zum Terminal und führt den Befehl auf dem verbundenen Server aus.",
+    "install": "Installieren",
+    "view_on_github": "Auf GitHub ansehen",
+    "command_sent": "Installationsbefehl an das Terminal gesendet.",
+    "terminal_not_ready": "Keine aktive Terminal-Sitzung. Öffne zuerst ein Terminal."
   }
 }

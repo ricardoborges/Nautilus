@@ -57,6 +57,10 @@
   "settings": {
     "stacks_directory": "Directory Stack",
     "stacks_directory_help": "Directory remota dove verranno archiviati gli stack Docker Compose",
+    "terminal_font": "Font del Terminale",
+    "terminal_font_help": "Famiglia di font utilizzata nel terminale",
+    "terminal_font_size": "Dimensione Font",
+    "terminal_font_size_help": "Dimensione del font del terminale in pixel",
     "data_management": "Gestione Dati",
     "export_database": "Esporta Database",
     "export_database_help": "Esporta tutte le connessioni e i frammenti in un file",
@@ -441,5 +445,19 @@
     "session_info": "La sessione Desktop Remoto è stata aperta in una finestra separata.",
     "session_launched": "Sessione Desktop Remoto avviata per {{name}}",
     "launch_failed": "Errore nell'avvio del Desktop Remoto: {{error}}"
+  },
+  "lzy_cli": {
+    "title": "Lzy-CLI",
+    "description": "Lzy-CLI è uno strumento leggero da riga di comando che automatizza attività ripetitive sui server Linux — gestione di servizi, deploy, ispezione dei log e altro — tramite comandi brevi e facili da ricordare.",
+    "what_it_does": "Cosa puoi farci",
+    "feature_1": "Eseguire attività amministrative comuni con comandi più brevi",
+    "feature_2": "Gestire servizi, processi e log da una sola CLI",
+    "feature_3": "Velocizzare le routine sui server collegati da Nautilus",
+    "install_command": "Comando di installazione",
+    "install_hint": "Cliccando Installa verrà aperta la scheda Terminale e il comando sarà eseguito sul server connesso.",
+    "install": "Installa",
+    "view_on_github": "Vedi su GitHub",
+    "command_sent": "Comando di installazione inviato al terminale.",
+    "terminal_not_ready": "Nessuna sessione di terminale attiva. Apri prima un terminale."
   }
 }

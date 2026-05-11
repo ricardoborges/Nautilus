@@ -57,6 +57,10 @@
   "settings": {
     "stacks_directory": "Stacks Directory",
     "stacks_directory_help": "Remote directory where Docker Compose stacks will be stored",
+    "terminal_font": "Terminal Font",
+    "terminal_font_help": "Font family used in the terminal",
+    "terminal_font_size": "Font Size",
+    "terminal_font_size_help": "Terminal font size in pixels",
     "data_management": "Data Management",
     "export_database": "Export Database",
     "export_database_help": "Export all connections and snippets to a file",
@@ -441,5 +445,19 @@
     "session_info": "The Remote Desktop session has been opened in a separate window. Use the Disconnect button to end the session.",
     "session_launched": "Remote Desktop session launched for {{name}}",
     "launch_failed": "Failed to launch Remote Desktop: {{error}}"
+  },
+  "lzy_cli": {
+    "title": "Lzy-CLI",
+    "description": "Lzy-CLI is a lightweight command-line tool that automates repetitive Linux server tasks — service management, deploys, log inspection and more — through short, easy-to-remember commands.",
+    "what_it_does": "What you can do with it",
+    "feature_1": "Run common admin tasks with shorter, friendlier commands",
+    "feature_2": "Manage services, processes and logs from a single CLI",
+    "feature_3": "Speed up routines on the servers you connect to from Nautilus",
+    "install_command": "Install command",
+    "install_hint": "Clicking Install will switch to the Terminal tab and run the command on the connected server.",
+    "install": "Install",
+    "view_on_github": "View on GitHub",
+    "command_sent": "Install command sent to the terminal.",
+    "terminal_not_ready": "No active terminal session. Open a terminal first."
   }
 }

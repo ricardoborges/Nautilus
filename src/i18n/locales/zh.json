@@ -57,6 +57,10 @@
   "settings": {
     "stacks_directory": "堆栈目录",
     "stacks_directory_help": "存储 Docker Compose 堆栈的远程目录",
+    "terminal_font": "终端字体",
+    "terminal_font_help": "终端中使用的字体",
+    "terminal_font_size": "字体大小",
+    "terminal_font_size_help": "终端字体大小（像素）",
     "data_management": "数据管理",
     "export_database": "导出数据库",
     "export_database_help": "将所有连接和代码片段导出到文件",
@@ -441,5 +445,19 @@
     "session_info": "远程桌面会话已在单独的窗口中打开。",
     "session_launched": "已为{{name}}启动远程桌面会话",
     "launch_failed": "启动远程桌面失败：{{error}}"
+  },
+  "lzy_cli": {
+    "title": "Lzy-CLI",
+    "description": "Lzy-CLI 是一款轻量级命令行工具，通过简短易记的命令自动化 Linux 服务器的重复任务，包括服务管理、部署、日志查看等。",
+    "what_it_does": "你可以用它做什么",
+    "feature_1": "使用更短、更友好的命令执行常见管理任务",
+    "feature_2": "通过单一 CLI 管理服务、进程和日志",
+    "feature_3": "加速在 Nautilus 中连接的服务器上的日常操作",
+    "install_command": "安装命令",
+    "install_hint": "点击「安装」将切换到终端标签页，并在已连接的服务器上执行该命令。",
+    "install": "安装",
+    "view_on_github": "在 GitHub 查看",
+    "command_sent": "安装命令已发送到终端。",
+    "terminal_not_ready": "没有活动的终端会话，请先打开一个终端。"
   }
 }

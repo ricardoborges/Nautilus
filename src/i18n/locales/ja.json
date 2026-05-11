@@ -57,6 +57,10 @@
   "settings": {
     "stacks_directory": "スタックディレクトリ",
     "stacks_directory_help": "Docker Composeスタックが保存されるリモートディレクトリ",
+    "terminal_font": "ターミナルフォント",
+    "terminal_font_help": "ターミナルで使用されるフォントファミリー",
+    "terminal_font_size": "フォントサイズ",
+    "terminal_font_size_help": "ターミナルフォントのサイズ（ピクセル）",
     "data_management": "データ管理",
     "export_database": "データベースをエクスポート",
     "export_database_help": "すべての接続とスニペットをファイルにエクスポート",
@@ -441,5 +445,19 @@
     "session_info": "リモートデスクトップセッションが別のウィンドウで開かれました。",
     "session_launched": "{{name}}のリモートデスクトップセッションを開始しました",
     "launch_failed": "リモートデスクトップの起動に失敗しました: {{error}}"
+  },
+  "lzy_cli": {
+    "title": "Lzy-CLI",
+    "description": "Lzy-CLIは、サービス管理・デプロイ・ログ確認など、Linuxサーバーで繰り返し行うタスクを短く覚えやすいコマンドで自動化する軽量なコマンドラインツールです。",
+    "what_it_does": "できること",
+    "feature_1": "よくある管理作業を短く分かりやすいコマンドで実行",
+    "feature_2": "サービス・プロセス・ログを一つのCLIから管理",
+    "feature_3": "Nautilusから接続するサーバーの作業を高速化",
+    "install_command": "インストールコマンド",
+    "install_hint": "「インストール」を押すと、ターミナルタブに切り替わり、接続中のサーバーでコマンドが実行されます。",
+    "install": "インストール",
+    "view_on_github": "GitHubで見る",
+    "command_sent": "インストールコマンドをターミナルに送信しました。",
+    "terminal_not_ready": "アクティブなターミナルセッションがありません。先にターミナルを開いてください。"
   }
 }
