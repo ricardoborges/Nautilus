@@ -24,6 +24,22 @@ import { SnippetSidebar } from './SnippetSidebar';
 
 const { Text } = Typography;
 
+const TERMINAL_FONT_STORAGE_KEY = 'nautilus_terminal_font';
+const TERMINAL_FONT_SIZE_STORAGE_KEY = 'nautilus_terminal_font_size';
+const DEFAULT_TERMINAL_FONT = '"Fira Code", "Cascadia Code", "ProggyClean Nerd Font", Consolas, monospace';
+const DEFAULT_TERMINAL_FONT_SIZE = 14;
+const TERMINAL_FONT_EVENT = 'nautilus:terminal-font-changed';
+
+const getTerminalFont = (): string => {
+    return localStorage.getItem(TERMINAL_FONT_STORAGE_KEY) || DEFAULT_TERMINAL_FONT;
+};
+
+const getTerminalFontSize = (): number => {
+    const raw = localStorage.getItem(TERMINAL_FONT_SIZE_STORAGE_KEY);
+    const parsed = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TERMINAL_FONT_SIZE;
+};
+
 interface TerminalSession {
     id: string;
     term: Terminal;
@@ -75,8 +91,8 @@ export const TerminalManager: React.FC<TerminalManagerProps> = ({ connectionId: 
 
         const id = generateId();
         const term = new Terminal({
-            fontFamily: '"Cascadia Code", "Fira Code", Consolas, monospace',
-            fontSize: 14,
+            fontFamily: getTerminalFont(),
+            fontSize: getTerminalFontSize(),
             theme: {
                 background: '#1e1e1e',
                 foreground: '#d4d4d4',
@@ -153,6 +169,25 @@ export const TerminalManager: React.FC<TerminalManagerProps> = ({ connectionId: 
     useEffect(() => {
         terminalService.setActive(activeSessionId);
     }, [activeSessionId]);
+
+    // Subscribe to terminal font changes
+    useEffect(() => {
+        const handleFontChange = () => {
+            const font = getTerminalFont();
+            const size = getTerminalFontSize();
+            sessionsRef.current.forEach((session) => {
+                session.term.options.fontFamily = font;
+                session.term.options.fontSize = size;
+                try {
+                    session.fitAddon.fit();
+                } catch {
+                    /* ignore */
+                }
+            });
+        };
+        window.addEventListener(TERMINAL_FONT_EVENT, handleFontChange);
+        return () => window.removeEventListener(TERMINAL_FONT_EVENT, handleFontChange);
+    }, []);
 
     // Subscribe to terminal data
     useEffect(() => {
@@ -345,16 +380,27 @@ export const TerminalManager: React.FC<TerminalManagerProps> = ({ connectionId: 
                 {sessions.length > 0 ? (
                     <div style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0 }}>
                         <div
-                            ref={terminalContainerRef}
-                            className="terminal-container"
                             style={{
                                 flex: 1,
                                 minWidth: 0,
                                 minHeight: 0,
                                 background: '#1e1e1e',
-                                borderRadius: '0 0 0 8px'
+                                borderRadius: '0 0 0 8px',
+                                padding: '8px 8px 12px 8px',
+                                display: 'flex',
+                                flexDirection: 'column',
                             }}
-                        />
+                        >
+                            <div
+                                ref={terminalContainerRef}
+                                className="terminal-container"
+                                style={{
+                                    flex: 1,
+                                    minWidth: 0,
+                                    minHeight: 0,
+                                }}
+                            />
+                        </div>
                         {showSnippets && <SnippetSidebar />}
                     </div>
                 ) : (
