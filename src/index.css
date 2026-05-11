@@ -5,6 +5,23 @@
  * Most styling is handled by Ant Design components.
  */
 
+/* Terminal fonts */
+@font-face {
+    font-family: 'ProggyClean Nerd Font';
+    src: url('./fonts/ProggyCleanNerdFont-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'GeistMono Nerd Font';
+    src: url('./fonts/GeistMonoNerdFont-Regular.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* Reset and base styles */
 * {
     margin: 0;
@@ -51,9 +68,8 @@ body {
 /* Terminal container styles */
 .terminal-container {
     background: #1e1e1e;
-    border-radius: 8px;
-    padding: 8px;
     height: 100%;
+    overflow: hidden;
 }
 
 .terminal-container .xterm {

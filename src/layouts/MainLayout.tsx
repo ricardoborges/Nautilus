@@ -17,10 +17,11 @@ import {
     WindowsOutlined,
     LinuxOutlined,
     DatabaseOutlined,
+    CodeOutlined,
     ExportOutlined,
     ImportOutlined,
 } from '@ant-design/icons';
-import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input, Popconfirm, Row, Col } from 'antd';
+import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input, InputNumber, Popconfirm, Row, Col } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { MenuProps } from 'antd';
 import { useTheme } from '../context/ThemeContext';
@@ -61,6 +62,39 @@ export const MainLayout: React.FC = () => {
     const handleStacksDirectoryChange = (value: string) => {
         setStacksDirectory(value);
         localStorage.setItem('nautilus_stacks_dir', value);
+    };
+
+    // Terminal font setting
+    const DEFAULT_TERMINAL_FONT = '"Fira Code", "Cascadia Code", "ProggyClean Nerd Font", Consolas, monospace';
+    const DEFAULT_TERMINAL_FONT_SIZE = 14;
+    const TERMINAL_FONT_OPTIONS = [
+        { value: DEFAULT_TERMINAL_FONT, label: 'Fira Code (default)' },
+        { value: '"ProggyClean Nerd Font", "Cascadia Code", Consolas, monospace', label: 'ProggyClean Nerd Font' },
+        { value: '"GeistMono Nerd Font", "Cascadia Code", Consolas, monospace', label: 'GeistMono Nerd Font' },
+        { value: '"Cascadia Code", Consolas, monospace', label: 'Cascadia Code' },
+        { value: 'Consolas, monospace', label: 'Consolas' },
+        { value: '"Courier New", monospace', label: 'Courier New' },
+    ];
+    const [terminalFont, setTerminalFont] = useState<string>(() => {
+        return localStorage.getItem('nautilus_terminal_font') || DEFAULT_TERMINAL_FONT;
+    });
+    const [terminalFontSize, setTerminalFontSize] = useState<number>(() => {
+        const raw = localStorage.getItem('nautilus_terminal_font_size');
+        const parsed = raw ? parseInt(raw, 10) : NaN;
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TERMINAL_FONT_SIZE;
+    });
+
+    const handleTerminalFontChange = (value: string) => {
+        setTerminalFont(value);
+        localStorage.setItem('nautilus_terminal_font', value);
+        window.dispatchEvent(new Event('nautilus:terminal-font-changed'));
+    };
+
+    const handleTerminalFontSizeChange = (value: number | null) => {
+        if (value == null || !Number.isFinite(value) || value <= 0) return;
+        setTerminalFontSize(value);
+        localStorage.setItem('nautilus_terminal_font_size', String(value));
+        window.dispatchEvent(new Event('nautilus:terminal-font-changed'));
     };
 
 
@@ -315,6 +349,44 @@ export const MainLayout: React.FC = () => {
                             placeholder="/tmp/nautilus-stacks"
                         />
                     </Form.Item>
+
+                    <Row gutter={16}>
+                        <Col span={16}>
+                            <Form.Item
+                                label={
+                                    <Space>
+                                        <CodeOutlined />
+                                        {t('settings.terminal_font')}
+                                    </Space>
+                                }
+                                help={t('settings.terminal_font_help')}
+                                style={{ marginBottom: 16 }}
+                            >
+                                <Select
+                                    value={terminalFont}
+                                    onChange={handleTerminalFontChange}
+                                    style={{ width: '100%' }}
+                                    options={TERMINAL_FONT_OPTIONS}
+                                />
+                            </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                            <Form.Item
+                                label={t('settings.terminal_font_size')}
+                                help={t('settings.terminal_font_size_help')}
+                                style={{ marginBottom: 16 }}
+                            >
+                                <InputNumber
+                                    value={terminalFontSize}
+                                    onChange={handleTerminalFontSizeChange}
+                                    min={8}
+                                    max={48}
+                                    step={1}
+                                    style={{ width: '100%' }}
+                                />
+                            </Form.Item>
+                        </Col>
+                    </Row>
 
                     <Divider style={{ margin: '8px 0 16px' }}>{t('settings.data_management')}</Divider>
 
