@@ -65,14 +65,14 @@ export const MainLayout: React.FC = () => {
     };
 
     // Terminal font setting
-    const DEFAULT_TERMINAL_FONT = '"Fira Code", "Cascadia Code", "ProggyClean Nerd Font", Consolas, monospace';
-    const DEFAULT_TERMINAL_FONT_SIZE = 14;
+    const DEFAULT_TERMINAL_FONT = 'Consolas, monospace';
+    const DEFAULT_TERMINAL_FONT_SIZE = 13;
     const TERMINAL_FONT_OPTIONS = [
-        { value: DEFAULT_TERMINAL_FONT, label: 'Fira Code (default)' },
+        { value: DEFAULT_TERMINAL_FONT, label: 'Consolas (default)' },
+        { value: '"Fira Code", "Cascadia Code", Consolas, monospace', label: 'Fira Code' },
         { value: '"ProggyClean Nerd Font", "Cascadia Code", Consolas, monospace', label: 'ProggyClean Nerd Font' },
         { value: '"GeistMono Nerd Font", "Cascadia Code", Consolas, monospace', label: 'GeistMono Nerd Font' },
         { value: '"Cascadia Code", Consolas, monospace', label: 'Cascadia Code' },
-        { value: 'Consolas, monospace', label: 'Consolas' },
         { value: '"Courier New", monospace', label: 'Courier New' },
     ];
     const [terminalFont, setTerminalFont] = useState<string>(() => {

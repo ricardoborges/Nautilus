@@ -26,8 +26,8 @@ const { Text } = Typography;
 
 const TERMINAL_FONT_STORAGE_KEY = 'nautilus_terminal_font';
 const TERMINAL_FONT_SIZE_STORAGE_KEY = 'nautilus_terminal_font_size';
-const DEFAULT_TERMINAL_FONT = '"Fira Code", "Cascadia Code", "ProggyClean Nerd Font", Consolas, monospace';
-const DEFAULT_TERMINAL_FONT_SIZE = 14;
+const DEFAULT_TERMINAL_FONT = 'Consolas, monospace';
+const DEFAULT_TERMINAL_FONT_SIZE = 13;
 const TERMINAL_FONT_EVENT = 'nautilus:terminal-font-changed';
 
 const getTerminalFont = (): string => {
