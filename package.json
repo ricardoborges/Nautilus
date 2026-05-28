@@ -1,6 +1,6 @@
 {
   "name": "nautilus",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Simple Server Manager application built with Tauri.",
   "type": "module",
   "scripts": {
