@@ -33,6 +33,7 @@ export class TerminalSession {
                     stream
                         .on('close', () => {
                             logger.info(`[Terminal-${this.terminalId}] Stream do shell fechado para ${this.sshConfig.host}.`);
+                            this.onData(Buffer.from(`\r\n\x1b[31m[Nautilus] Conexão encerrada pelo servidor ou perdida.\x1b[0m\r\n`).toString('base64'));
                             this.client.end();
                         })
                         .on('data', (data: Buffer) => {
@@ -49,7 +50,12 @@ export class TerminalSession {
                 logger.error(`[Terminal-${this.terminalId}] Erro de conexão SSH: ${err.message}`);
                 this.onData(Buffer.from(`\r\n\x1b[31mErro de conexão SSH: ${err.message}\x1b[0m\r\n`).toString('base64'));
             })
-            .connect(this.sshConfig);
+            .connect({
+                keepaliveInterval: 15000,
+                keepaliveCountMax: 3,
+                readyTimeout: 20000,
+                ...this.sshConfig
+            });
     }
 
     write(data: string): void {

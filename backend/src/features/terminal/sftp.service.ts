@@ -22,7 +22,12 @@ export class SFTPClient {
                     });
                 })
                 .on('error', (err) => reject(err))
-                .connect(this.sshConfig);
+                .connect({
+                    keepaliveInterval: 15000,
+                    keepaliveCountMax: 3,
+                    readyTimeout: 20000,
+                    ...this.sshConfig
+                });
         });
     }
 

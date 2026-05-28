@@ -19,7 +19,12 @@ export class SSHClient {
                 .on('error', (err) => {
                     reject(err);
                 })
-                .connect(this.config);
+                .connect({
+                    keepaliveInterval: 15000,
+                    keepaliveCountMax: 3,
+                    readyTimeout: 20000,
+                    ...this.config
+                });
         });
     }
 
