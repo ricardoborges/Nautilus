@@ -459,7 +459,9 @@
     "fingerprint": "Empreinte de la clé (SHA-256)",
     "verify_hint": "Pour la vérifier, exécutez ceci sur la console du serveur :",
     "trust": "Faire confiance et se connecter",
-    "reject": "Annuler"
+    "reject": "Annuler",
+    "too_late": "La confirmation est arrivée trop tard — la connexion a été refusée. Reconnectez-vous.",
+    "respond_failed": "Impossible d’envoyer la réponse. Reconnectez-vous."
   },
   "env": {
     "title": "Fichiers d'environnement",

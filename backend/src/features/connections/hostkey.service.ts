@@ -8,7 +8,9 @@
  */
 
 import crypto from 'crypto';
+import { Client } from 'ssh2';
 import { query, queryOne, runAndSave } from '../../shared/database';
+import type { SSHConfig } from '../../shared/types';
 
 export interface KnownHost {
     host: string;
@@ -90,6 +92,17 @@ let promptHandler: HostKeyPromptHandler | null = null;
 export function setHostKeyPromptHandler(handler: HostKeyPromptHandler | null): void {
     promptHandler = handler;
 }
+
+/**
+ * Hosts whose dialog is currently on screen, as `host:port`.
+ *
+ * Only the first connection to an unknown host waits for the answer, the rest
+ * fail straight away. Every waiting connection is an API request the webview
+ * is holding open, and a webview only allows a handful of sockets per origin:
+ * park them all on the dialog and there is no socket left for the answer to
+ * travel back on, so the confirmation cannot arrive and everything times out.
+ */
+const promptsInFlight = new Set<string>();
 
 /** How long the handshake may take, excluding time spent waiting on the user. */
 export const HANDSHAKE_TIMEOUT_MS = 20000;
@@ -189,11 +202,26 @@ export class HostKeyVerifier {
                     return;
                 }
 
-                const decision = await promptHandler({
-                    host: this.host,
-                    port: this.port,
-                    fingerprint: presented,
-                });
+                const pending = `${this.host}:${this.port}`;
+                if (promptsInFlight.has(pending)) {
+                    this.error =
+                        `Já existe uma confirmação de chave pendente para ${pending}. ` +
+                        `Confirme a chave e tente novamente.`;
+                    done(false);
+                    return;
+                }
+
+                promptsInFlight.add(pending);
+                let decision: HostKeyPromptResult;
+                try {
+                    decision = await promptHandler({
+                        host: this.host,
+                        port: this.port,
+                        fingerprint: presented,
+                    });
+                } finally {
+                    promptsInFlight.delete(pending);
+                }
 
                 if (!decision.accepted) {
                     this.error = decision.reason
@@ -219,4 +247,61 @@ export class HostKeyVerifier {
         this.clearTimer();
         return this.error ? new Error(this.error) : err;
     }
+}
+
+/**
+ * Settles the host key question on a connection of its own, before anything
+ * else is dialled.
+ *
+ * The handshake is abandoned as soon as the key is decided - no
+ * authentication happens here. Known hosts return without touching the
+ * network. Doing this first means the dialog is the only thing the UI is
+ * waiting on, so its answer always has a socket to travel on.
+ */
+export function ensureHostTrusted(config: SSHConfig): Promise<HostKeyPromptResult> {
+    const host = config.host;
+    const port = config.port || 22;
+
+    if (isKnownHost(host, port)) return Promise.resolve({ accepted: true });
+
+    return new Promise((resolve) => {
+        const verifier = new HostKeyVerifier(host, port);
+        const client = new Client();
+        let settled = false;
+        let disarm: () => void = () => {};
+
+        const finish = (result: HostKeyPromptResult): void => {
+            if (settled) return;
+            settled = true;
+            disarm();
+            try {
+                client.end();
+            } catch {
+                // Already tearing down; the answer is what matters.
+            }
+            resolve(result);
+        };
+
+        disarm = verifier.armTimeout((err) => finish({ accepted: false, reason: err.message }));
+
+        client
+            .on('ready', () => finish({ accepted: true }))
+            .on('error', (err) => finish({ accepted: false, reason: verifier.wrapError(err).message }))
+            .connect({
+                host,
+                port,
+                username: config.username,
+                readyTimeout: verifier.readyTimeout,
+                hostVerifier: (key: Buffer, done: (valid: boolean) => void) => {
+                    verifier.verify(key, (valid) => {
+                        done(valid);
+                        // Accepted and recorded: there is nothing left to ask,
+                        // so drop the handshake instead of authenticating.
+                        // A refusal is left to surface as a connection error,
+                        // which carries the reason.
+                        if (valid) finish({ accepted: true });
+                    });
+                },
+            });
+    });
 }

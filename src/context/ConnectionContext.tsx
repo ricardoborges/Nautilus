@@ -6,6 +6,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { message } from 'antd';
 import type { Connection, Snippet, SystemMetrics } from '../types';
 import { SYSTEM_SNIPPETS } from '../utils/constants';
 
@@ -136,6 +137,24 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             return;
         }
 
+        // Settle the SSH host key first. The confirmation dialog is answered
+        // over the same local API the panels use, and the webview only allows
+        // a few sockets per origin - asking before the tab exists keeps those
+        // sockets free so the answer can get through.
+        const connection = connections.find(c => c.id === id);
+        if (connection && connection.connectionType !== 'rdp') {
+            try {
+                const gate = await window.ssm.hostKeyEnsure(id);
+                if (!gate.trusted) {
+                    message.error(gate.reason || 'Chave do host não confirmada. Conexão recusada.');
+                    return;
+                }
+            } catch (error) {
+                message.error(`Falha ao verificar a chave do host: ${(error as Error).message}`);
+                return;
+            }
+        }
+
         // Initialize connection state
         setConnectionStates(prev => ({
             ...prev,
@@ -168,7 +187,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
                 }
             }));
         }
-    }, [activeConnectionIds, checkDockerAvailability]);
+    }, [activeConnectionIds, connections, checkDockerAvailability]);
 
     // Close a connection (remove from active list)
     const closeConnection = useCallback(async (id: string) => {

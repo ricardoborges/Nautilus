@@ -332,6 +332,9 @@ const ssm: SSMAPI = {
     hostKeyForget: (host: string, port: number): Promise<{ success: boolean }> =>
         backendInvoke<{ success: boolean }>('ssm:hostkeys:forget', { host, port }),
 
+    hostKeyEnsure: (connectionId: string): Promise<{ trusted: boolean; reason?: string }> =>
+        backendInvoke<{ trusted: boolean; reason?: string }>('ssm:hostkeys:ensure', { connectionId }),
+
     hostKeyRespond: (requestId: string, accept: boolean): Promise<{ success: boolean }> =>
         backendInvoke<{ success: boolean }>('ssm:hostkeys:respond', { requestId, accept }),
 

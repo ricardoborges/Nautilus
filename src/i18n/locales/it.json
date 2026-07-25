@@ -459,7 +459,9 @@
     "fingerprint": "Impronta digitale della chiave (SHA-256)",
     "verify_hint": "Per verificarla, esegui questo sulla console del server:",
     "trust": "Fidati e connetti",
-    "reject": "Annulla"
+    "reject": "Annulla",
+    "too_late": "La conferma è arrivata troppo tardi — la connessione è stata rifiutata. Riprova a connetterti.",
+    "respond_failed": "Impossibile inviare la risposta. Riprova a connetterti."
   },
   "env": {
     "title": "File di ambiente",

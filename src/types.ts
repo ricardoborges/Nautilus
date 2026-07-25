@@ -374,6 +374,7 @@ export interface SSMAPI {
     // SSH known hosts (host key pinning)
     hostKeysList: () => Promise<KnownHost[]>;
     hostKeyForget: (host: string, port: number) => Promise<{ success: boolean }>;
+    hostKeyEnsure: (connectionId: string) => Promise<{ trusted: boolean; reason?: string }>;
     hostKeyRespond: (requestId: string, accept: boolean) => Promise<{ success: boolean }>;
     onHostKeyPrompt: (callback: (event: HostKeyPromptEvent) => void) => () => void;
 

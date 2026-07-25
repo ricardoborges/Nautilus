@@ -7,7 +7,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Modal, Typography, Alert, Space, Tag } from 'antd';
+import { Modal, Typography, Alert, Space, Tag, App } from 'antd';
 import { SafetyCertificateOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { HostKeyPromptEvent } from '../../types';
@@ -16,6 +16,7 @@ const { Text, Paragraph } = Typography;
 
 export const HostKeyPrompt: React.FC = () => {
     const { t } = useTranslation();
+    const { message } = App.useApp();
     const [queue, setQueue] = useState<HostKeyPromptEvent[]>([]);
     const [responding, setResponding] = useState(false);
 
@@ -35,14 +36,20 @@ export const HostKeyPrompt: React.FC = () => {
         if (!current) return;
         setResponding(true);
         try {
-            await window.ssm.hostKeyRespond(current.requestId, accept);
+            const result = await window.ssm.hostKeyRespond(current.requestId, accept);
+            // The backend had already given up on this question, so the answer
+            // changed nothing and the connection was refused.
+            if (!result.success) {
+                message.error(t('hostkey.too_late'));
+            }
         } catch (err) {
             console.error('Failed to answer host key prompt:', err);
+            message.error(t('hostkey.respond_failed'));
         } finally {
             setResponding(false);
             setQueue(prev => prev.filter(item => item.requestId !== current.requestId));
         }
-    }, [current]);
+    }, [current, message, t]);
 
     if (!current) return null;
 

@@ -459,7 +459,9 @@
     "fingerprint": "Impressão digital da chave (SHA-256)",
     "verify_hint": "Para conferir, execute no console do servidor:",
     "trust": "Confiar e conectar",
-    "reject": "Cancelar"
+    "reject": "Cancelar",
+    "too_late": "A confirmação chegou tarde demais — a conexão foi recusada. Conecte novamente.",
+    "respond_failed": "Não foi possível enviar a resposta. Conecte novamente."
   },
   "env": {
     "title": "Arquivos de ambiente",

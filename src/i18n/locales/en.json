@@ -459,7 +459,9 @@
     "fingerprint": "Key fingerprint (SHA-256)",
     "verify_hint": "To check it, run this on the server console:",
     "trust": "Trust and connect",
-    "reject": "Cancel"
+    "reject": "Cancel",
+    "too_late": "The confirmation arrived too late — the connection was refused. Please connect again.",
+    "respond_failed": "Could not send the answer. Please connect again."
   },
   "env": {
     "title": "Environment files",

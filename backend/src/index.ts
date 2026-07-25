@@ -13,6 +13,7 @@ import { connectionManager } from './features/connections';
 import {
     listKnownHosts,
     forgetKnownHost,
+    ensureHostTrusted,
     setHostKeyPromptHandler,
     type HostKeyPromptRequest,
     type HostKeyPromptResult
@@ -545,6 +546,21 @@ const handlers: HandlerRegistry = {
     // Known hosts handlers (SSH host key pinning)
     'ssm:hostkeys:list': async () => {
         return listKnownHosts();
+    },
+
+    'ssm:hostkeys:ensure': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+
+        // No credentials: the key is presented before authentication, and the
+        // handshake is dropped as soon as it has been decided.
+        const decision = await ensureHostTrusted({
+            host: conn.host,
+            port: conn.port || 22,
+            username: conn.user,
+        });
+        return { trusted: decision.accepted, reason: decision.reason };
     },
 
     'ssm:hostkeys:respond': async (args) => {

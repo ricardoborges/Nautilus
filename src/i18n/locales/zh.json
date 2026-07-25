@@ -459,7 +459,9 @@
     "fingerprint": "密钥指纹 (SHA-256)",
     "verify_hint": "要核对指纹，请在服务器控制台运行:",
     "trust": "信任并连接",
-    "reject": "取消"
+    "reject": "取消",
+    "too_late": "确认送达太晚，连接已被拒绝。请重新连接。",
+    "respond_failed": "无法发送回复。请重新连接。"
   },
   "env": {
     "title": "环境文件",

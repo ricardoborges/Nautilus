@@ -459,7 +459,9 @@
     "fingerprint": "Schlüssel-Fingerabdruck (SHA-256)",
     "verify_hint": "Zum Prüfen auf der Serverkonsole ausführen:",
     "trust": "Vertrauen und verbinden",
-    "reject": "Abbrechen"
+    "reject": "Abbrechen",
+    "too_late": "Die Bestätigung kam zu spät — die Verbindung wurde abgelehnt. Bitte erneut verbinden.",
+    "respond_failed": "Die Antwort konnte nicht gesendet werden. Bitte erneut verbinden."
   },
   "env": {
     "title": "Umgebungsdateien",

@@ -459,7 +459,9 @@
     "fingerprint": "Huella digital de la clave (SHA-256)",
     "verify_hint": "Para comprobarlo, ejecuta esto en la consola del servidor:",
     "trust": "Confiar y conectar",
-    "reject": "Cancelar"
+    "reject": "Cancelar",
+    "too_late": "La confirmación llegó demasiado tarde — se rechazó la conexión. Conecta de nuevo.",
+    "respond_failed": "No se pudo enviar la respuesta. Conecta de nuevo."
   },
   "env": {
     "title": "Archivos de entorno",
