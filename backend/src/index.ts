@@ -14,7 +14,8 @@ import {
     listKnownHosts,
     forgetKnownHost,
     setHostKeyPromptHandler,
-    type HostKeyPromptRequest
+    type HostKeyPromptRequest,
+    type HostKeyPromptResult
 } from './features/connections/hostkey.service';
 import { SFTPClient, SSHClient, TerminalSession } from './features/terminal';
 import { SystemMonitor } from './features/metrics';
@@ -31,6 +32,11 @@ import type {
     HandlerRegistry,
     MetricsUpdate
 } from './shared/types';
+
+// Env file discovery limits: deep enough for real project trees, bounded so a
+// large home directory cannot stall the UI.
+const ENV_SEARCH_MAX_DEPTH = 6;
+const ENV_SEARCH_MAX_RESULTS = 500;
 
 // Active services
 let activeSystemMonitor: SystemMonitor | null = null;
@@ -472,6 +478,68 @@ const handlers: HandlerRegistry = {
     'ssm:snippets:remove': async (args) => {
         const { id } = args as { id: string };
         return await snippetManager.remove(id);
+    },
+
+    // Env file handlers
+    'ssm:env:list': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+
+            // Search the logged-in user's home for dotenv files. Heavy directories
+            // are pruned so this stays fast on real project trees, and every part
+            // is tolerant of permission errors.
+            const findCmd = [
+                'echo "HOME=$HOME"',
+                `find "$HOME" -maxdepth ${ENV_SEARCH_MAX_DEPTH} \\( -name node_modules -o -name .git -o -name vendor -o -name .cache -o -name .venv -o -name __pycache__ \\) -prune -o`,
+                `-type f \\( -name '.env' -o -name '.env.*' -o -name '*.env' \\) -print 2>/dev/null`,
+                `| head -n ${ENV_SEARCH_MAX_RESULTS}`,
+                `| while IFS= read -r f; do`,
+                `printf '%s|%s|%s\\n' "$f" "$(stat -c %s "$f" 2>/dev/null || echo 0)" "$(stat -c %Y "$f" 2>/dev/null || echo 0)";`,
+                'done',
+                '|| true',
+            ].join(' ');
+
+            const result = await ssh.exec(findCmd);
+            const lines = result.stdout.split('\n').map(l => l.trim()).filter(Boolean);
+
+            let home = '';
+            const files: Array<{ path: string; name: string; directory: string; size: number; modified: number }> = [];
+
+            for (const line of lines) {
+                if (line.startsWith('HOME=')) {
+                    home = line.slice(5);
+                    continue;
+                }
+                const sep = line.lastIndexOf('|');
+                if (sep === -1) continue;
+                const prevSep = line.lastIndexOf('|', sep - 1);
+                if (prevSep === -1) continue;
+
+                const filePath = line.slice(0, prevSep);
+                const size = parseInt(line.slice(prevSep + 1, sep), 10) || 0;
+                const modified = parseInt(line.slice(sep + 1), 10) || 0;
+                if (!filePath) continue;
+
+                const lastSlash = filePath.lastIndexOf('/');
+                files.push({
+                    path: filePath,
+                    name: lastSlash === -1 ? filePath : filePath.slice(lastSlash + 1),
+                    directory: lastSlash === -1 ? '' : filePath.slice(0, lastSlash),
+                    size,
+                    modified: modified * 1000,
+                });
+            }
+
+            files.sort((a, b) => a.path.localeCompare(b.path));
+            return { home, files };
+        } finally {
+            ssh.end();
+        }
     },
 
     // Known hosts handlers (SSH host key pinning)
@@ -1329,13 +1397,13 @@ function broadcastEvent(channel: string, data: unknown): void {
 const HOSTKEY_PROMPT_TIMEOUT_MS = 120000;
 
 interface PendingHostKeyPrompt {
-    promise: Promise<boolean>;
+    promise: Promise<HostKeyPromptResult>;
     settle: (accept: boolean) => void;
 }
 
 const pendingHostKeyPrompts = new Map<string, PendingHostKeyPrompt>();
 
-function promptForHostKey(request: HostKeyPromptRequest): Promise<boolean> {
+function promptForHostKey(request: HostKeyPromptRequest): Promise<HostKeyPromptResult> {
     const requestId = `${request.host}:${request.port}:${request.fingerprint}`;
 
     const existing = pendingHostKeyPrompts.get(requestId);
@@ -1345,22 +1413,32 @@ function promptForHostKey(request: HostKeyPromptRequest): Promise<boolean> {
     const subscribers = eventSubscribers.get('events') || [];
     if (subscribers.length === 0) {
         logger.warn(`[HostKey] No UI connected to confirm ${request.host}:${request.port}`);
-        return Promise.resolve(false);
+        return Promise.resolve({
+            accepted: false,
+            reason:
+                `Chave desconhecida para ${request.host}:${request.port} (${request.fingerprint}) e não há ` +
+                `interface conectada para confirmá-la. Conexão recusada.`,
+        });
     }
 
     let settle!: (accept: boolean) => void;
-    const promise = new Promise<boolean>((resolve) => {
+    const promise = new Promise<HostKeyPromptResult>((resolve) => {
         const timer = setTimeout(() => {
             logger.warn(`[HostKey] Confirmation timed out for ${request.host}:${request.port}`);
             pendingHostKeyPrompts.delete(requestId);
-            resolve(false);
+            resolve({
+                accepted: false,
+                reason:
+                    `Tempo esgotado aguardando a confirmação da chave de ${request.host}:${request.port}. ` +
+                    `Conexão recusada.`,
+            });
         }, HOSTKEY_PROMPT_TIMEOUT_MS);
 
         settle = (accept: boolean) => {
             clearTimeout(timer);
             pendingHostKeyPrompts.delete(requestId);
             logger.info(`[HostKey] ${accept ? 'Accepted' : 'Rejected'} key for ${request.host}:${request.port}`);
-            resolve(accept);
+            resolve({ accepted: accept });
         };
     });
 

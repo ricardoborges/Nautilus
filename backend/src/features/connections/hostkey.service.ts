@@ -73,11 +73,17 @@ export interface HostKeyPromptRequest {
     fingerprint: string;
 }
 
+export interface HostKeyPromptResult {
+    accepted: boolean;
+    /** Why it was not accepted, when that is not simply "the user said no". */
+    reason?: string;
+}
+
 /**
- * Asks the user to confirm an unknown host key. Resolves true to accept.
+ * Asks the user to confirm an unknown host key.
  * Installed by the API layer, which relays the question to the UI.
  */
-export type HostKeyPromptHandler = (request: HostKeyPromptRequest) => Promise<boolean>;
+export type HostKeyPromptHandler = (request: HostKeyPromptRequest) => Promise<HostKeyPromptResult>;
 
 let promptHandler: HostKeyPromptHandler | null = null;
 
@@ -183,16 +189,16 @@ export class HostKeyVerifier {
                     return;
                 }
 
-                const accepted = await promptHandler({
+                const decision = await promptHandler({
                     host: this.host,
                     port: this.port,
                     fingerprint: presented,
                 });
 
-                if (!accepted) {
-                    this.error =
-                        `Chave do host ${this.host}:${this.port} (${presented}) não foi confirmada. ` +
-                        `Conexão recusada.`;
+                if (!decision.accepted) {
+                    this.error = decision.reason
+                        ?? `Chave do host ${this.host}:${this.port} (${presented}) não foi confirmada. ` +
+                           `Conexão recusada.`;
                     done(false);
                     return;
                 }
