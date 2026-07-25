@@ -15,6 +15,7 @@ import type {
     SFTPUploadResult,
     Snippet,
     KnownHost,
+    EnvListResult,
     HostKeyPromptEvent,
     TerminalDataPayload,
     DockerContainer,
@@ -320,6 +321,10 @@ const ssm: SSMAPI = {
     databaseExport: (): Promise<{ data: string }> => backendInvoke<{ data: string }>('ssm:database:export'),
 
     databaseImport: (data: string): Promise<void> => backendInvoke<void>('ssm:database:import', { data }),
+
+    // Env file methods
+    envList: (connectionId: string): Promise<EnvListResult> =>
+        backendInvoke<EnvListResult>('ssm:env:list', { connectionId }),
 
     // SSH known hosts methods
     hostKeysList: (): Promise<KnownHost[]> => backendInvoke<KnownHost[]>('ssm:hostkeys:list'),

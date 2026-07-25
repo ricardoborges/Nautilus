@@ -14,6 +14,7 @@ import {
     ClockCircleOutlined,
     AppstoreOutlined,
     ContainerOutlined,
+    FileTextOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
 } from '@ant-design/icons';
@@ -25,10 +26,11 @@ import { FileManager } from '../files/FileManager';
 import { ProcessManager } from '../processes/ProcessManager';
 import { CronManager } from '../cron/CronManager';
 import { DockerDashboard } from '../docker/DockerDashboard';
+import { EnvManager } from '../env/EnvManager';
 
 const { Sider, Content } = Layout;
 
-type TabKey = 'dashboard' | 'terminal' | 'files' | 'processes' | 'cron' | 'docker';
+type TabKey = 'dashboard' | 'terminal' | 'files' | 'env' | 'processes' | 'cron' | 'docker';
 
 interface ConnectionPaneProps {
     connectionId: string;
@@ -65,6 +67,11 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
             key: 'files',
             icon: <FolderOutlined />,
             label: t('common.files'),
+        },
+        {
+            key: 'env',
+            icon: <FileTextOutlined />,
+            label: t('common.env'),
         },
         {
             key: 'processes',
@@ -165,6 +172,9 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
                 </div>
                 <div style={tabStyle('files')}>
                     <FileManager connectionId={connectionId} />
+                </div>
+                <div style={tabStyle('env')}>
+                    <EnvManager connectionId={connectionId} />
                 </div>
                 <div style={tabStyle('processes')}>
                     <ProcessManager connectionId={connectionId} />

@@ -167,6 +167,22 @@ export interface KnownHost {
     createdAt: string;
 }
 
+export interface EnvFile {
+    /** Absolute path on the remote host. */
+    path: string;
+    name: string;
+    directory: string;
+    size: number;
+    /** Epoch milliseconds; 0 when the server could not report it. */
+    modified: number;
+}
+
+export interface EnvListResult {
+    /** Home directory of the SSH user, used to show shorter relative paths. */
+    home: string;
+    files: EnvFile[];
+}
+
 export interface HostKeyPromptEvent {
     requestId: string;
     host: string;
@@ -351,6 +367,9 @@ export interface SSMAPI {
     // Database
     databaseExport: () => Promise<{ data: string }>;
     databaseImport: (data: string) => Promise<void>;
+
+    // Env files
+    envList: (connectionId: string) => Promise<EnvListResult>;
 
     // SSH known hosts (host key pinning)
     hostKeysList: () => Promise<KnownHost[]>;

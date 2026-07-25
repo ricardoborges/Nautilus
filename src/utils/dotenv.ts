@@ -20,6 +20,8 @@ export interface EnvVariable {
     exported: boolean;
     /** Trailing `# comment` kept after the value. */
     inlineComment: string;
+    /** Original whitespace between value and `#`, so spacing survives a save. */
+    inlineCommentGap: string;
 }
 
 export interface EnvComment {
@@ -51,14 +53,15 @@ const VARIABLE_RE = /^(\s*)(export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/;
  * Splits an unquoted value from its trailing comment. Dotenv treats ` #` as the
  * start of a comment only when preceded by whitespace, so `pass#word` is intact.
  */
-function splitBareValue(rest: string): { value: string; inlineComment: string } {
-    const match = rest.match(/\s+#(.*)$/);
+function splitBareValue(rest: string): { value: string; inlineComment: string; gap: string } {
+    const match = rest.match(/(\s+)#(.*)$/);
     if (!match || match.index === undefined) {
-        return { value: rest.trim(), inlineComment: '' };
+        return { value: rest.trim(), inlineComment: '', gap: '' };
     }
     return {
         value: rest.slice(0, match.index).trim(),
-        inlineComment: match[1].trim(),
+        inlineComment: match[2].trim(),
+        gap: match[1],
     };
 }
 
@@ -67,7 +70,7 @@ function splitBareValue(rest: string): { value: string; inlineComment: string } 
  * Returns null when the closing quote is missing, so the caller can preserve
  * the line verbatim instead of corrupting a multi-line value.
  */
-function readQuoted(rest: string, quoteChar: '"' | "'"): { value: string; inlineComment: string } | null {
+function readQuoted(rest: string, quoteChar: '"' | "'"): { value: string; inlineComment: string; gap: string } | null {
     let value = '';
     let i = 1;
 
@@ -85,12 +88,16 @@ function readQuoted(rest: string, quoteChar: '"' | "'"): { value: string; inline
         }
 
         if (char === quoteChar) {
-            const trailing = rest.slice(i + 1).trim();
-            const inlineComment = trailing.startsWith('#') ? trailing.slice(1).trim() : '';
+            const after = rest.slice(i + 1);
+            const trailing = after.trim();
             // Anything else after the closing quote is unexpected; bail out and
             // keep the original line rather than silently dropping it.
             if (trailing && !trailing.startsWith('#')) return null;
-            return { value, inlineComment };
+            return {
+                value,
+                inlineComment: trailing.startsWith('#') ? trailing.slice(1).trim() : '',
+                gap: trailing ? (after.match(/^\s*/)?.[0] ?? '') : '',
+            };
         }
 
         value += char;
@@ -137,10 +144,11 @@ export function parseEnv(content: string): EnvEntry[] {
                 quote: quoteChar === '"' ? 'double' : 'single',
                 exported: Boolean(exportPrefix),
                 inlineComment: parsed.inlineComment,
+                inlineCommentGap: parsed.gap,
             };
         }
 
-        const { value, inlineComment } = splitBareValue(rest);
+        const { value, inlineComment, gap } = splitBareValue(rest);
         return {
             kind: 'variable',
             id: nextId(),
@@ -149,15 +157,23 @@ export function parseEnv(content: string): EnvEntry[] {
             quote: 'none',
             exported: Boolean(exportPrefix),
             inlineComment,
+            inlineCommentGap: gap,
         };
     });
 }
 
-/** Picks the quoting a value needs, upgrading only when required. */
+/**
+ * Picks the quoting a value needs, upgrading only when required.
+ *
+ * Deliberately conservative: a value is quoted only when leaving it bare would
+ * change its meaning (whitespace, quote characters, backslashes, newlines).
+ * An empty value or a bare `#` inside a value - as in a URL fragment - is left
+ * exactly as the user wrote it, so saving never reformats untouched lines.
+ */
 function effectiveQuote(entry: EnvVariable): QuoteStyle {
-    const needsQuoting = /[\s#'"$`\\]|^$/.test(entry.value) || entry.value.includes('\n');
+    const needsQuoting = /[\s"'\\]/.test(entry.value);
 
-    if (!needsQuoting) return entry.quote === 'none' ? 'none' : entry.quote;
+    if (!needsQuoting) return entry.quote;
     if (entry.quote !== 'none') return entry.quote;
     // Single quotes cannot hold a single quote; fall back to double
     return entry.value.includes("'") ? 'double' : 'single';
@@ -202,7 +218,9 @@ export function serializeEnv(entries: EnvEntry[]): string {
                 return entry.text;
             case 'variable': {
                 const prefix = entry.exported ? 'export ' : '';
-                const comment = entry.inlineComment ? ` # ${entry.inlineComment}` : '';
+                const comment = entry.inlineComment
+                    ? `${entry.inlineCommentGap || ' '}# ${entry.inlineComment}`
+                    : '';
                 return `${prefix}${entry.key}=${formatValue(entry)}${comment}`;
             }
         }
@@ -221,6 +239,7 @@ export function createVariable(key = '', value = ''): EnvVariable {
         quote: 'none',
         exported: false,
         inlineComment: '',
+        inlineCommentGap: '',
     };
 }
 

@@ -493,16 +493,16 @@ const handlers: HandlerRegistry = {
             // Search the logged-in user's home for dotenv files. Heavy directories
             // are pruned so this stays fast on real project trees, and every part
             // is tolerant of permission errors.
-            const findCmd = [
-                'echo "HOME=$HOME"',
-                `find "$HOME" -maxdepth ${ENV_SEARCH_MAX_DEPTH} \\( -name node_modules -o -name .git -o -name vendor -o -name .cache -o -name .venv -o -name __pycache__ \\) -prune -o`,
-                `-type f \\( -name '.env' -o -name '.env.*' -o -name '*.env' \\) -print 2>/dev/null`,
-                `| head -n ${ENV_SEARCH_MAX_RESULTS}`,
-                `| while IFS= read -r f; do`,
-                `printf '%s|%s|%s\\n' "$f" "$(stat -c %s "$f" 2>/dev/null || echo 0)" "$(stat -c %Y "$f" 2>/dev/null || echo 0)";`,
-                'done',
-                '|| true',
-            ].join(' ');
+            const pruned = '-name node_modules -o -name .git -o -name vendor -o -name .cache -o -name .venv -o -name __pycache__';
+            const findCmd =
+                `echo "HOME=$HOME"; ` +
+                `find "$HOME" -maxdepth ${ENV_SEARCH_MAX_DEPTH} \\( ${pruned} \\) -prune -o ` +
+                `-type f \\( -name '.env' -o -name '.env.*' -o -name '*.env' \\) -print 2>/dev/null ` +
+                `| head -n ${ENV_SEARCH_MAX_RESULTS} ` +
+                `| while IFS= read -r f; do ` +
+                `printf '%s|%s|%s\\n' "$f" "$(stat -c %s "$f" 2>/dev/null || echo 0)" "$(stat -c %Y "$f" 2>/dev/null || echo 0)"; ` +
+                `done; ` +
+                `true`;
 
             const result = await ssh.exec(findCmd);
             const lines = result.stdout.split('\n').map(l => l.trim()).filter(Boolean);
