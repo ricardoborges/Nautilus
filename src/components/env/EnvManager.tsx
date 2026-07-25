@@ -127,10 +127,10 @@ export const EnvManager: React.FC<EnvManagerProps> = ({ connectionId: propConnec
             dataIndex: 'name',
             key: 'name',
             width: 180,
-            render: (name: any) => (
+            render: (_: unknown, record: EnvFile) => (
                 <Space>
                     <FileTextOutlined style={{ color: '#1677ff' }} />
-                    <Text strong style={{ fontFamily: 'monospace' }}>{name}</Text>
+                    <Text strong style={{ fontFamily: 'monospace' }}>{record.name}</Text>
                 </Space>
             ),
         },
@@ -139,10 +139,13 @@ export const EnvManager: React.FC<EnvManagerProps> = ({ connectionId: propConnec
             dataIndex: 'directory',
             key: 'directory',
             ellipsis: true,
-            render: (directory: any) => (
-                <Tooltip title={directory}>
+            // ProTable hands the already-rendered dom to `render`, so the raw
+            // path has to come from the record - with `ellipsis` the first
+            // argument is a Typography element, not the string.
+            render: (_: unknown, record: EnvFile) => (
+                <Tooltip title={record.directory}>
                     <Text type="secondary" style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                        {relativeDir(directory)}
+                        {relativeDir(record.directory)}
                     </Text>
                 </Tooltip>
             ),
@@ -153,7 +156,7 @@ export const EnvManager: React.FC<EnvManagerProps> = ({ connectionId: propConnec
             key: 'size',
             width: 100,
             sorter: (a: EnvFile, b: EnvFile) => a.size - b.size,
-            render: (size: any) => <Tag>{formatSize(size)}</Tag>,
+            render: (_: unknown, record: EnvFile) => <Tag>{formatSize(record.size)}</Tag>,
         },
         {
             title: t('env.modified'),
@@ -161,8 +164,8 @@ export const EnvManager: React.FC<EnvManagerProps> = ({ connectionId: propConnec
             key: 'modified',
             width: 170,
             sorter: (a: EnvFile, b: EnvFile) => a.modified - b.modified,
-            render: (modified: any) => (
-                <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(modified)}</Text>
+            render: (_: unknown, record: EnvFile) => (
+                <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(record.modified)}</Text>
             ),
         },
         {
