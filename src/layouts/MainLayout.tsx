@@ -401,16 +401,43 @@ export const MainLayout: React.FC = () => {
                                     icon={<ExportOutlined />}
                                     onClick={async () => {
                                         try {
-                                            const result = await window.ssm.databaseExport();
-                                            const blob = new Blob([result.data], { type: 'application/octet-stream' });
-                                            const url = URL.createObjectURL(blob);
-                                            const a = document.createElement('a');
-                                            a.href = url;
-                                            a.download = `nautilus-backup-${new Date().toISOString().split('T')[0]}.ndb`;
-                                            document.body.appendChild(a);
-                                            a.click();
-                                            document.body.removeChild(a);
-                                            URL.revokeObjectURL(url);
+                                            const defaultName = `nautilus-backup-${new Date().toISOString().split('T')[0]}.ndb`;
+                                            let dialog: typeof import('@tauri-apps/plugin-dialog') | null = null;
+                                            try {
+                                                dialog = await import('@tauri-apps/plugin-dialog');
+                                            } catch {
+                                                dialog = null;
+                                            }
+
+                                            if (dialog) {
+                                                const targetPath = await dialog.save({
+                                                    defaultPath: defaultName,
+                                                    filters: [
+                                                        { name: 'Nautilus Backup', extensions: ['ndb'] },
+                                                        { name: 'All Files', extensions: ['*'] },
+                                                    ],
+                                                });
+                                                if (!targetPath) return;
+                                                const result = await window.ssm.databaseExport();
+                                                const fs = await import('@tauri-apps/plugin-fs');
+                                                const binary = atob(result.data);
+                                                const bytes = new Uint8Array(binary.length);
+                                                for (let i = 0; i < binary.length; i++) {
+                                                    bytes[i] = binary.charCodeAt(i);
+                                                }
+                                                await fs.writeFile(targetPath, bytes);
+                                            } else {
+                                                const result = await window.ssm.databaseExport();
+                                                const blob = new Blob([result.data], { type: 'application/octet-stream' });
+                                                const url = URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = defaultName;
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                document.body.removeChild(a);
+                                                URL.revokeObjectURL(url);
+                                            }
                                             message.success(t('settings.export_success'));
                                         } catch (error) {
                                             message.error(t('settings.export_error'));

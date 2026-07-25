@@ -448,7 +448,7 @@
   },
   "lzy_cli": {
     "title": "Lzy-CLI",
-    "description": "Lzy-CLI es una herramienta ligera de línea de comandos que automatiza tareas repetitivas en servidores Linux — gestión de servicios, despliegues, inspección de logs y mucho más — mediante comandos cortos y fáciles de recordar.",
+    "description": "Lzy es una herramienta de línea de comandos que usa IA para traducir lenguaje natural a comandos bash de Linux, explica qué hace el comando y te permite elegir entre ejecutarlo, editarlo o cancelar la ejecución.",
     "what_it_does": "Lo que puedes hacer con ella",
     "feature_1": "Ejecutar tareas administrativas comunes con comandos más cortos y amigables",
     "feature_2": "Gestionar servicios, procesos y logs desde una sola CLI",

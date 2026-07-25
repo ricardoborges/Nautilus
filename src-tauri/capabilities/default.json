@@ -14,6 +14,17 @@
     "core:window:allow-hide",
     "core:window:allow-unmaximize",
     "core:window:allow-is-maximized",
-    "shell:default"
+    "shell:default",
+    "dialog:default",
+    "dialog:allow-save",
+    "dialog:allow-open",
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [{ "path": "**" }]
+    }
   ]
 }

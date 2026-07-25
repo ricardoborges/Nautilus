@@ -448,7 +448,7 @@
   },
   "lzy_cli": {
     "title": "Lzy-CLI",
-    "description": "Lzy-CLI ist ein schlankes Kommandozeilen-Tool, das wiederkehrende Aufgaben auf Linux-Servern automatisiert — Dienste verwalten, Deployments, Log-Analyse und mehr — über kurze, leicht zu merkende Befehle.",
+    "description": "Lzy ist ein Kommandozeilen-Tool, das KI nutzt, um natürliche Sprache in Linux-Bash-Befehle zu übersetzen, erklärt, was der Befehl bewirkt, und Sie wählen lässt, ob die Ausführung gestartet, bearbeitet oder abgebrochen wird.",
     "what_it_does": "Damit kannst du",
     "feature_1": "Häufige Admin-Aufgaben mit kürzeren, freundlicheren Befehlen ausführen",
     "feature_2": "Dienste, Prozesse und Logs aus einer einzigen CLI verwalten",

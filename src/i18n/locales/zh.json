@@ -448,7 +448,7 @@
   },
   "lzy_cli": {
     "title": "Lzy-CLI",
-    "description": "Lzy-CLI 是一款轻量级命令行工具，通过简短易记的命令自动化 Linux 服务器的重复任务，包括服务管理、部署、日志查看等。",
+    "description": "Lzy 是一款使用 AI 将自然语言翻译为 Linux bash 命令的命令行工具，它会解释命令的作用，并让你选择执行、编辑或中止执行。",
     "what_it_does": "你可以用它做什么",
     "feature_1": "使用更短、更友好的命令执行常见管理任务",
     "feature_2": "通过单一 CLI 管理服务、进程和日志",
