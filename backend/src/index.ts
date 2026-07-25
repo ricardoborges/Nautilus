@@ -6,9 +6,11 @@
  */
 
 import http, { IncomingMessage, ServerResponse } from 'http';
+import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
 import { connectionManager } from './features/connections';
+import { listKnownHosts, forgetKnownHost } from './features/connections/hostkey.service';
 import { SFTPClient, SSHClient, TerminalSession } from './features/terminal';
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
@@ -329,12 +331,14 @@ const handlers: HandlerRegistry = {
                 const parts = line.trim().split(/\s+/);
                 if (parts.length >= 6) {
                     const command = parts.slice(5).join(' ');
-                    const scriptMatch = command.match(/^(\/[^\s>&;]+)/);
+                    // Only a plain absolute path is treated as a script to chmod.
+                    // Anything with shell metacharacters is left alone.
+                    const scriptMatch = command.match(/^(\/[a-zA-Z0-9_./-]+)(?:\s|$)/);
                     if (scriptMatch) {
                         const scriptPath = scriptMatch[1];
                         if (!scriptPath.startsWith('/bin/') && !scriptPath.startsWith('/usr/bin/') && !scriptPath.startsWith('/sbin/')) {
                             try {
-                                await ssh.exec(`chmod +x "${scriptPath}" 2>/dev/null || true`);
+                                await ssh.exec(`chmod +x ${escapeShellArg(scriptPath)} 2>/dev/null || true`);
                             } catch {
                                 // Ignore chmod errors
                             }
@@ -343,8 +347,7 @@ const handlers: HandlerRegistry = {
                 }
             }
 
-            const escapedContent = content.replace(/'/g, "'\\''");
-            await ssh.exec(`echo '${escapedContent}' | crontab -`);
+            await ssh.exec(`echo ${escapeShellArg(content)} | crontab -`);
             return { success: true };
         } finally {
             ssh.end();
@@ -353,14 +356,17 @@ const handlers: HandlerRegistry = {
 
     'ssm:cron:readLog': async (args) => {
         const { connectionId, logPath } = args as { connectionId: string; logPath: string };
+        if (typeof logPath !== 'string' || !logPath.trim()) {
+            throw new Error('Caminho de log inválido');
+        }
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
         const authConfig = await getAuthConfig(conn as AuthArgs);
         const ssh = new SSHClient(authConfig);
         try {
             await ssh.connect();
-            const safeLogPath = logPath.replace(/[;&|`$]/g, '');
-            const result = await ssh.exec(`tail -n 200 "${safeLogPath}" 2>/dev/null || echo "(Arquivo de log não encontrado: ${safeLogPath})"`);
+            const safeLogPath = escapeShellArg(logPath);
+            const result = await ssh.exec(`tail -n 200 ${safeLogPath} 2>/dev/null || echo "(Arquivo de log não encontrado)"`);
             return result.stdout;
         } finally {
             ssh.end();
@@ -461,6 +467,20 @@ const handlers: HandlerRegistry = {
     'ssm:snippets:remove': async (args) => {
         const { id } = args as { id: string };
         return await snippetManager.remove(id);
+    },
+
+    // Known hosts handlers (SSH host key pinning)
+    'ssm:hostkeys:list': async () => {
+        return listKnownHosts();
+    },
+
+    'ssm:hostkeys:forget': async (args) => {
+        const { host, port } = args as { host: string; port: number };
+        if (typeof host !== 'string' || !host.trim()) {
+            throw new Error('Host inválido');
+        }
+        const safePort = Math.floor(Number(port)) || 22;
+        return { success: forgetKnownHost(host.trim(), safePort) };
     },
 
     // Database handlers
@@ -733,13 +753,19 @@ const handlers: HandlerRegistry = {
             throw new Error('ID de container inválido');
         }
 
+        // `tail` is typed as a number but arrives as untrusted JSON
+        const safeTail = Math.floor(Number(tail));
+        if (!Number.isFinite(safeTail) || safeTail < 1 || safeTail > 100000) {
+            throw new Error('Valor de tail inválido');
+        }
+
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
         const authConfig = await getAuthConfig(conn as AuthArgs);
         const ssh = new SSHClient(authConfig);
         try {
             await ssh.connect();
-            const result = await ssh.exec(`docker logs --tail ${tail} --timestamps ${containerId} 2>&1`);
+            const result = await ssh.exec(`docker logs --tail ${safeTail} --timestamps ${containerId} 2>&1`);
             return result.stdout || result.stderr || '';
         } finally {
             ssh.end();
@@ -762,8 +788,11 @@ const handlers: HandlerRegistry = {
                 return [];
             }
 
-            // Get detailed info for each volume using docker volume inspect
-            const inspectResult = await ssh.exec(`docker volume inspect ${volumeNames.join(' ')} --format "{{.Name}}|{{.Driver}}|{{.Mountpoint}}|{{.CreatedAt}}" 2>/dev/null || echo ""`);
+            // Get detailed info for each volume using docker volume inspect.
+            // Volume names come from the remote host, so they are escaped before
+            // being placed back into a command.
+            const quotedVolumes = volumeNames.map(name => escapeShellArg(name.trim())).join(' ');
+            const inspectResult = await ssh.exec(`docker volume inspect ${quotedVolumes} --format "{{.Name}}|{{.Driver}}|{{.Mountpoint}}|{{.CreatedAt}}" 2>/dev/null || echo ""`);
 
             // Get volume sizes using docker system df -v
             let volumeSizes: Record<string, string> = {};
@@ -874,7 +903,8 @@ const handlers: HandlerRegistry = {
             }
 
             // Get detailed info using docker network inspect with JSON format
-            const inspectResult = await ssh.exec(`docker network inspect ${networkIds.join(' ')} 2>/dev/null || echo "[]"`);
+            const quotedNetworkIds = networkIds.map(id => escapeShellArg(id.trim())).join(' ');
+            const inspectResult = await ssh.exec(`docker network inspect ${quotedNetworkIds} 2>/dev/null || echo "[]"`);
 
             try {
                 const networksData = JSON.parse(inspectResult.stdout.trim()) as Array<{
@@ -999,8 +1029,10 @@ const handlers: HandlerRegistry = {
                     const projectName = projectMatch[1];
                     if (!projectsMap.has(projectName)) {
                         // Get the creation time of the oldest container in the stack
+                        // projectName comes from a container label on the remote
+                        // host, so it is escaped before going back into a command
                         const createdResult = await ssh.exec(
-                            `docker ps -a --filter "label=com.docker.compose.project=${projectName}" --format "{{.CreatedAt}}" | head -1 2>/dev/null || echo ""`
+                            `docker ps -a --filter ${escapeShellArg(`label=com.docker.compose.project=${projectName}`)} --format "{{.CreatedAt}}" | head -1 2>/dev/null || echo ""`
                         );
                         const createdAt = createdResult.stdout.trim() || '';
                         projectsMap.set(projectName, {
@@ -1038,8 +1070,16 @@ const handlers: HandlerRegistry = {
             throw new Error('Invalid stack name. Use alphanumeric characters, hyphens, and underscores only.');
         }
 
-        // Use provided directory or default
+        // Use provided directory or default. It comes from a settings field,
+        // so it must be a plain absolute path - no shell metacharacters.
         const baseDir = stacksDirectory || '/tmp/nautilus-stacks';
+        if (!/^\/[a-zA-Z0-9_./-]*$/.test(baseDir) || baseDir.includes('..')) {
+            throw new Error('Invalid stacks directory. Use a plain absolute path.');
+        }
+
+        if (typeof composeContent !== 'string') {
+            throw new Error('Invalid compose content');
+        }
 
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Connection not found');
@@ -1049,17 +1089,21 @@ const handlers: HandlerRegistry = {
             await ssh.connect();
 
             // Create the stack directory
-            const stackDir = `${baseDir}/${stackName}`;
-            await ssh.exec(`mkdir -p "${stackDir}"`);
+            const stackDir = `${baseDir.replace(/\/+$/, '')}/${stackName}`;
+            const quotedStackDir = escapeShellArg(stackDir);
+            await ssh.exec(`mkdir -p ${quotedStackDir}`);
 
-            // Write the docker-compose.yml file using heredoc
-            await ssh.exec(`cat > "${stackDir}/docker-compose.yml" << 'NAUTILUS_EOF'
+            // Write the docker-compose.yml file using a heredoc whose delimiter
+            // cannot appear in the payload, so the content can never break out.
+            const eof = `NAUTILUS_EOF_${crypto.randomBytes(12).toString('hex')}`;
+            await ssh.exec(`cat > ${escapeShellArg(`${stackDir}/docker-compose.yml`)} << '${eof}'
 ${composeContent}
-NAUTILUS_EOF`);
+${eof}`);
 
             // Try docker compose (plugin) first, fall back to docker-compose (standalone)
             // This ensures compatibility with both old and new Docker installations
-            const composeCmd = `cd "${stackDir}" && (docker compose -p "${stackName}" up -d 2>&1 || docker-compose -p "${stackName}" up -d 2>&1)`;
+            const quotedStackName = escapeShellArg(stackName);
+            const composeCmd = `cd ${quotedStackDir} && (docker compose -p ${quotedStackName} up -d 2>&1 || docker-compose -p ${quotedStackName} up -d 2>&1)`;
             const result = await ssh.exec(composeCmd);
 
             // Check for errors in output
@@ -1260,10 +1304,40 @@ function broadcastEvent(channel: string, data: unknown): void {
 
 // HTTP Server
 const AUTH_TOKEN = process.env.NAUTILUS_AUTH_TOKEN || '';
+const ALLOW_NO_AUTH = process.env.NAUTILUS_DEV_ALLOW_NO_AUTH === '1';
+
+// Only the app's own webview may talk to this server. Any other origin is a
+// browser page trying to reach the local API, which must never be allowed:
+// the API hands out stored passwords and runs commands on remote servers.
+const ALLOWED_ORIGINS = new Set([
+    'tauri://localhost',
+    'http://tauri.localhost',
+    'https://tauri.localhost',
+    'http://localhost:5174',
+    'http://127.0.0.1:5174',
+]);
+
+/** Constant-time token comparison to avoid leaking the token byte by byte. */
+function tokenMatches(provided: string): boolean {
+    const expected = Buffer.from(AUTH_TOKEN, 'utf8');
+    const actual = Buffer.from(provided, 'utf8');
+    if (expected.length !== actual.length) return false;
+    return crypto.timingSafeEqual(expected, actual);
+}
 
 const server = http.createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // CORS: echo back only origins we trust, never '*'
+    const origin = req.headers.origin;
+    if (origin) {
+        if (!ALLOWED_ORIGINS.has(origin)) {
+            logger.warn(`[Auth] Blocked request from disallowed origin '${origin}'`);
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Forbidden origin' }));
+            return;
+        }
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Nautilus-Auth');
 
@@ -1280,13 +1354,17 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
         return;
     }
 
-    // Authenticate all API and event requests if token is configured
+    // Authenticate all API and event requests
     if (AUTH_TOKEN) {
         const reqUrl = new URL(req.url || '', 'http://127.0.0.1');
-        const reqToken = req.headers['x-nautilus-auth'] || reqUrl.searchParams.get('token');
+        const headerToken = req.headers['x-nautilus-auth'];
+        const reqToken = (typeof headerToken === 'string' ? headerToken : null)
+            ?? reqUrl.searchParams.get('token')
+            ?? '';
 
-        if (reqToken !== AUTH_TOKEN) {
-            logger.warn(`[Auth] Unauthorized request attempt to '${req.url}'`);
+        if (!tokenMatches(reqToken)) {
+            // Never log req.url here: the SSE token travels in the query string
+            logger.warn(`[Auth] Unauthorized request attempt to '${reqUrl.pathname}'`);
             res.writeHead(401, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: false, error: 'Unauthorized' }));
             return;
@@ -1368,6 +1446,21 @@ const PORT = parseInt(process.env.NAUTILUS_BACKEND_PORT || '45678', 10);
 
 // Start the server after database initialization
 async function startServer(): Promise<void> {
+    // Refuse to run unauthenticated: this API exposes stored passwords and
+    // shell access to every configured server.
+    if (!AUTH_TOKEN) {
+        if (!ALLOW_NO_AUTH) {
+            logger.error(
+                'NAUTILUS_AUTH_TOKEN is not set. The backend will not start without it. ' +
+                'It is normally provided by the Tauri host process; to run the sidecar standalone, ' +
+                'set NAUTILUS_AUTH_TOKEN yourself, or set NAUTILUS_DEV_ALLOW_NO_AUTH=1 to run it ' +
+                'unauthenticated (development only - this exposes all credentials to any local process).'
+            );
+            process.exit(1);
+        }
+        logger.warn('[Auth] Running WITHOUT authentication (NAUTILUS_DEV_ALLOW_NO_AUTH=1). Never use this outside development.');
+    }
+
     try {
         // Initialize SQLite database
         await initializeDatabase();

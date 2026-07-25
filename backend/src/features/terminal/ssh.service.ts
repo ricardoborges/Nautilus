@@ -1,4 +1,5 @@
 import { Client } from 'ssh2';
+import { HostKeyVerifier } from '../connections/hostkey.service';
 import type { SSHConfig, SSHExecResult } from '../../shared/types';
 
 export class SSHClient {
@@ -11,19 +12,22 @@ export class SSHClient {
     }
 
     connect(): Promise<void> {
+        const verifier = new HostKeyVerifier(this.config.host, this.config.port);
+
         return new Promise((resolve, reject) => {
             this.client
                 .on('ready', () => {
                     resolve();
                 })
                 .on('error', (err) => {
-                    reject(err);
+                    reject(verifier.wrapError(err));
                 })
                 .connect({
                     keepaliveInterval: 15000,
                     keepaliveCountMax: 3,
                     readyTimeout: 20000,
-                    ...this.config
+                    ...this.config,
+                    hostVerifier: verifier.verify
                 });
         });
     }

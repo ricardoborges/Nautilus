@@ -20,21 +20,16 @@ impl Clone for AppState {
     }
 }
 
+/// Generates the token that guards the local backend API.
+///
+/// This must come from the OS CSPRNG: the API it protects hands out stored
+/// SSH passwords and shell access to every configured server, and the port is
+/// reachable by any process (and, via CORS preflight, any web page) on the
+/// machine. Anything derived from time/PID/addresses is guessable.
 fn generate_auth_token() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let pid = std::process::id();
-    let ptr = &nanos as *const _ as usize;
-    format!(
-        "{:016x}{:016x}{:016x}{:016x}",
-        nanos,
-        (nanos >> 64) ^ (pid as u128),
-        ptr as u128,
-        nanos ^ 0xDEADBEEFCAFEBABE
-    )
+    let mut bytes = [0u8; 32];
+    getrandom::getrandom(&mut bytes).expect("failed to read from the OS random source");
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 // Window control commands

@@ -14,6 +14,7 @@ import type {
     SFTPDownloadResult,
     SFTPUploadResult,
     Snippet,
+    KnownHost,
     TerminalDataPayload,
     DockerContainer,
     DockerImage,
@@ -318,6 +319,12 @@ const ssm: SSMAPI = {
     databaseExport: (): Promise<{ data: string }> => backendInvoke<{ data: string }>('ssm:database:export'),
 
     databaseImport: (data: string): Promise<void> => backendInvoke<void>('ssm:database:import', { data }),
+
+    // SSH known hosts methods
+    hostKeysList: (): Promise<KnownHost[]> => backendInvoke<KnownHost[]>('ssm:hostkeys:list'),
+
+    hostKeyForget: (host: string, port: number): Promise<{ success: boolean }> =>
+        backendInvoke<{ success: boolean }>('ssm:hostkeys:forget', { host, port }),
 
     // Docker methods
     dockerCheckAvailable: (connectionId: string): Promise<DockerInfo> =>

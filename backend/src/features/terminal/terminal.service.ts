@@ -1,4 +1,5 @@
 import { Client, ClientChannel } from 'ssh2';
+import { HostKeyVerifier } from '../connections/hostkey.service';
 import logger from '../../shared/utils/logger';
 import type { SSHConfig } from '../../shared/types';
 
@@ -28,6 +29,8 @@ export class TerminalSession {
     }
 
     start(): void {
+        const verifier = new HostKeyVerifier(this.sshConfig.host, this.sshConfig.port);
+
         this.client
             .on('ready', () => {
                 logger.info(`[Terminal-${this.terminalId}] Conexão SSH pronta para ${this.sshConfig.host}.`);
@@ -74,14 +77,16 @@ export class TerminalSession {
                 });
             })
             .on('error', (err) => {
-                logger.error(`[Terminal-${this.terminalId}] Erro de conexão SSH: ${err.message}`);
-                this.onData(Buffer.from(`\r\n\x1b[31mErro de conexão SSH: ${err.message}\x1b[0m\r\n`).toString('base64'));
+                const reason = verifier.wrapError(err).message;
+                logger.error(`[Terminal-${this.terminalId}] Erro de conexão SSH: ${reason}`);
+                this.onData(Buffer.from(`\r\n\x1b[31mErro de conexão SSH: ${reason}\x1b[0m\r\n`).toString('base64'));
             })
             .connect({
                 keepaliveInterval: 15000,
                 keepaliveCountMax: 3,
                 readyTimeout: 20000,
-                ...this.sshConfig
+                ...this.sshConfig,
+                hostVerifier: verifier.verify
             });
     }
 

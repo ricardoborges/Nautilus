@@ -82,6 +82,63 @@ function saveDatabaseSync(): void {
 }
 
 /**
+ * Create/upgrade the schema on the given database.
+ * Safe to call repeatedly and required after importing a database file,
+ * which may come from an older version missing tables or columns.
+ */
+function createSchema(database: SqlJsDatabase): void {
+    // Create connections table
+    database.run(`
+        CREATE TABLE IF NOT EXISTS connections (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            host TEXT NOT NULL,
+            port INTEGER NOT NULL DEFAULT 22,
+            user TEXT NOT NULL,
+            connection_type TEXT NOT NULL DEFAULT 'ssh',
+            auth_method TEXT NOT NULL DEFAULT 'key',
+            key_path TEXT,
+            last_seen TEXT,
+            monitored_services TEXT DEFAULT '[]',
+            auto_connect INTEGER DEFAULT 0,
+            rdp_auth_method TEXT,
+            domain TEXT,
+            tags TEXT DEFAULT '[]',
+            environment TEXT DEFAULT 'other',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    // Migration for existing databases
+    try { database.run("ALTER TABLE connections ADD COLUMN tags TEXT DEFAULT '[]'"); } catch {}
+    try { database.run("ALTER TABLE connections ADD COLUMN environment TEXT DEFAULT 'other'"); } catch {}
+
+    // Create snippets table (for future migration)
+    database.run(`
+        CREATE TABLE IF NOT EXISTS snippets (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            command TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    // Create known_hosts table (SSH host key pinning / TOFU)
+    database.run(`
+        CREATE TABLE IF NOT EXISTS known_hosts (
+            host TEXT NOT NULL,
+            port INTEGER NOT NULL,
+            fingerprint TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (host, port)
+        )
+    `);
+}
+
+/**
  * Initialize all database tables
  */
 export async function initializeDatabase(): Promise<void> {
@@ -101,44 +158,7 @@ export async function initializeDatabase(): Promise<void> {
             console.log('[Database] Created new SQLite database at:', DB_FILE);
         }
 
-        // Create connections table
-        db.run(`
-            CREATE TABLE IF NOT EXISTS connections (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT,
-                host TEXT NOT NULL,
-                port INTEGER NOT NULL DEFAULT 22,
-                user TEXT NOT NULL,
-                connection_type TEXT NOT NULL DEFAULT 'ssh',
-                auth_method TEXT NOT NULL DEFAULT 'key',
-                key_path TEXT,
-                last_seen TEXT,
-                monitored_services TEXT DEFAULT '[]',
-                auto_connect INTEGER DEFAULT 0,
-                rdp_auth_method TEXT,
-                domain TEXT,
-                tags TEXT DEFAULT '[]',
-                environment TEXT DEFAULT 'other',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // Migration for existing databases
-        try { db.run("ALTER TABLE connections ADD COLUMN tags TEXT DEFAULT '[]'"); } catch {}
-        try { db.run("ALTER TABLE connections ADD COLUMN environment TEXT DEFAULT 'other'"); } catch {}
-
-        // Create snippets table (for future migration)
-        db.run(`
-            CREATE TABLE IF NOT EXISTS snippets (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                command TEXT NOT NULL,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
+        createSchema(db);
 
         // Save after creating tables
         saveDatabase();
@@ -231,17 +251,33 @@ export function exportDatabase(): string {
  * Import database from base64 string
  */
 export async function importDatabase(base64Data: string): Promise<void> {
+    if (typeof base64Data !== 'string' || !base64Data) {
+        throw new Error('Backup inválido: conteúdo vazio');
+    }
+
     const SQL = await initSqlJs();
     const buffer = Buffer.from(base64Data, 'base64');
-    const uint8Array = new Uint8Array(buffer);
 
-    // Close current database
+    // Validate the SQLite header before touching the live database
+    if (buffer.length < 16 || buffer.toString('utf8', 0, 15) !== 'SQLite format 3') {
+        throw new Error('Backup inválido: não é um arquivo de banco Nautilus');
+    }
+
+    // Open the candidate first; only replace the live database if it loads
+    let imported: SqlJsDatabase;
+    try {
+        imported = new SQL.Database(new Uint8Array(buffer));
+        // Missing tables/columns are expected on backups from older versions
+        createSchema(imported);
+    } catch (err) {
+        throw new Error(`Backup inválido: ${(err as Error).message}`);
+    }
+
     if (db) {
         db.close();
     }
 
-    // Load the imported database
-    db = new SQL.Database(uint8Array);
+    db = imported;
 
     // Save to disk
     saveDatabase();

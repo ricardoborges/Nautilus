@@ -160,6 +160,13 @@ export interface Snippet {
     isSystem?: boolean;
 }
 
+export interface KnownHost {
+    host: string;
+    port: number;
+    fingerprint: string;
+    createdAt: string;
+}
+
 // ========================
 // Docker Types
 // ========================
@@ -337,6 +344,10 @@ export interface SSMAPI {
     // Database
     databaseExport: () => Promise<{ data: string }>;
     databaseImport: (data: string) => Promise<void>;
+
+    // SSH known hosts (host key pinning)
+    hostKeysList: () => Promise<KnownHost[]>;
+    hostKeyForget: (host: string, port: number) => Promise<{ success: boolean }>;
 
     // Docker
     dockerCheckAvailable: (connectionId: string) => Promise<DockerInfo>;
