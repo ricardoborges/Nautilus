@@ -52,7 +52,8 @@
     "no_connections_yet": "Aún no hay conexiones",
     "connection_deleted": "Conexión eliminada con éxito",
     "active": "Activo",
-    "disconnect": "Desconectar"
+    "disconnect": "Desconectar",
+    "env": "Env"
   },
   "settings": {
     "stacks_directory": "Directorio de Stacks",
@@ -260,7 +261,12 @@
     "auto_connect": "Conectar automáticamente al iniciar",
     "test_success": "¡Conexión probada con éxito!",
     "connection_updated": "¡Conexión actualizada con éxito!",
-    "connection_created": "¡Conexión creada con éxito!"
+    "connection_created": "¡Conexión creada con éxito!",
+    "environment": "Entorno",
+    "env_production": "Producción",
+    "env_staging": "Preproducción",
+    "env_development": "Desarrollo",
+    "env_other": "Otros"
   },
   "snippet": {
     "new_snippet": "Nuevo Fragmento",
@@ -446,18 +452,56 @@
     "session_launched": "Sesión de Escritorio Remoto iniciada para {{name}}",
     "launch_failed": "Error al iniciar Escritorio Remoto: {{error}}"
   },
-  "lzy_cli": {
-    "title": "Lzy-CLI",
-    "description": "Lzy-CLI es una herramienta ligera de línea de comandos que automatiza tareas repetitivas en servidores Linux — gestión de servicios, despliegues, inspección de logs y mucho más — mediante comandos cortos y fáciles de recordar.",
-    "what_it_does": "Lo que puedes hacer con ella",
-    "feature_1": "Ejecutar tareas administrativas comunes con comandos más cortos y amigables",
-    "feature_2": "Gestionar servicios, procesos y logs desde una sola CLI",
-    "feature_3": "Acelerar rutinas en los servidores que conectas desde Nautilus",
-    "install_command": "Comando de instalación",
-    "install_hint": "Al hacer clic en Instalar, se abrirá la pestaña Terminal y se ejecutará el comando en el servidor conectado.",
-    "install": "Instalar",
-    "view_on_github": "Ver en GitHub",
-    "command_sent": "Comando de instalación enviado a la terminal.",
-    "terminal_not_ready": "No hay sesión de terminal activa. Abre una terminal primero."
+  "hostkey": {
+    "title": "Clave del servidor desconocida",
+    "first_connection": "Esta es la primera conexión a este servidor. Confirma que la huella digital de abajo coincide con la del servidor antes de continuar — si no coincide, alguien podría estar interceptando la conexión.",
+    "server": "Servidor",
+    "fingerprint": "Huella digital de la clave (SHA-256)",
+    "verify_hint": "Para comprobarlo, ejecuta esto en la consola del servidor:",
+    "trust": "Confiar y conectar",
+    "reject": "Cancelar",
+    "too_late": "La confirmación llegó demasiado tarde — se rechazó la conexión. Conecta de nuevo.",
+    "respond_failed": "No se pudo enviar la respuesta. Conecta de nuevo."
+  },
+  "env": {
+    "title": "Archivos de entorno",
+    "searched_in": "en {{home}}",
+    "file": "Archivo",
+    "location": "Ubicación",
+    "size": "Tamaño",
+    "modified": "Modificado",
+    "actions": "Acciones",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "refresh": "Actualizar",
+    "no_files": "No se encontraron archivos .env en la carpeta del usuario",
+    "select_connection": "Ninguna conexión seleccionada",
+    "select_connection_desc": "Selecciona una conexión para ver sus archivos de entorno",
+    "load_list_error": "Error al listar archivos .env: {{message}}",
+    "load_error": "No se pudo abrir el archivo",
+    "delete_title": "Eliminar archivo",
+    "delete_confirm": "Este archivo se eliminará permanentemente del servidor.",
+    "delete_success": "{{name}} eliminado",
+    "delete_error": "Error al eliminar: {{message}}",
+    "save": "Guardar",
+    "save_success": "{{name}} guardado",
+    "save_error": "Error al guardar: {{message}}",
+    "add_variable": "Añadir variable",
+    "remove_variable": "Eliminar variable",
+    "key_placeholder": "CLAVE",
+    "value_placeholder": "valor",
+    "search_placeholder": "Filtrar variables",
+    "show_values": "Mostrar valores",
+    "hide_values": "Ocultar valores",
+    "variable_count": "{{count}} variables",
+    "no_variables": "Este archivo aún no tiene variables",
+    "no_matches": "Ninguna variable coincide con el filtro",
+    "duplicate_warning": "Claves duplicadas: {{keys}}. El último valor prevalece.",
+    "error_empty_key": "Hay una variable sin nombre",
+    "error_invalid_key": "Nombre inválido: {{keys}}",
+    "preserve_note": "Los comentarios, líneas en blanco y el formato se conservan al guardar.",
+    "discard_title": "¿Descartar cambios?",
+    "discard_message": "Se perderán los cambios realizados.",
+    "discard_confirm": "Descartar"
   }
 }

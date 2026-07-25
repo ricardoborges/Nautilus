@@ -52,7 +52,8 @@
     "no_connections_yet": "还没有连接",
     "connection_deleted": "连接删除成功",
     "active": "活跃",
-    "disconnect": "断开连接"
+    "disconnect": "断开连接",
+    "env": "Env"
   },
   "settings": {
     "stacks_directory": "堆栈目录",
@@ -260,7 +261,12 @@
     "auto_connect": "启动时自动连接",
     "test_success": "连接测试成功！",
     "connection_updated": "连接更新成功！",
-    "connection_created": "连接创建成功！"
+    "connection_created": "连接创建成功！",
+    "environment": "环境",
+    "env_production": "生产",
+    "env_staging": "预发布",
+    "env_development": "开发",
+    "env_other": "其他"
   },
   "snippet": {
     "new_snippet": "新建代码片段",
@@ -446,18 +452,56 @@
     "session_launched": "已为{{name}}启动远程桌面会话",
     "launch_failed": "启动远程桌面失败：{{error}}"
   },
-  "lzy_cli": {
-    "title": "Lzy-CLI",
-    "description": "Lzy-CLI 是一款轻量级命令行工具，通过简短易记的命令自动化 Linux 服务器的重复任务，包括服务管理、部署、日志查看等。",
-    "what_it_does": "你可以用它做什么",
-    "feature_1": "使用更短、更友好的命令执行常见管理任务",
-    "feature_2": "通过单一 CLI 管理服务、进程和日志",
-    "feature_3": "加速在 Nautilus 中连接的服务器上的日常操作",
-    "install_command": "安装命令",
-    "install_hint": "点击「安装」将切换到终端标签页，并在已连接的服务器上执行该命令。",
-    "install": "安装",
-    "view_on_github": "在 GitHub 查看",
-    "command_sent": "安装命令已发送到终端。",
-    "terminal_not_ready": "没有活动的终端会话，请先打开一个终端。"
+  "hostkey": {
+    "title": "未知的服务器密钥",
+    "first_connection": "这是首次连接到此服务器。请在继续之前确认下方的指纹与服务器一致 — 如果不一致，可能有人正在拦截此连接。",
+    "server": "服务器",
+    "fingerprint": "密钥指纹 (SHA-256)",
+    "verify_hint": "要核对指纹，请在服务器控制台运行:",
+    "trust": "信任并连接",
+    "reject": "取消",
+    "too_late": "确认送达太晚，连接已被拒绝。请重新连接。",
+    "respond_failed": "无法发送回复。请重新连接。"
+  },
+  "env": {
+    "title": "环境文件",
+    "searched_in": "位于 {{home}}",
+    "file": "文件",
+    "location": "位置",
+    "size": "大小",
+    "modified": "修改时间",
+    "actions": "操作",
+    "edit": "编辑",
+    "delete": "删除",
+    "refresh": "刷新",
+    "no_files": "在用户主目录中未找到 .env 文件",
+    "select_connection": "未选择连接",
+    "select_connection_desc": "选择一个连接以查看其环境文件",
+    "load_list_error": "列出 .env 文件失败: {{message}}",
+    "load_error": "无法打开文件",
+    "delete_title": "删除文件",
+    "delete_confirm": "此文件将从服务器永久删除。",
+    "delete_success": "已删除 {{name}}",
+    "delete_error": "删除失败: {{message}}",
+    "save": "保存",
+    "save_success": "已保存 {{name}}",
+    "save_error": "保存失败: {{message}}",
+    "add_variable": "添加变量",
+    "remove_variable": "移除变量",
+    "key_placeholder": "键",
+    "value_placeholder": "值",
+    "search_placeholder": "筛选变量",
+    "show_values": "显示值",
+    "hide_values": "隐藏值",
+    "variable_count": "{{count}} 个变量",
+    "no_variables": "此文件还没有变量",
+    "no_matches": "没有匹配的变量",
+    "duplicate_warning": "重复的键: {{keys}}。最后一个值生效。",
+    "error_empty_key": "存在名称为空的变量",
+    "error_invalid_key": "无效名称: {{keys}}",
+    "preserve_note": "保存时会保留注释、空行和格式。",
+    "discard_title": "放弃更改?",
+    "discard_message": "所做的更改将丢失。",
+    "discard_confirm": "放弃"
   }
 }

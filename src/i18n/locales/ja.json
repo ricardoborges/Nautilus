@@ -52,7 +52,8 @@
     "no_connections_yet": "まだ接続がありません",
     "connection_deleted": "接続を削除しました",
     "active": "アクティブ",
-    "disconnect": "切断"
+    "disconnect": "切断",
+    "env": "Env"
   },
   "settings": {
     "stacks_directory": "スタックディレクトリ",
@@ -260,7 +261,12 @@
     "auto_connect": "起動時に自動接続",
     "test_success": "接続テスト成功！",
     "connection_updated": "接続を更新しました！",
-    "connection_created": "接続を作成しました！"
+    "connection_created": "接続を作成しました！",
+    "environment": "環境",
+    "env_production": "本番",
+    "env_staging": "ステージング",
+    "env_development": "開発",
+    "env_other": "その他"
   },
   "snippet": {
     "new_snippet": "新規スニペット",
@@ -446,18 +452,56 @@
     "session_launched": "{{name}}のリモートデスクトップセッションを開始しました",
     "launch_failed": "リモートデスクトップの起動に失敗しました: {{error}}"
   },
-  "lzy_cli": {
-    "title": "Lzy-CLI",
-    "description": "Lzy-CLIは、サービス管理・デプロイ・ログ確認など、Linuxサーバーで繰り返し行うタスクを短く覚えやすいコマンドで自動化する軽量なコマンドラインツールです。",
-    "what_it_does": "できること",
-    "feature_1": "よくある管理作業を短く分かりやすいコマンドで実行",
-    "feature_2": "サービス・プロセス・ログを一つのCLIから管理",
-    "feature_3": "Nautilusから接続するサーバーの作業を高速化",
-    "install_command": "インストールコマンド",
-    "install_hint": "「インストール」を押すと、ターミナルタブに切り替わり、接続中のサーバーでコマンドが実行されます。",
-    "install": "インストール",
-    "view_on_github": "GitHubで見る",
-    "command_sent": "インストールコマンドをターミナルに送信しました。",
-    "terminal_not_ready": "アクティブなターミナルセッションがありません。先にターミナルを開いてください。"
+  "hostkey": {
+    "title": "不明なサーバーキー",
+    "first_connection": "このサーバーへの初回接続です。続行する前に、以下のフィンガープリントがサーバーのものと一致することを確認してください。一致しない場合、接続が傍受されている可能性があります。",
+    "server": "サーバー",
+    "fingerprint": "キーのフィンガープリント (SHA-256)",
+    "verify_hint": "確認するには、サーバーのコンソールで次を実行します:",
+    "trust": "信頼して接続",
+    "reject": "キャンセル",
+    "too_late": "確認が遅すぎたため、接続は拒否されました。もう一度接続してください。",
+    "respond_failed": "応答を送信できませんでした。もう一度接続してください。"
+  },
+  "env": {
+    "title": "環境ファイル",
+    "searched_in": "{{home}} 内",
+    "file": "ファイル",
+    "location": "場所",
+    "size": "サイズ",
+    "modified": "更新日時",
+    "actions": "操作",
+    "edit": "編集",
+    "delete": "削除",
+    "refresh": "更新",
+    "no_files": "ホームディレクトリに .env ファイルが見つかりません",
+    "select_connection": "接続が選択されていません",
+    "select_connection_desc": "接続を選択して環境ファイルを表示します",
+    "load_list_error": ".env ファイルの一覧取得に失敗しました: {{message}}",
+    "load_error": "ファイルを開けませんでした",
+    "delete_title": "ファイルを削除",
+    "delete_confirm": "このファイルはサーバーから完全に削除されます。",
+    "delete_success": "{{name}} を削除しました",
+    "delete_error": "削除に失敗しました: {{message}}",
+    "save": "保存",
+    "save_success": "{{name}} を保存しました",
+    "save_error": "保存に失敗しました: {{message}}",
+    "add_variable": "変数を追加",
+    "remove_variable": "変数を削除",
+    "key_placeholder": "キー",
+    "value_placeholder": "値",
+    "search_placeholder": "変数を絞り込む",
+    "show_values": "値を表示",
+    "hide_values": "値を隠す",
+    "variable_count": "{{count}} 個の変数",
+    "no_variables": "このファイルにはまだ変数がありません",
+    "no_matches": "条件に一致する変数がありません",
+    "duplicate_warning": "重複したキー: {{keys}}。最後の値が有効になります。",
+    "error_empty_key": "名前が空の変数があります",
+    "error_invalid_key": "無効な名前: {{keys}}",
+    "preserve_note": "コメント・空行・書式は保存時に維持されます。",
+    "discard_title": "変更を破棄しますか?",
+    "discard_message": "行った変更は失われます。",
+    "discard_confirm": "破棄"
   }
 }

@@ -17,6 +17,8 @@ export interface Connection {
     keyPath?: string;
     monitoredServices?: string[];
     autoConnect?: boolean;
+    tags?: string[];
+    environment?: 'production' | 'staging' | 'development' | 'other';
     // RDP specific fields
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
@@ -27,6 +29,8 @@ export interface ConnectionFormData extends Omit<Connection, 'id'> {
     id?: string;
     description?: string;
     password?: string;
+    tags?: string[];
+    environment?: 'production' | 'staging' | 'development' | 'other';
     // RDP specific
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
@@ -156,6 +160,36 @@ export interface Snippet {
     isSystem?: boolean;
 }
 
+export interface KnownHost {
+    host: string;
+    port: number;
+    fingerprint: string;
+    createdAt: string;
+}
+
+export interface EnvFile {
+    /** Absolute path on the remote host. */
+    path: string;
+    name: string;
+    directory: string;
+    size: number;
+    /** Epoch milliseconds; 0 when the server could not report it. */
+    modified: number;
+}
+
+export interface EnvListResult {
+    /** Home directory of the SSH user, used to show shorter relative paths. */
+    home: string;
+    files: EnvFile[];
+}
+
+export interface HostKeyPromptEvent {
+    requestId: string;
+    host: string;
+    port: number;
+    fingerprint: string;
+}
+
 // ========================
 // Docker Types
 // ========================
@@ -209,11 +243,24 @@ export interface DockerStack {
     created: string;
 }
 
+export interface DockerStatItem {
+    id: string;
+    name: string;
+    cpu: string;
+    memUsage: string;
+    memPerc: string;
+    netIO: string;
+    blockIO: string;
+}
+
 export interface DockerInfo {
     available: boolean;
     version?: string;
     containers?: number;
     imagesCount?: number;
+    runningCount?: number;
+    stoppedCount?: number;
+    error?: string;
 }
 
 // ========================
@@ -321,6 +368,16 @@ export interface SSMAPI {
     databaseExport: () => Promise<{ data: string }>;
     databaseImport: (data: string) => Promise<void>;
 
+    // Env files
+    envList: (connectionId: string) => Promise<EnvListResult>;
+
+    // SSH known hosts (host key pinning)
+    hostKeysList: () => Promise<KnownHost[]>;
+    hostKeyForget: (host: string, port: number) => Promise<{ success: boolean }>;
+    hostKeyEnsure: (connectionId: string) => Promise<{ trusted: boolean; reason?: string }>;
+    hostKeyRespond: (requestId: string, accept: boolean) => Promise<{ success: boolean }>;
+    onHostKeyPrompt: (callback: (event: HostKeyPromptEvent) => void) => () => void;
+
     // Docker
     dockerCheckAvailable: (connectionId: string) => Promise<DockerInfo>;
     dockerListContainers: (connectionId: string) => Promise<DockerContainer[]>;
@@ -335,6 +392,8 @@ export interface SSMAPI {
     dockerNetworkAction: (connectionId: string, networkId: string, action: 'remove') => Promise<void>;
     dockerDeployStack: (connectionId: string, stackName: string, composeContent: string, stacksDirectory: string) => Promise<void>;
     dockerConvertRun: (connectionId: string, dockerRunCommand: string) => Promise<string>;
+    dockerExecTerminal: (connectionId: string, terminalId: string, containerId: string, cols?: number, rows?: number) => Promise<void>;
+    dockerStats: (connectionId: string) => Promise<DockerStatItem[]>;
 
     // RDP
     rdpConnect: (options: RdpConnectOptions) => Promise<RdpConnectResponse>;

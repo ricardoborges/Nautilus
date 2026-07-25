@@ -1,4 +1,5 @@
 import { Client, ClientChannel } from 'ssh2';
+import { HostKeyVerifier } from '../connections/hostkey.service';
 import logger from '../../shared/utils/logger';
 import type { SSHConfig } from '../../shared/types';
 
@@ -9,19 +10,44 @@ export class TerminalSession {
     private terminalId: string;
     private stream: ClientChannel | null = null;
 
-    constructor(sshConfig: SSHConfig, onData: (data: string) => void, terminalId: string) {
+    private initialCommand?: string;
+    private pendingSize: { cols: number; rows: number } | null = null;
+
+    constructor(
+        sshConfig: SSHConfig,
+        onData: (data: string) => void,
+        terminalId: string,
+        initialCommand?: string,
+        initialSize?: { cols: number; rows: number }
+    ) {
         this.client = new Client();
         this.sshConfig = sshConfig;
         this.onData = onData;
         this.terminalId = terminalId;
+        this.initialCommand = initialCommand;
+        this.pendingSize = initialSize ?? null;
     }
 
     start(): void {
+        const verifier = new HostKeyVerifier(this.sshConfig.host, this.sshConfig.port);
+        const disarm = verifier.armTimeout((err) => {
+            this.client.end();
+            logger.error(`[Terminal-${this.terminalId}] ${err.message}`);
+            this.onData(Buffer.from(`\r\n\x1b[31m${err.message}\x1b[0m\r\n`).toString('base64'));
+        });
+
         this.client
             .on('ready', () => {
+                disarm();
                 logger.info(`[Terminal-${this.terminalId}] Conexão SSH pronta para ${this.sshConfig.host}.`);
 
-                this.client.shell((err, stream) => {
+                const ptyOptions = {
+                    term: 'xterm-256color',
+                    cols: this.pendingSize?.cols ?? 80,
+                    rows: this.pendingSize?.rows ?? 24,
+                };
+
+                this.client.shell(ptyOptions, (err, stream) => {
                     if (err) {
                         logger.error(`[Terminal-${this.terminalId}] Erro ao iniciar o shell: ${err.message}`);
                         this.onData(Buffer.from(`\r\n\x1b[31mErro ao iniciar o shell: ${err.message}\x1b[0m\r\n`).toString('base64'));
@@ -43,18 +69,31 @@ export class TerminalSession {
                             this.onData(data.toString('base64'));
                         });
 
+                    // Aplica um resize solicitado antes do stream existir
+                    if (this.pendingSize) {
+                        stream.setWindow(this.pendingSize.rows, this.pendingSize.cols, 0, 0);
+                        this.pendingSize = null;
+                    }
+
+                    if (this.initialCommand) {
+                        stream.write(`${this.initialCommand}\n`);
+                    }
+
                     logger.info(`[Terminal-${this.terminalId}] Shell iniciado com sucesso para ${this.sshConfig.host}.`);
                 });
             })
             .on('error', (err) => {
-                logger.error(`[Terminal-${this.terminalId}] Erro de conexão SSH: ${err.message}`);
-                this.onData(Buffer.from(`\r\n\x1b[31mErro de conexão SSH: ${err.message}\x1b[0m\r\n`).toString('base64'));
+                disarm();
+                const reason = verifier.wrapError(err).message;
+                logger.error(`[Terminal-${this.terminalId}] Erro de conexão SSH: ${reason}`);
+                this.onData(Buffer.from(`\r\n\x1b[31mErro de conexão SSH: ${reason}\x1b[0m\r\n`).toString('base64'));
             })
             .connect({
                 keepaliveInterval: 15000,
                 keepaliveCountMax: 3,
-                readyTimeout: 20000,
-                ...this.sshConfig
+                ...this.sshConfig,
+                readyTimeout: verifier.readyTimeout,
+                hostVerifier: verifier.verify
             });
     }
 
@@ -71,6 +110,9 @@ export class TerminalSession {
     resize(cols: number, rows: number): void {
         if (this.stream) {
             this.stream.setWindow(rows, cols, 0, 0);
+        } else {
+            // Stream ainda não está pronto: guarda para aplicar na abertura do shell
+            this.pendingSize = { cols, rows };
         }
     }
 

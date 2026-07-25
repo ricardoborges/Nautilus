@@ -12,6 +12,11 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './tauri-bridge'; // Initialize the ssm API bridge
 
+// Set initial theme background to prevent flash (lives here rather than as an
+// inline script in index.html, which the CSP script hashes would block)
+const savedTheme = localStorage.getItem('nautilus-theme') || 'light';
+document.body.style.backgroundColor = savedTheme === 'dark' ? '#141414' : '#f5f5f5';
+
 // Wait for DOM and backend to be ready
 const initApp = (): void => {
     const rootElement = document.getElementById('root');

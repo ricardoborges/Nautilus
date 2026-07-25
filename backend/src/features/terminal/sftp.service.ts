@@ -1,4 +1,5 @@
 import { Client, SFTPWrapper, FileEntry } from 'ssh2';
+import { HostKeyVerifier } from '../connections/hostkey.service';
 import type { SSHConfig, SFTPFile } from '../../shared/types';
 
 export class SFTPClient {
@@ -12,21 +13,33 @@ export class SFTPClient {
     }
 
     connect(): Promise<void> {
+        const verifier = new HostKeyVerifier(this.sshConfig.host, this.sshConfig.port);
+
         return new Promise((resolve, reject) => {
+            const disarm = verifier.armTimeout((err) => {
+                this.client.end();
+                reject(err);
+            });
+
             this.client
                 .on('ready', () => {
+                    disarm();
                     this.client.sftp((err, sftp) => {
                         if (err) return reject(err);
                         this.sftp = sftp;
                         resolve();
                     });
                 })
-                .on('error', (err) => reject(err))
+                .on('error', (err) => {
+                    disarm();
+                    reject(verifier.wrapError(err));
+                })
                 .connect({
                     keepaliveInterval: 15000,
                     keepaliveCountMax: 3,
-                    readyTimeout: 20000,
-                    ...this.sshConfig
+                    ...this.sshConfig,
+                    readyTimeout: verifier.readyTimeout,
+                    hostVerifier: verifier.verify
                 });
         });
     }

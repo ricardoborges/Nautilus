@@ -33,17 +33,21 @@ export interface ConnectionData {
     lastSeen?: string | null;
     monitoredServices?: string[];
     autoConnect?: boolean;
+    tags?: string[];
+    environment?: 'production' | 'staging' | 'development' | 'other';
     // RDP specific fields
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
 }
 
-export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen' | 'rdpAuthMethod' | 'domain' | 'description'>> {
+export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen' | 'rdpAuthMethod' | 'domain' | 'description' | 'tags' | 'environment'>> {
     keyPath: string | null;
     lastSeen: string | null;
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
     description?: string;
+    tags?: string[];
+    environment?: 'production' | 'staging' | 'development' | 'other';
 }
 
 // ========================

@@ -14,12 +14,16 @@ import type {
     SFTPDownloadResult,
     SFTPUploadResult,
     Snippet,
+    KnownHost,
+    EnvListResult,
+    HostKeyPromptEvent,
     TerminalDataPayload,
     DockerContainer,
     DockerImage,
     DockerVolume,
     DockerNetwork,
     DockerStack,
+    DockerStatItem,
     DockerInfo,
     RdpConnectOptions,
     RdpConnectResponse,
@@ -31,15 +35,35 @@ const BACKEND_URL = 'http://127.0.0.1:45678';
 // Event listeners storage
 const eventListeners = new Map<string, Array<(data: unknown) => void>>();
 
+// Auth token cache
+let cachedAuthToken: string | null = null;
+
+async function getAuthToken(): Promise<string> {
+    if (cachedAuthToken) return cachedAuthToken;
+    try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const token = await invoke<string>('get_auth_token');
+        if (token) {
+            cachedAuthToken = token;
+            return token;
+        }
+    } catch (e) {
+        console.warn('Tauri get_auth_token API error:', e);
+    }
+    return '';
+}
+
 // Setup SSE connection for real-time events
 let eventSource: EventSource | null = null;
 
-function setupEventSource(): void {
+async function setupEventSource(): Promise<void> {
     if (eventSource) {
         eventSource.close();
     }
 
-    eventSource = new EventSource(`${BACKEND_URL}/events`);
+    const token = await getAuthToken();
+    const url = token ? `${BACKEND_URL}/events?token=${encodeURIComponent(token)}` : `${BACKEND_URL}/events`;
+    eventSource = new EventSource(url);
 
     eventSource.onmessage = (event: MessageEvent) => {
         try {
@@ -70,7 +94,7 @@ async function waitForBackend(maxRetries: number = 30): Promise<boolean> {
             const response = await fetch(`${BACKEND_URL}/health`);
             if (response.ok) {
                 console.log('Backend is ready');
-                setupEventSource();
+                await setupEventSource();
                 return true;
             }
         } catch (e) {
@@ -84,9 +108,15 @@ async function waitForBackend(maxRetries: number = 30): Promise<boolean> {
 
 // Helper to invoke backend
 async function backendInvoke<T>(channel: string, args: Record<string, unknown> = {}): Promise<T> {
+    const token = await getAuthToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+        headers['X-Nautilus-Auth'] = token;
+    }
+
     const response = await fetch(`${BACKEND_URL}/api`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ channel, args })
     });
 
@@ -292,6 +322,38 @@ const ssm: SSMAPI = {
 
     databaseImport: (data: string): Promise<void> => backendInvoke<void>('ssm:database:import', { data }),
 
+    // Env file methods
+    envList: (connectionId: string): Promise<EnvListResult> =>
+        backendInvoke<EnvListResult>('ssm:env:list', { connectionId }),
+
+    // SSH known hosts methods
+    hostKeysList: (): Promise<KnownHost[]> => backendInvoke<KnownHost[]>('ssm:hostkeys:list'),
+
+    hostKeyForget: (host: string, port: number): Promise<{ success: boolean }> =>
+        backendInvoke<{ success: boolean }>('ssm:hostkeys:forget', { host, port }),
+
+    hostKeyEnsure: (connectionId: string): Promise<{ trusted: boolean; reason?: string }> =>
+        backendInvoke<{ trusted: boolean; reason?: string }>('ssm:hostkeys:ensure', { connectionId }),
+
+    hostKeyRespond: (requestId: string, accept: boolean): Promise<{ success: boolean }> =>
+        backendInvoke<{ success: boolean }>('ssm:hostkeys:respond', { requestId, accept }),
+
+    onHostKeyPrompt: (callback: (event: HostKeyPromptEvent) => void): (() => void) => {
+        const channel = 'ssm:hostkey:prompt';
+        const listeners = eventListeners.get(channel) || [];
+        listeners.push(callback as (data: unknown) => void);
+        eventListeners.set(channel, listeners);
+
+        return () => {
+            const currentListeners = eventListeners.get(channel) || [];
+            const index = currentListeners.indexOf(callback as (data: unknown) => void);
+            if (index > -1) {
+                currentListeners.splice(index, 1);
+                eventListeners.set(channel, currentListeners);
+            }
+        };
+    },
+
     // Docker methods
     dockerCheckAvailable: (connectionId: string): Promise<DockerInfo> =>
         backendInvoke<DockerInfo>('ssm:docker:check', { connectionId }),
@@ -331,6 +393,12 @@ const ssm: SSMAPI = {
 
     dockerConvertRun: (connectionId: string, dockerRunCommand: string): Promise<string> =>
         backendInvoke<string>('ssm:docker:convertRun', { connectionId, dockerRunCommand }),
+
+    dockerExecTerminal: (connectionId: string, terminalId: string, containerId: string, cols?: number, rows?: number): Promise<void> =>
+        backendInvoke<void>('ssm:docker:execTerminal', { connectionId, terminalId, containerId, cols, rows }),
+
+    dockerStats: (connectionId: string): Promise<DockerStatItem[]> =>
+        backendInvoke<DockerStatItem[]>('ssm:docker:stats', { connectionId }),
 
     // RDP methods
     rdpConnect: (options: RdpConnectOptions): Promise<RdpConnectResponse> =>

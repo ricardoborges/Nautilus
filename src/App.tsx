@@ -25,6 +25,7 @@ import koKR from 'antd/locale/ko_KR';
 import { ConnectionProvider } from './context/ConnectionContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { SplashScreen } from './components/SplashScreen';
+import { HostKeyPrompt } from './components/modals/HostKeyPrompt';
 import { MainLayout } from './layouts/MainLayout';
 import { getThemeConfig } from './theme/themeConfig';
 
@@ -70,29 +71,41 @@ const AppContent: React.FC = () => {
             setLoadingMessage(t('splash.connecting_backend'));
             setLoadingProgress(20);
 
-            // Wait for ssm-ready event or check if already ready
-            await new Promise<void>((resolve) => {
-                // Check if backend is already ready (ssm exists and has methods)
-                if (window.ssm && typeof window.ssm.listConnections === 'function') {
-                    // Try a simple call to verify backend is actually responding
-                    window.ssm.listConnections()
-                        .then(() => resolve())
-                        .catch(() => {
-                            // Wait for the event
-                            const handleReady = () => {
+            // Wait for ssm-ready event or polling check with 15s timeout
+            await new Promise<void>((resolve, reject) => {
+                let attempts = 0;
+                const maxAttempts = 30;
+
+                const check = () => {
+                    if (window.ssm && typeof window.ssm.listConnections === 'function') {
+                        window.ssm.listConnections()
+                            .then(() => {
                                 window.removeEventListener('ssm-ready', handleReady);
                                 resolve();
-                            };
-                            window.addEventListener('ssm-ready', handleReady);
-                        });
-                } else {
-                    // Wait for the event
-                    const handleReady = () => {
+                            })
+                            .catch(() => retry());
+                    } else {
+                        retry();
+                    }
+                };
+
+                const retry = () => {
+                    attempts++;
+                    if (attempts >= maxAttempts) {
                         window.removeEventListener('ssm-ready', handleReady);
-                        resolve();
-                    };
-                    window.addEventListener('ssm-ready', handleReady);
-                }
+                        reject(new Error('Erro: O processo backend (nautilus-backend.exe) não respondeu a tempo.'));
+                    } else {
+                        setTimeout(check, 500);
+                    }
+                };
+
+                const handleReady = () => {
+                    window.removeEventListener('ssm-ready', handleReady);
+                    resolve();
+                };
+
+                window.addEventListener('ssm-ready', handleReady);
+                check();
             });
 
             setLoadingProgress(50);
@@ -116,7 +129,9 @@ const AppContent: React.FC = () => {
             setAppState('ready');
         } catch (error) {
             console.error('Failed to initialize app:', error);
-            setLoadingMessage(t('splash.error_starting'));
+            const errStr = (error as Error).message || String(error);
+            setLoadingMessage(`${t('splash.error_starting')}: ${errStr}`);
+            setLoadingProgress(undefined);
         }
     }, [t]);
 
@@ -150,6 +165,7 @@ const AppContent: React.FC = () => {
                 <AntApp>
                     <ConnectionProvider>
                         <MainLayout />
+                        <HostKeyPrompt />
                     </ConnectionProvider>
                 </AntApp>
             </ConfigProvider>

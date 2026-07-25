@@ -54,8 +54,10 @@ import {
     AppstoreOutlined,
     ContainerOutlined,
     RocketOutlined,
+    CodeOutlined,
 } from '@ant-design/icons';
 import { NewDeployModal } from './NewDeployModal';
+import { DockerExecModal } from './DockerExecModal';
 import type { DockerContainer, DockerImage, DockerVolume, DockerNetwork, DockerStack } from '../../types';
 
 const { Text, Title } = Typography;
@@ -201,8 +203,9 @@ const QuickActions: React.FC<{
     container: DockerContainer;
     onAction: (id: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill') => void;
     onLogs: (id: string, name: string) => void;
+    onExec: (id: string, name: string) => void;
     loading: string | null;
-}> = ({ container, onAction, onLogs, loading }) => {
+}> = ({ container, onAction, onLogs, onExec, loading }) => {
     const { t } = useTranslation();
     const isLoading = loading === container.id;
     const isRunning = container.state === 'running';
@@ -222,6 +225,19 @@ const QuickActions: React.FC<{
                     style={{ padding: '2px 6px' }}
                 />
             </Tooltip>
+
+            {/* Exec Terminal button */}
+            {isRunning && (
+                <Tooltip title="Abrir Terminal no Container (docker exec)">
+                    <Button
+                        type="text"
+                        size="small"
+                        icon={<CodeOutlined style={{ ...iconStyle, color: '#1890ff' }} />}
+                        onClick={() => onExec(container.id, container.name)}
+                        style={{ padding: '2px 6px' }}
+                    />
+                </Tooltip>
+            )}
 
             {isRunning && !isPaused && (
                 <>
@@ -349,6 +365,9 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
 
     // New Deploy modal state
     const [deployModalOpen, setDeployModalOpen] = useState(false);
+
+    // Exec terminal modal state
+    const [execContainer, setExecContainer] = useState<{ id: string; name: string } | null>(null);
 
     // Helper to check for Docker permission errors
     const isDockerPermissionError = (error: unknown): boolean => {
@@ -910,6 +929,7 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
                     container={record}
                     onAction={handleAction}
                     onLogs={openLogs}
+                    onExec={(id, name) => setExecContainer({ id, name })}
                     loading={actionLoading}
                 />
             ),
@@ -1818,6 +1838,16 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
                         loadContainers();
                         loadStacks();
                     }}
+                />
+            )}
+            {/* Docker Exec Modal */}
+            {activeConnectionId && (
+                <DockerExecModal
+                    isOpen={!!execContainer}
+                    onClose={() => setExecContainer(null)}
+                    connectionId={activeConnectionId}
+                    containerId={execContainer?.id || ''}
+                    containerName={execContainer?.name || ''}
                 />
             )}
         </div>

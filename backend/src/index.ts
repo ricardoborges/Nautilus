@@ -6,14 +6,24 @@
  */
 
 import http, { IncomingMessage, ServerResponse } from 'http';
+import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
 import { connectionManager } from './features/connections';
+import {
+    listKnownHosts,
+    forgetKnownHost,
+    ensureHostTrusted,
+    setHostKeyPromptHandler,
+    type HostKeyPromptRequest,
+    type HostKeyPromptResult
+} from './features/connections/hostkey.service';
 import { SFTPClient, SSHClient, TerminalSession } from './features/terminal';
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
 import logger from './shared/utils/logger';
 import { initializeDatabase, closeDatabase, exportDatabase, importDatabase } from './shared/database';
+import { validateId, escapeShellArg } from './shared/utils/security.utils';
 import type {
     SSHConfig,
     ConnectionData,
@@ -23,6 +33,11 @@ import type {
     HandlerRegistry,
     MetricsUpdate
 } from './shared/types';
+
+// Env file discovery limits: deep enough for real project trees, bounded so a
+// large home directory cannot stall the UI.
+const ENV_SEARCH_MAX_DEPTH = 6;
+const ENV_SEARCH_MAX_RESULTS = 500;
 
 // Active services
 let activeSystemMonitor: SystemMonitor | null = null;
@@ -328,12 +343,14 @@ const handlers: HandlerRegistry = {
                 const parts = line.trim().split(/\s+/);
                 if (parts.length >= 6) {
                     const command = parts.slice(5).join(' ');
-                    const scriptMatch = command.match(/^(\/[^\s>&;]+)/);
+                    // Only a plain absolute path is treated as a script to chmod.
+                    // Anything with shell metacharacters is left alone.
+                    const scriptMatch = command.match(/^(\/[a-zA-Z0-9_./-]+)(?:\s|$)/);
                     if (scriptMatch) {
                         const scriptPath = scriptMatch[1];
                         if (!scriptPath.startsWith('/bin/') && !scriptPath.startsWith('/usr/bin/') && !scriptPath.startsWith('/sbin/')) {
                             try {
-                                await ssh.exec(`chmod +x "${scriptPath}" 2>/dev/null || true`);
+                                await ssh.exec(`chmod +x ${escapeShellArg(scriptPath)} 2>/dev/null || true`);
                             } catch {
                                 // Ignore chmod errors
                             }
@@ -342,8 +359,7 @@ const handlers: HandlerRegistry = {
                 }
             }
 
-            const escapedContent = content.replace(/'/g, "'\\''");
-            await ssh.exec(`echo '${escapedContent}' | crontab -`);
+            await ssh.exec(`echo ${escapeShellArg(content)} | crontab -`);
             return { success: true };
         } finally {
             ssh.end();
@@ -352,14 +368,17 @@ const handlers: HandlerRegistry = {
 
     'ssm:cron:readLog': async (args) => {
         const { connectionId, logPath } = args as { connectionId: string; logPath: string };
+        if (typeof logPath !== 'string' || !logPath.trim()) {
+            throw new Error('Caminho de log inválido');
+        }
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
         const authConfig = await getAuthConfig(conn as AuthArgs);
         const ssh = new SSHClient(authConfig);
         try {
             await ssh.connect();
-            const safeLogPath = logPath.replace(/[;&|`$]/g, '');
-            const result = await ssh.exec(`tail -n 200 "${safeLogPath}" 2>/dev/null || echo "(Arquivo de log não encontrado: ${safeLogPath})"`);
+            const safeLogPath = escapeShellArg(logPath);
+            const result = await ssh.exec(`tail -n 200 ${safeLogPath} 2>/dev/null || echo "(Arquivo de log não encontrado)"`);
             return result.stdout;
         } finally {
             ssh.end();
@@ -460,6 +479,108 @@ const handlers: HandlerRegistry = {
     'ssm:snippets:remove': async (args) => {
         const { id } = args as { id: string };
         return await snippetManager.remove(id);
+    },
+
+    // Env file handlers
+    'ssm:env:list': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+
+            // Search the logged-in user's home for dotenv files. Heavy directories
+            // are pruned so this stays fast on real project trees, and every part
+            // is tolerant of permission errors.
+            const pruned = '-name node_modules -o -name .git -o -name vendor -o -name .cache -o -name .venv -o -name __pycache__';
+            const findCmd =
+                `echo "HOME=$HOME"; ` +
+                `find "$HOME" -maxdepth ${ENV_SEARCH_MAX_DEPTH} \\( ${pruned} \\) -prune -o ` +
+                `-type f \\( -name '.env' -o -name '.env.*' -o -name '*.env' \\) -print 2>/dev/null ` +
+                `| head -n ${ENV_SEARCH_MAX_RESULTS} ` +
+                `| while IFS= read -r f; do ` +
+                `printf '%s|%s|%s\\n' "$f" "$(stat -c %s "$f" 2>/dev/null || echo 0)" "$(stat -c %Y "$f" 2>/dev/null || echo 0)"; ` +
+                `done; ` +
+                `true`;
+
+            const result = await ssh.exec(findCmd);
+            const lines = result.stdout.split('\n').map(l => l.trim()).filter(Boolean);
+
+            let home = '';
+            const files: Array<{ path: string; name: string; directory: string; size: number; modified: number }> = [];
+
+            for (const line of lines) {
+                if (line.startsWith('HOME=')) {
+                    home = line.slice(5);
+                    continue;
+                }
+                const sep = line.lastIndexOf('|');
+                if (sep === -1) continue;
+                const prevSep = line.lastIndexOf('|', sep - 1);
+                if (prevSep === -1) continue;
+
+                const filePath = line.slice(0, prevSep);
+                const size = parseInt(line.slice(prevSep + 1, sep), 10) || 0;
+                const modified = parseInt(line.slice(sep + 1), 10) || 0;
+                if (!filePath) continue;
+
+                const lastSlash = filePath.lastIndexOf('/');
+                files.push({
+                    path: filePath,
+                    name: lastSlash === -1 ? filePath : filePath.slice(lastSlash + 1),
+                    directory: lastSlash === -1 ? '' : filePath.slice(0, lastSlash),
+                    size,
+                    modified: modified * 1000,
+                });
+            }
+
+            files.sort((a, b) => a.path.localeCompare(b.path));
+            return { home, files };
+        } finally {
+            ssh.end();
+        }
+    },
+
+    // Known hosts handlers (SSH host key pinning)
+    'ssm:hostkeys:list': async () => {
+        return listKnownHosts();
+    },
+
+    'ssm:hostkeys:ensure': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+
+        // No credentials: the key is presented before authentication, and the
+        // handshake is dropped as soon as it has been decided.
+        const decision = await ensureHostTrusted({
+            host: conn.host,
+            port: conn.port || 22,
+            username: conn.user,
+        });
+        return { trusted: decision.accepted, reason: decision.reason };
+    },
+
+    'ssm:hostkeys:respond': async (args) => {
+        const { requestId, accept } = args as { requestId: string; accept: boolean };
+        const pending = pendingHostKeyPrompts.get(requestId);
+        if (!pending) {
+            // Already answered, timed out, or never existed
+            return { success: false };
+        }
+        pending.settle(accept === true);
+        return { success: true };
+    },
+
+    'ssm:hostkeys:forget': async (args) => {
+        const { host, port } = args as { host: string; port: number };
+        if (typeof host !== 'string' || !host.trim()) {
+            throw new Error('Host inválido');
+        }
+        const safePort = Math.floor(Number(port)) || 22;
+        return { success: forgetKnownHost(host.trim(), safePort) };
     },
 
     // Database handlers
@@ -591,6 +712,74 @@ const handlers: HandlerRegistry = {
         }
     },
 
+    'ssm:docker:execTerminal': async (args) => {
+        const { connectionId, terminalId, containerId, cols, rows } = args as {
+            connectionId: string;
+            terminalId: string;
+            containerId: string;
+            cols?: number;
+            rows?: number;
+        };
+
+        const safeContainerId = validateId(containerId, 'Container ID');
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+
+        // O usuário SSH pode não pertencer ao grupo "docker". Detectamos o acesso
+        // ao daemon antes do exec e caímos para "sudo docker" quando necessário
+        // (como há PTY, o sudo pode pedir a senha diretamente no terminal).
+        // Dentro do container preferimos bash e usamos sh como alternativa.
+        const innerShell = `sh -c 'command -v bash >/dev/null 2>&1 && exec bash || exec sh'`;
+        const initialCmd = [
+            'clear',
+            'if docker info >/dev/null 2>&1; then DK=docker; else DK="sudo docker"; fi',
+            `$DK exec -it ${safeContainerId} ${innerShell}`,
+        ].join('; ');
+
+        const session = new TerminalSession(
+            authConfig,
+            (data: string) => broadcastEvent('ssm:terminal:data', { id: terminalId, data }),
+            terminalId,
+            initialCmd,
+            typeof cols === 'number' && typeof rows === 'number' ? { cols, rows } : undefined
+        );
+
+        activeTerminals.set(terminalId, session);
+        session.start();
+        return { success: true };
+    },
+
+    'ssm:docker:stats': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            const result = await ssh.exec('docker stats --no-stream --format "{{.ID}}|{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}" 2>/dev/null || echo ""');
+            const lines = result.stdout.trim().split('\n').filter(l => l.trim());
+            const stats = lines.map(l => {
+                const [id, name, cpu, memUsage, memPerc, netIO, blockIO] = l.split('|');
+                return {
+                    id: id || '',
+                    name: name || '',
+                    cpu: cpu || '0%',
+                    memUsage: memUsage || '0B',
+                    memPerc: memPerc || '0%',
+                    netIO: netIO || '0B',
+                    blockIO: blockIO || '0B'
+                };
+            });
+            return stats;
+        } finally {
+            ssh.end();
+        }
+    },
+
     'ssm:docker:images': async (args) => {
         const { connectionId } = args as { connectionId: string };
         const conn = await connectionManager.get(connectionId);
@@ -664,13 +853,19 @@ const handlers: HandlerRegistry = {
             throw new Error('ID de container inválido');
         }
 
+        // `tail` is typed as a number but arrives as untrusted JSON
+        const safeTail = Math.floor(Number(tail));
+        if (!Number.isFinite(safeTail) || safeTail < 1 || safeTail > 100000) {
+            throw new Error('Valor de tail inválido');
+        }
+
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
         const authConfig = await getAuthConfig(conn as AuthArgs);
         const ssh = new SSHClient(authConfig);
         try {
             await ssh.connect();
-            const result = await ssh.exec(`docker logs --tail ${tail} --timestamps ${containerId} 2>&1`);
+            const result = await ssh.exec(`docker logs --tail ${safeTail} --timestamps ${containerId} 2>&1`);
             return result.stdout || result.stderr || '';
         } finally {
             ssh.end();
@@ -693,8 +888,11 @@ const handlers: HandlerRegistry = {
                 return [];
             }
 
-            // Get detailed info for each volume using docker volume inspect
-            const inspectResult = await ssh.exec(`docker volume inspect ${volumeNames.join(' ')} --format "{{.Name}}|{{.Driver}}|{{.Mountpoint}}|{{.CreatedAt}}" 2>/dev/null || echo ""`);
+            // Get detailed info for each volume using docker volume inspect.
+            // Volume names come from the remote host, so they are escaped before
+            // being placed back into a command.
+            const quotedVolumes = volumeNames.map(name => escapeShellArg(name.trim())).join(' ');
+            const inspectResult = await ssh.exec(`docker volume inspect ${quotedVolumes} --format "{{.Name}}|{{.Driver}}|{{.Mountpoint}}|{{.CreatedAt}}" 2>/dev/null || echo ""`);
 
             // Get volume sizes using docker system df -v
             let volumeSizes: Record<string, string> = {};
@@ -805,7 +1003,8 @@ const handlers: HandlerRegistry = {
             }
 
             // Get detailed info using docker network inspect with JSON format
-            const inspectResult = await ssh.exec(`docker network inspect ${networkIds.join(' ')} 2>/dev/null || echo "[]"`);
+            const quotedNetworkIds = networkIds.map(id => escapeShellArg(id.trim())).join(' ');
+            const inspectResult = await ssh.exec(`docker network inspect ${quotedNetworkIds} 2>/dev/null || echo "[]"`);
 
             try {
                 const networksData = JSON.parse(inspectResult.stdout.trim()) as Array<{
@@ -930,8 +1129,10 @@ const handlers: HandlerRegistry = {
                     const projectName = projectMatch[1];
                     if (!projectsMap.has(projectName)) {
                         // Get the creation time of the oldest container in the stack
+                        // projectName comes from a container label on the remote
+                        // host, so it is escaped before going back into a command
                         const createdResult = await ssh.exec(
-                            `docker ps -a --filter "label=com.docker.compose.project=${projectName}" --format "{{.CreatedAt}}" | head -1 2>/dev/null || echo ""`
+                            `docker ps -a --filter ${escapeShellArg(`label=com.docker.compose.project=${projectName}`)} --format "{{.CreatedAt}}" | head -1 2>/dev/null || echo ""`
                         );
                         const createdAt = createdResult.stdout.trim() || '';
                         projectsMap.set(projectName, {
@@ -969,8 +1170,16 @@ const handlers: HandlerRegistry = {
             throw new Error('Invalid stack name. Use alphanumeric characters, hyphens, and underscores only.');
         }
 
-        // Use provided directory or default
+        // Use provided directory or default. It comes from a settings field,
+        // so it must be a plain absolute path - no shell metacharacters.
         const baseDir = stacksDirectory || '/tmp/nautilus-stacks';
+        if (!/^\/[a-zA-Z0-9_./-]*$/.test(baseDir) || baseDir.includes('..')) {
+            throw new Error('Invalid stacks directory. Use a plain absolute path.');
+        }
+
+        if (typeof composeContent !== 'string') {
+            throw new Error('Invalid compose content');
+        }
 
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Connection not found');
@@ -980,17 +1189,21 @@ const handlers: HandlerRegistry = {
             await ssh.connect();
 
             // Create the stack directory
-            const stackDir = `${baseDir}/${stackName}`;
-            await ssh.exec(`mkdir -p "${stackDir}"`);
+            const stackDir = `${baseDir.replace(/\/+$/, '')}/${stackName}`;
+            const quotedStackDir = escapeShellArg(stackDir);
+            await ssh.exec(`mkdir -p ${quotedStackDir}`);
 
-            // Write the docker-compose.yml file using heredoc
-            await ssh.exec(`cat > "${stackDir}/docker-compose.yml" << 'NAUTILUS_EOF'
+            // Write the docker-compose.yml file using a heredoc whose delimiter
+            // cannot appear in the payload, so the content can never break out.
+            const eof = `NAUTILUS_EOF_${crypto.randomBytes(12).toString('hex')}`;
+            await ssh.exec(`cat > ${escapeShellArg(`${stackDir}/docker-compose.yml`)} << '${eof}'
 ${composeContent}
-NAUTILUS_EOF`);
+${eof}`);
 
             // Try docker compose (plugin) first, fall back to docker-compose (standalone)
             // This ensures compatibility with both old and new Docker installations
-            const composeCmd = `cd "${stackDir}" && (docker compose -p "${stackName}" up -d 2>&1 || docker-compose -p "${stackName}" up -d 2>&1)`;
+            const quotedStackName = escapeShellArg(stackName);
+            const composeCmd = `cd ${quotedStackDir} && (docker compose -p ${quotedStackName} up -d 2>&1 || docker-compose -p ${quotedStackName} up -d 2>&1)`;
             const result = await ssh.exec(composeCmd);
 
             // Check for errors in output
@@ -1189,12 +1402,110 @@ function broadcastEvent(channel: string, data: unknown): void {
     });
 }
 
+// ============================================================
+// Host key confirmation
+//
+// An unknown host key suspends the SSH handshake while the user is asked to
+// confirm the fingerprint, so nothing is trusted silently. Requests for the
+// same key are coalesced into a single dialog.
+// ============================================================
+
+const HOSTKEY_PROMPT_TIMEOUT_MS = 120000;
+
+interface PendingHostKeyPrompt {
+    promise: Promise<HostKeyPromptResult>;
+    settle: (accept: boolean) => void;
+}
+
+const pendingHostKeyPrompts = new Map<string, PendingHostKeyPrompt>();
+
+function promptForHostKey(request: HostKeyPromptRequest): Promise<HostKeyPromptResult> {
+    const requestId = `${request.host}:${request.port}:${request.fingerprint}`;
+
+    const existing = pendingHostKeyPrompts.get(requestId);
+    if (existing) return existing.promise;
+
+    // Without a listening UI nobody can confirm, so refuse instead of hanging
+    const subscribers = eventSubscribers.get('events') || [];
+    if (subscribers.length === 0) {
+        logger.warn(`[HostKey] No UI connected to confirm ${request.host}:${request.port}`);
+        return Promise.resolve({
+            accepted: false,
+            reason:
+                `Chave desconhecida para ${request.host}:${request.port} (${request.fingerprint}) e não há ` +
+                `interface conectada para confirmá-la. Conexão recusada.`,
+        });
+    }
+
+    let settle!: (accept: boolean) => void;
+    const promise = new Promise<HostKeyPromptResult>((resolve) => {
+        const timer = setTimeout(() => {
+            logger.warn(`[HostKey] Confirmation timed out for ${request.host}:${request.port}`);
+            pendingHostKeyPrompts.delete(requestId);
+            resolve({
+                accepted: false,
+                reason:
+                    `Tempo esgotado aguardando a confirmação da chave de ${request.host}:${request.port}. ` +
+                    `Conexão recusada.`,
+            });
+        }, HOSTKEY_PROMPT_TIMEOUT_MS);
+
+        settle = (accept: boolean) => {
+            clearTimeout(timer);
+            pendingHostKeyPrompts.delete(requestId);
+            logger.info(`[HostKey] ${accept ? 'Accepted' : 'Rejected'} key for ${request.host}:${request.port}`);
+            resolve({ accepted: accept });
+        };
+    });
+
+    pendingHostKeyPrompts.set(requestId, { promise, settle });
+
+    logger.info(`[HostKey] Asking user to confirm ${request.host}:${request.port} (${request.fingerprint})`);
+    broadcastEvent('ssm:hostkey:prompt', { requestId, ...request });
+
+    return promise;
+}
+
+setHostKeyPromptHandler(promptForHostKey);
+
 // HTTP Server
+const AUTH_TOKEN = process.env.NAUTILUS_AUTH_TOKEN || '';
+const ALLOW_NO_AUTH = process.env.NAUTILUS_DEV_ALLOW_NO_AUTH === '1';
+
+// Only the app's own webview may talk to this server. Any other origin is a
+// browser page trying to reach the local API, which must never be allowed:
+// the API hands out stored passwords and runs commands on remote servers.
+const ALLOWED_ORIGINS = new Set([
+    'tauri://localhost',
+    'http://tauri.localhost',
+    'https://tauri.localhost',
+    'http://localhost:5174',
+    'http://127.0.0.1:5174',
+]);
+
+/** Constant-time token comparison to avoid leaking the token byte by byte. */
+function tokenMatches(provided: string): boolean {
+    const expected = Buffer.from(AUTH_TOKEN, 'utf8');
+    const actual = Buffer.from(provided, 'utf8');
+    if (expected.length !== actual.length) return false;
+    return crypto.timingSafeEqual(expected, actual);
+}
+
 const server = http.createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // CORS: echo back only origins we trust, never '*'
+    const origin = req.headers.origin;
+    if (origin) {
+        if (!ALLOWED_ORIGINS.has(origin)) {
+            logger.warn(`[Auth] Blocked request from disallowed origin '${origin}'`);
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Forbidden origin' }));
+            return;
+        }
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Nautilus-Auth');
 
     if (req.method === 'OPTIONS') {
         res.writeHead(204);
@@ -1202,8 +1513,32 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
         return;
     }
 
+    // Health check (unauthenticated for startup readiness check)
+    if (req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok' }));
+        return;
+    }
+
+    // Authenticate all API and event requests
+    if (AUTH_TOKEN) {
+        const reqUrl = new URL(req.url || '', 'http://127.0.0.1');
+        const headerToken = req.headers['x-nautilus-auth'];
+        const reqToken = (typeof headerToken === 'string' ? headerToken : null)
+            ?? reqUrl.searchParams.get('token')
+            ?? '';
+
+        if (!tokenMatches(reqToken)) {
+            // Never log req.url here: the SSE token travels in the query string
+            logger.warn(`[Auth] Unauthorized request attempt to '${reqUrl.pathname}'`);
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Unauthorized' }));
+            return;
+        }
+    }
+
     // Server-Sent Events for streaming updates
-    if (req.url === '/events' && req.method === 'GET') {
+    if (req.url?.startsWith('/events') && req.method === 'GET') {
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
@@ -1269,13 +1604,6 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
         return;
     }
 
-    // Health check
-    if (req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok' }));
-        return;
-    }
-
     res.writeHead(404);
     res.end('Not found');
 });
@@ -1284,6 +1612,21 @@ const PORT = parseInt(process.env.NAUTILUS_BACKEND_PORT || '45678', 10);
 
 // Start the server after database initialization
 async function startServer(): Promise<void> {
+    // Refuse to run unauthenticated: this API exposes stored passwords and
+    // shell access to every configured server.
+    if (!AUTH_TOKEN) {
+        if (!ALLOW_NO_AUTH) {
+            logger.error(
+                'NAUTILUS_AUTH_TOKEN is not set. The backend will not start without it. ' +
+                'It is normally provided by the Tauri host process; to run the sidecar standalone, ' +
+                'set NAUTILUS_AUTH_TOKEN yourself, or set NAUTILUS_DEV_ALLOW_NO_AUTH=1 to run it ' +
+                'unauthenticated (development only - this exposes all credentials to any local process).'
+            );
+            process.exit(1);
+        }
+        logger.warn('[Auth] Running WITHOUT authentication (NAUTILUS_DEV_ALLOW_NO_AUTH=1). Never use this outside development.');
+    }
+
     try {
         // Initialize SQLite database
         await initializeDatabase();

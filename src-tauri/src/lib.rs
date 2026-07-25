@@ -8,14 +8,28 @@ use tokio::sync::Mutex;
 // State to track if backend is running
 pub struct AppState {
     pub backend_process: Arc<Mutex<Option<std::process::Child>>>,
+    pub auth_token: String,
 }
 
 impl Clone for AppState {
     fn clone(&self) -> Self {
         AppState {
             backend_process: Arc::clone(&self.backend_process),
+            auth_token: self.auth_token.clone(),
         }
     }
+}
+
+/// Generates the token that guards the local backend API.
+///
+/// This must come from the OS CSPRNG: the API it protects hands out stored
+/// SSH passwords and shell access to every configured server, and the port is
+/// reachable by any process (and, via CORS preflight, any web page) on the
+/// machine. Anything derived from time/PID/addresses is guessable.
+fn generate_auth_token() -> String {
+    let mut bytes = [0u8; 32];
+    getrandom::getrandom(&mut bytes).expect("failed to read from the OS random source");
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 // Window control commands
@@ -48,42 +62,68 @@ async fn show_window(window: WebviewWindow) -> Result<(), String> {
     window.show().map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn get_auth_token(state: tauri::State<'_, AppState>) -> String {
+    state.auth_token.clone()
+}
+
 fn get_sidecar_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     #[cfg(target_os = "windows")]
     let sidecar_name = "nautilus-backend-x86_64-pc-windows-msvc.exe";
-    
+
     #[cfg(target_os = "linux")]
     let sidecar_name = "nautilus-backend-x86_64-unknown-linux-gnu";
-    
+
     #[cfg(target_os = "macos")]
     let sidecar_name = "nautilus-backend-x86_64-apple-darwin";
-    
-    // Try resource dir first (production)
+
+    let mut candidates = Vec::new();
+
+    // 1. Resource dir (production build / installed app)
     if let Ok(resource_dir) = app.path().resource_dir() {
-        let sidecar_path = resource_dir.join("binaries").join(sidecar_name);
-        if sidecar_path.exists() {
-            return Ok(sidecar_path);
+        candidates.push(resource_dir.join("binaries").join(sidecar_name));
+        candidates.push(resource_dir.join(sidecar_name));
+    }
+
+    // 2. Relative to current executable location (e.g. target/release/nautilus.exe)
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            candidates.push(exe_dir.join("binaries").join(sidecar_name));
+            candidates.push(exe_dir.join(sidecar_name));
+
+            if let Some(parent1) = exe_dir.parent() {
+                candidates.push(parent1.join("binaries").join(sidecar_name));
+                candidates.push(parent1.join("src-tauri").join("binaries").join(sidecar_name));
+
+                if let Some(parent2) = parent1.parent() {
+                    candidates.push(parent2.join("binaries").join(sidecar_name));
+                    candidates.push(parent2.join("src-tauri").join("binaries").join(sidecar_name));
+                }
+            }
         }
     }
-    
-    // Fallback for development
+
+    // 3. Relative to current working directory
     if let Ok(current_dir) = std::env::current_dir() {
-        let dev_path = current_dir.join("binaries").join(sidecar_name);
-        if dev_path.exists() {
-            return Ok(dev_path);
-        }
-        
-        // Try src-tauri/binaries
-        let dev_path2 = current_dir.join("src-tauri").join("binaries").join(sidecar_name);
-        if dev_path2.exists() {
-            return Ok(dev_path2);
+        candidates.push(current_dir.join("binaries").join(sidecar_name));
+        candidates.push(current_dir.join("src-tauri").join("binaries").join(sidecar_name));
+        if let Some(p1) = current_dir.parent() {
+            candidates.push(p1.join("binaries").join(sidecar_name));
+            candidates.push(p1.join("src-tauri").join("binaries").join(sidecar_name));
         }
     }
-    
+
+    for path in candidates {
+        if path.exists() {
+            log::info!("Found sidecar binary at: {:?}", path);
+            return Ok(path);
+        }
+    }
+
     Err(format!("Sidecar {} not found", sidecar_name))
 }
 
-fn start_backend_process(app: &AppHandle) -> Result<std::process::Child, String> {
+fn start_backend_process(app: &AppHandle, auth_token: &str) -> Result<std::process::Child, String> {
     let sidecar_path = get_sidecar_path(app)?;
     
     log::info!("Starting backend sidecar: {:?}", sidecar_path);
@@ -94,6 +134,7 @@ fn start_backend_process(app: &AppHandle) -> Result<std::process::Child, String>
     command.creation_flags(0x08000000); // CREATE_NO_WINDOW
     
     command
+        .env("NAUTILUS_AUTH_TOKEN", auth_token)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -102,12 +143,17 @@ fn start_backend_process(app: &AppHandle) -> Result<std::process::Child, String>
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let auth_token = generate_auth_token();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(AppState {
             backend_process: Arc::new(Mutex::new(None)),
+            auth_token: auth_token.clone(),
         })
-        .setup(|app| {
+        .setup(move |app| {
             // Initialize logging in debug mode
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -119,23 +165,17 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             let state = app.state::<AppState>().inner().clone();
+            let token_clone = auth_token.clone();
             
-            // Start backend sidecar in a separate thread
-            std::thread::spawn(move || {
-                match start_backend_process(&app_handle) {
+            // Start backend sidecar asynchronously
+            tauri::async_runtime::spawn(async move {
+                match start_backend_process(&app_handle, &token_clone) {
                     Ok(child) => {
                         log::info!("Backend sidecar started with PID: {}", child.id());
                         
                         // Store the process handle
-                        let state_clone = state.clone();
-                        let rt = tokio::runtime::Runtime::new().unwrap();
-                        rt.block_on(async {
-                            let mut backend = state_clone.backend_process.lock().await;
-                            *backend = Some(child);
-                        });
-                        
-                        // Wait a bit for backend to start, then show window
-                        std::thread::sleep(std::time::Duration::from_millis(1500));
+                        let mut backend = state.backend_process.lock().await;
+                        *backend = Some(child);
                         
                         if let Some(window) = app_handle.get_webview_window("main") {
                             let _ = window.show();
@@ -156,9 +196,8 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 // Kill backend when window closes
-                let state = window.state::<AppState>();
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(async {
+                let state = window.state::<AppState>().inner().clone();
+                tauri::async_runtime::block_on(async move {
                     let mut backend = state.backend_process.lock().await;
                     if let Some(ref mut child) = *backend {
                         let _ = child.kill();
@@ -173,7 +212,9 @@ pub fn run() {
             win_close,
             win_toggle_maximize,
             show_window,
+            get_auth_token,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+

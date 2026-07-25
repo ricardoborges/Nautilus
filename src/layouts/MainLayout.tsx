@@ -21,7 +21,7 @@ import {
     ExportOutlined,
     ImportOutlined,
 } from '@ant-design/icons';
-import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input, InputNumber, Popconfirm, Row, Col } from 'antd';
+import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input, InputNumber, Popconfirm, Row, Col, Tag } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { MenuProps } from 'antd';
 import { useTheme } from '../context/ThemeContext';
@@ -32,8 +32,9 @@ import { ConnectionModal } from '../components/modals/ConnectionModal';
 import { ConnectionManager } from '../components/connections/ConnectionManager';
 import type { Connection } from '../types';
 import splashScreen from '../assets/splash-screen.png';
+import pkg from '../../package.json';
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 
 export const MainLayout: React.FC = () => {
     const { t, i18n } = useTranslation();
@@ -164,10 +165,18 @@ export const MainLayout: React.FC = () => {
                         style={{
                             maxWidth: '100%',
                             height: 'auto',
-                            marginBottom: 24,
+                            marginBottom: 16,
                             borderRadius: 8
                         }}
                     />
+                    <div style={{ marginBottom: 12 }}>
+                        <Title level={4} style={{ margin: '0 0 4px 0' }}>
+                            Nautilus Server Manager
+                        </Title>
+                        <Tag color="blue" style={{ fontSize: 12, padding: '2px 8px', fontWeight: 600 }}>
+                            v{pkg.version}
+                        </Tag>
+                    </div>
                     <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic' }}>
                         <a href="https://github.com/ricardoborges/nautilus" target="_blank" rel="noopener noreferrer">
                             github.com/ricardoborges/nautilus
@@ -401,16 +410,43 @@ export const MainLayout: React.FC = () => {
                                     icon={<ExportOutlined />}
                                     onClick={async () => {
                                         try {
-                                            const result = await window.ssm.databaseExport();
-                                            const blob = new Blob([result.data], { type: 'application/octet-stream' });
-                                            const url = URL.createObjectURL(blob);
-                                            const a = document.createElement('a');
-                                            a.href = url;
-                                            a.download = `nautilus-backup-${new Date().toISOString().split('T')[0]}.ndb`;
-                                            document.body.appendChild(a);
-                                            a.click();
-                                            document.body.removeChild(a);
-                                            URL.revokeObjectURL(url);
+                                            const defaultName = `nautilus-backup-${new Date().toISOString().split('T')[0]}.ndb`;
+                                            let dialog: typeof import('@tauri-apps/plugin-dialog') | null = null;
+                                            try {
+                                                dialog = await import('@tauri-apps/plugin-dialog');
+                                            } catch {
+                                                dialog = null;
+                                            }
+
+                                            if (dialog) {
+                                                const targetPath = await dialog.save({
+                                                    defaultPath: defaultName,
+                                                    filters: [
+                                                        { name: 'Nautilus Backup', extensions: ['ndb'] },
+                                                        { name: 'All Files', extensions: ['*'] },
+                                                    ],
+                                                });
+                                                if (!targetPath) return;
+                                                const result = await window.ssm.databaseExport();
+                                                const fs = await import('@tauri-apps/plugin-fs');
+                                                const binary = atob(result.data);
+                                                const bytes = new Uint8Array(binary.length);
+                                                for (let i = 0; i < binary.length; i++) {
+                                                    bytes[i] = binary.charCodeAt(i);
+                                                }
+                                                await fs.writeFile(targetPath, bytes);
+                                            } else {
+                                                const result = await window.ssm.databaseExport();
+                                                const blob = new Blob([result.data], { type: 'application/octet-stream' });
+                                                const url = URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = defaultName;
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                document.body.removeChild(a);
+                                                URL.revokeObjectURL(url);
+                                            }
                                             message.success(t('settings.export_success'));
                                         } catch (error) {
                                             message.error(t('settings.export_error'));

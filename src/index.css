@@ -5,6 +5,39 @@
  * Most styling is handled by Ant Design components.
  */
 
+/* Loading state before React mounts (kept here, not inline in index.html:
+   an inline <style> gets a Tauri CSP nonce that disables 'unsafe-inline'
+   for every style Ant Design injects at runtime) */
+#root:empty::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0f172a;
+}
+
+#root:empty::after {
+    content: '';
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 3px solid #334155;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: splash-spin 1s linear infinite;
+}
+
+@keyframes splash-spin {
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
 /* Terminal fonts */
 @font-face {
     font-family: 'ProggyClean Nerd Font';

@@ -51,6 +51,8 @@ class ConnectionManager {
             autoConnect: newConnection.autoConnect,
             rdpAuthMethod: newConnection.rdpAuthMethod,
             domain: newConnection.domain,
+            tags: connectionData.tags,
+            environment: connectionData.environment,
         });
     }
 

@@ -52,7 +52,8 @@
     "no_connections_yet": "Nenhuma conexão ainda",
     "connection_deleted": "Conexão excluída com sucesso",
     "active": "Ativo",
-    "disconnect": "Desconectar"
+    "disconnect": "Desconectar",
+    "env": "Env"
   },
   "settings": {
     "stacks_directory": "Diretório de Stacks",
@@ -260,7 +261,12 @@
     "rdp_test_not_available": "Teste de conexão não disponível para RDP. A conexão será validada ao conectar.",
     "test_success": "Conexão testada com sucesso!",
     "connection_updated": "Conexão atualizada com sucesso!",
-    "connection_created": "Conexão criada com sucesso!"
+    "connection_created": "Conexão criada com sucesso!",
+    "environment": "Ambiente",
+    "env_production": "Produção",
+    "env_staging": "Homologação",
+    "env_development": "Desenvolvimento",
+    "env_other": "Outros"
   },
   "snippet": {
     "new_snippet": "Novo Snippet",
@@ -446,18 +452,56 @@
     "session_launched": "Sessão de Área de Trabalho Remota aberta para {{name}}",
     "launch_failed": "Falha ao abrir Área de Trabalho Remota: {{error}}"
   },
-  "lzy_cli": {
-    "title": "Lzy-CLI",
-    "description": "Lzy-CLI é uma ferramenta leve de linha de comando que automatiza tarefas repetitivas em servidores Linux — gerenciamento de serviços, deploys, inspeção de logs e muito mais — através de comandos curtos e fáceis de lembrar.",
-    "what_it_does": "O que você pode fazer com ele",
-    "feature_1": "Executar tarefas administrativas comuns com comandos mais curtos e amigáveis",
-    "feature_2": "Gerenciar serviços, processos e logs a partir de um único CLI",
-    "feature_3": "Acelerar rotinas nos servidores que você conecta pelo Nautilus",
-    "install_command": "Comando de instalação",
-    "install_hint": "Ao clicar em Instalar, o app abrirá a aba Terminal e executará o comando no servidor conectado.",
-    "install": "Instalar",
-    "view_on_github": "Ver no GitHub",
-    "command_sent": "Comando de instalação enviado ao terminal.",
-    "terminal_not_ready": "Nenhuma sessão de terminal ativa. Abra um terminal primeiro."
+  "hostkey": {
+    "title": "Chave do servidor desconhecida",
+    "first_connection": "Esta é a primeira conexão com este servidor. Confirme que a impressão digital abaixo confere com a do servidor antes de continuar — se não conferir, alguém pode estar interceptando a conexão.",
+    "server": "Servidor",
+    "fingerprint": "Impressão digital da chave (SHA-256)",
+    "verify_hint": "Para conferir, execute no console do servidor:",
+    "trust": "Confiar e conectar",
+    "reject": "Cancelar",
+    "too_late": "A confirmação chegou tarde demais — a conexão foi recusada. Conecte novamente.",
+    "respond_failed": "Não foi possível enviar a resposta. Conecte novamente."
+  },
+  "env": {
+    "title": "Arquivos de ambiente",
+    "searched_in": "em {{home}}",
+    "file": "Arquivo",
+    "location": "Local",
+    "size": "Tamanho",
+    "modified": "Modificado",
+    "actions": "Ações",
+    "edit": "Editar",
+    "delete": "Excluir",
+    "refresh": "Atualizar",
+    "no_files": "Nenhum arquivo .env encontrado na pasta do usuário",
+    "select_connection": "Nenhuma conexão selecionada",
+    "select_connection_desc": "Selecione uma conexão para ver seus arquivos de ambiente",
+    "load_list_error": "Falha ao listar arquivos .env: {{message}}",
+    "load_error": "Não foi possível abrir o arquivo",
+    "delete_title": "Excluir arquivo",
+    "delete_confirm": "Este arquivo será removido permanentemente do servidor.",
+    "delete_success": "{{name}} excluído",
+    "delete_error": "Falha ao excluir: {{message}}",
+    "save": "Salvar",
+    "save_success": "{{name}} salvo",
+    "save_error": "Falha ao salvar: {{message}}",
+    "add_variable": "Adicionar variável",
+    "remove_variable": "Remover variável",
+    "key_placeholder": "CHAVE",
+    "value_placeholder": "valor",
+    "search_placeholder": "Filtrar variáveis",
+    "show_values": "Mostrar valores",
+    "hide_values": "Ocultar valores",
+    "variable_count": "{{count}} variáveis",
+    "no_variables": "Este arquivo ainda não tem variáveis",
+    "no_matches": "Nenhuma variável corresponde ao filtro",
+    "duplicate_warning": "Chaves duplicadas: {{keys}}. O último valor prevalece.",
+    "error_empty_key": "Existe uma variável sem nome",
+    "error_invalid_key": "Nome inválido: {{keys}}",
+    "preserve_note": "Comentários, linhas em branco e formatação são preservados ao salvar.",
+    "discard_title": "Descartar alterações?",
+    "discard_message": "As alterações feitas serão perdidas.",
+    "discard_confirm": "Descartar"
   }
 }

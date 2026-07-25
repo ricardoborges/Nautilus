@@ -52,7 +52,8 @@
     "no_connections_yet": "Noch keine Verbindungen",
     "connection_deleted": "Verbindung erfolgreich gelöscht",
     "active": "Aktiv",
-    "disconnect": "Trennen"
+    "disconnect": "Trennen",
+    "env": "Env"
   },
   "settings": {
     "stacks_directory": "Stacks-Verzeichnis",
@@ -260,7 +261,12 @@
     "auto_connect": "Automatisch beim Start verbinden",
     "test_success": "Verbindung erfolgreich getestet!",
     "connection_updated": "Verbindung erfolgreich aktualisiert!",
-    "connection_created": "Verbindung erfolgreich erstellt!"
+    "connection_created": "Verbindung erfolgreich erstellt!",
+    "environment": "Umgebung",
+    "env_production": "Produktion",
+    "env_staging": "Staging",
+    "env_development": "Entwicklung",
+    "env_other": "Sonstige"
   },
   "snippet": {
     "new_snippet": "Neues Snippet",
@@ -446,18 +452,56 @@
     "session_launched": "Remote-Desktop-Sitzung für {{name}} gestartet",
     "launch_failed": "Fehler beim Starten des Remote-Desktops: {{error}}"
   },
-  "lzy_cli": {
-    "title": "Lzy-CLI",
-    "description": "Lzy-CLI ist ein schlankes Kommandozeilen-Tool, das wiederkehrende Aufgaben auf Linux-Servern automatisiert — Dienste verwalten, Deployments, Log-Analyse und mehr — über kurze, leicht zu merkende Befehle.",
-    "what_it_does": "Damit kannst du",
-    "feature_1": "Häufige Admin-Aufgaben mit kürzeren, freundlicheren Befehlen ausführen",
-    "feature_2": "Dienste, Prozesse und Logs aus einer einzigen CLI verwalten",
-    "feature_3": "Routinen auf den über Nautilus verbundenen Servern beschleunigen",
-    "install_command": "Installationsbefehl",
-    "install_hint": "Beim Klick auf Installieren wechselt die Ansicht zum Terminal und führt den Befehl auf dem verbundenen Server aus.",
-    "install": "Installieren",
-    "view_on_github": "Auf GitHub ansehen",
-    "command_sent": "Installationsbefehl an das Terminal gesendet.",
-    "terminal_not_ready": "Keine aktive Terminal-Sitzung. Öffne zuerst ein Terminal."
+  "hostkey": {
+    "title": "Unbekannter Serverschlüssel",
+    "first_connection": "Dies ist die erste Verbindung zu diesem Server. Prüfen Sie vor dem Fortfahren, ob der unten angezeigte Fingerabdruck mit dem des Servers übereinstimmt — andernfalls könnte jemand die Verbindung abfangen.",
+    "server": "Server",
+    "fingerprint": "Schlüssel-Fingerabdruck (SHA-256)",
+    "verify_hint": "Zum Prüfen auf der Serverkonsole ausführen:",
+    "trust": "Vertrauen und verbinden",
+    "reject": "Abbrechen",
+    "too_late": "Die Bestätigung kam zu spät — die Verbindung wurde abgelehnt. Bitte erneut verbinden.",
+    "respond_failed": "Die Antwort konnte nicht gesendet werden. Bitte erneut verbinden."
+  },
+  "env": {
+    "title": "Umgebungsdateien",
+    "searched_in": "in {{home}}",
+    "file": "Datei",
+    "location": "Ort",
+    "size": "Größe",
+    "modified": "Geändert",
+    "actions": "Aktionen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "refresh": "Aktualisieren",
+    "no_files": "Keine .env-Dateien im Benutzerverzeichnis gefunden",
+    "select_connection": "Keine Verbindung ausgewählt",
+    "select_connection_desc": "Wählen Sie eine Verbindung, um deren Umgebungsdateien zu sehen",
+    "load_list_error": "Fehler beim Auflisten der .env-Dateien: {{message}}",
+    "load_error": "Datei konnte nicht geöffnet werden",
+    "delete_title": "Datei löschen",
+    "delete_confirm": "Diese Datei wird dauerhaft vom Server entfernt.",
+    "delete_success": "{{name}} gelöscht",
+    "delete_error": "Löschen fehlgeschlagen: {{message}}",
+    "save": "Speichern",
+    "save_success": "{{name}} gespeichert",
+    "save_error": "Speichern fehlgeschlagen: {{message}}",
+    "add_variable": "Variable hinzufügen",
+    "remove_variable": "Variable entfernen",
+    "key_placeholder": "SCHLÜSSEL",
+    "value_placeholder": "Wert",
+    "search_placeholder": "Variablen filtern",
+    "show_values": "Werte anzeigen",
+    "hide_values": "Werte verbergen",
+    "variable_count": "{{count}} Variablen",
+    "no_variables": "Diese Datei hat noch keine Variablen",
+    "no_matches": "Keine Variable entspricht dem Filter",
+    "duplicate_warning": "Doppelte Schlüssel: {{keys}}. Der letzte Wert gilt.",
+    "error_empty_key": "Es gibt eine Variable ohne Namen",
+    "error_invalid_key": "Ungültiger Name: {{keys}}",
+    "preserve_note": "Kommentare, Leerzeilen und Formatierung bleiben beim Speichern erhalten.",
+    "discard_title": "Änderungen verwerfen?",
+    "discard_message": "Die vorgenommenen Änderungen gehen verloren.",
+    "discard_confirm": "Verwerfen"
   }
 }

@@ -22,6 +22,8 @@ interface ConnectionRow {
     auto_connect: number;
     rdp_auth_method: string | null;
     domain: string | null;
+    tags?: string | null;
+    environment?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -40,6 +42,8 @@ function rowToConnection(row: ConnectionRow): Connection {
         lastSeen: row.last_seen,
         monitoredServices: JSON.parse(row.monitored_services || '[]'),
         autoConnect: Boolean(row.auto_connect),
+        tags: JSON.parse(row.tags || '[]'),
+        environment: (row.environment as any) || 'other',
         rdpAuthMethod: row.rdp_auth_method as 'credentials' | 'windows_auth' | undefined,
         domain: row.domain ?? undefined,
     };
@@ -83,14 +87,17 @@ export class ConnectionRepository {
             data.autoConnect ? 1 : 0,
             data.rdpAuthMethod ?? null,
             data.domain ?? null,
+            JSON.stringify(data.tags ?? []),
+            data.environment ?? 'other',
         ];
 
         db.run(`
             INSERT INTO connections (
                 id, name, description, host, port, user,
                 connection_type, auth_method, key_path, last_seen,
-                monitored_services, auto_connect, rdp_auth_method, domain
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                monitored_services, auto_connect, rdp_auth_method, domain,
+                tags, environment
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, params);
 
         saveDatabase();
@@ -120,6 +127,8 @@ export class ConnectionRepository {
             (data.autoConnect ?? existing.autoConnect) ? 1 : 0,
             data.rdpAuthMethod ?? existing.rdpAuthMethod ?? null,
             data.domain ?? existing.domain ?? null,
+            JSON.stringify(data.tags ?? existing.tags ?? []),
+            data.environment ?? existing.environment ?? 'other',
             id,
         ];
 
@@ -138,6 +147,8 @@ export class ConnectionRepository {
                 auto_connect = ?,
                 rdp_auth_method = ?,
                 domain = ?,
+                tags = ?,
+                environment = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `, params);
