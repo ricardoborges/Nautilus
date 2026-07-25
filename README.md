@@ -342,13 +342,13 @@ After building, you'll find:
 📁 `src-tauri/target/release/bundle/`
 
 - **Windows**: 
-  - `Nautilus_1.0.0_x64.msi` (MSI Installer)
-  - `Nautilus_1.0.0_x64_en-US.msi` (Localized)
+  - `Nautilus_2.0.0_x64.msi` (MSI Installer)
+  - `Nautilus_2.0.0_x64_en-US.msi` (Localized)
 - **Linux**: 
-  - `nautilus_1.0.0_amd64.AppImage` (Portable AppImage)
-  - `nautilus_1.0.0_amd64.deb` (Debian package)
+  - `nautilus_2.0.0_amd64.AppImage` (Portable AppImage)
+  - `nautilus_2.0.0_amd64.deb` (Debian package)
 - **macOS**: 
-  - `Nautilus_1.0.0_x64.dmg` (DMG Installer)
+  - `Nautilus_2.0.0_x64.dmg` (DMG Installer)
 
 #### Backend Sidecar
 📁 `src-tauri/binaries/`
