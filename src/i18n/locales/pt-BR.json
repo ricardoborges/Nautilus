@@ -450,5 +450,14 @@
     "session_info": "A sessão de Área de Trabalho Remota foi aberta em uma janela separada. Use o botão Desconectar para encerrar a sessão.",
     "session_launched": "Sessão de Área de Trabalho Remota aberta para {{name}}",
     "launch_failed": "Falha ao abrir Área de Trabalho Remota: {{error}}"
+  },
+  "hostkey": {
+    "title": "Chave do servidor desconhecida",
+    "first_connection": "Esta é a primeira conexão com este servidor. Confirme que a impressão digital abaixo confere com a do servidor antes de continuar — se não conferir, alguém pode estar interceptando a conexão.",
+    "server": "Servidor",
+    "fingerprint": "Impressão digital da chave (SHA-256)",
+    "verify_hint": "Para conferir, execute no console do servidor:",
+    "trust": "Confiar e conectar",
+    "reject": "Cancelar"
   }
 }

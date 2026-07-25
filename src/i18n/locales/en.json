@@ -450,5 +450,14 @@
     "session_info": "The Remote Desktop session has been opened in a separate window. Use the Disconnect button to end the session.",
     "session_launched": "Remote Desktop session launched for {{name}}",
     "launch_failed": "Failed to launch Remote Desktop: {{error}}"
+  },
+  "hostkey": {
+    "title": "Unknown server key",
+    "first_connection": "This is the first connection to this server. Confirm the key fingerprint below matches the server before continuing — if it does not, someone may be intercepting the connection.",
+    "server": "Server",
+    "fingerprint": "Key fingerprint (SHA-256)",
+    "verify_hint": "To check it, run this on the server console:",
+    "trust": "Trust and connect",
+    "reject": "Cancel"
   }
 }

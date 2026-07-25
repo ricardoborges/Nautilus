@@ -450,5 +450,14 @@
     "session_info": "원격 데스크톱 세션이 별도 창에서 열렸습니다.",
     "session_launched": "{{name}}의 원격 데스크톱 세션이 시작되었습니다",
     "launch_failed": "원격 데스크톱 시작 실패: {{error}}"
+  },
+  "hostkey": {
+    "title": "알 수 없는 서버 키",
+    "first_connection": "이 서버에 처음 연결합니다. 계속하기 전에 아래 지문이 서버의 지문과 일치하는지 확인하세요. 일치하지 않으면 누군가 연결을 가로채고 있을 수 있습니다.",
+    "server": "서버",
+    "fingerprint": "키 지문 (SHA-256)",
+    "verify_hint": "확인하려면 서버 콘솔에서 다음을 실행하세요:",
+    "trust": "신뢰하고 연결",
+    "reject": "취소"
   }
 }

@@ -450,5 +450,14 @@
     "session_info": "La sesión de Escritorio Remoto se ha abierto en una ventana separada. Use el botón Desconectar para finalizar la sesión.",
     "session_launched": "Sesión de Escritorio Remoto iniciada para {{name}}",
     "launch_failed": "Error al iniciar Escritorio Remoto: {{error}}"
+  },
+  "hostkey": {
+    "title": "Clave del servidor desconocida",
+    "first_connection": "Esta es la primera conexión a este servidor. Confirma que la huella digital de abajo coincide con la del servidor antes de continuar — si no coincide, alguien podría estar interceptando la conexión.",
+    "server": "Servidor",
+    "fingerprint": "Huella digital de la clave (SHA-256)",
+    "verify_hint": "Para comprobarlo, ejecuta esto en la consola del servidor:",
+    "trust": "Confiar y conectar",
+    "reject": "Cancelar"
   }
 }

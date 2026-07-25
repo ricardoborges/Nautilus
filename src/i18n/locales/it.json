@@ -450,5 +450,14 @@
     "session_info": "La sessione Desktop Remoto è stata aperta in una finestra separata.",
     "session_launched": "Sessione Desktop Remoto avviata per {{name}}",
     "launch_failed": "Errore nell'avvio del Desktop Remoto: {{error}}"
+  },
+  "hostkey": {
+    "title": "Chiave del server sconosciuta",
+    "first_connection": "Questa è la prima connessione a questo server. Verifica che l'impronta digitale qui sotto corrisponda a quella del server prima di continuare — in caso contrario, qualcuno potrebbe intercettare la connessione.",
+    "server": "Server",
+    "fingerprint": "Impronta digitale della chiave (SHA-256)",
+    "verify_hint": "Per verificarla, esegui questo sulla console del server:",
+    "trust": "Fidati e connetti",
+    "reject": "Annulla"
   }
 }

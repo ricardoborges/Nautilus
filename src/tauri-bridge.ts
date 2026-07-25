@@ -15,6 +15,7 @@ import type {
     SFTPUploadResult,
     Snippet,
     KnownHost,
+    HostKeyPromptEvent,
     TerminalDataPayload,
     DockerContainer,
     DockerImage,
@@ -325,6 +326,25 @@ const ssm: SSMAPI = {
 
     hostKeyForget: (host: string, port: number): Promise<{ success: boolean }> =>
         backendInvoke<{ success: boolean }>('ssm:hostkeys:forget', { host, port }),
+
+    hostKeyRespond: (requestId: string, accept: boolean): Promise<{ success: boolean }> =>
+        backendInvoke<{ success: boolean }>('ssm:hostkeys:respond', { requestId, accept }),
+
+    onHostKeyPrompt: (callback: (event: HostKeyPromptEvent) => void): (() => void) => {
+        const channel = 'ssm:hostkey:prompt';
+        const listeners = eventListeners.get(channel) || [];
+        listeners.push(callback as (data: unknown) => void);
+        eventListeners.set(channel, listeners);
+
+        return () => {
+            const currentListeners = eventListeners.get(channel) || [];
+            const index = currentListeners.indexOf(callback as (data: unknown) => void);
+            if (index > -1) {
+                currentListeners.splice(index, 1);
+                eventListeners.set(channel, currentListeners);
+            }
+        };
+    },
 
     // Docker methods
     dockerCheckAvailable: (connectionId: string): Promise<DockerInfo> =>

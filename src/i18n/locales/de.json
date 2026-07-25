@@ -450,5 +450,14 @@
     "session_info": "Die Remote-Desktop-Sitzung wurde in einem separaten Fenster geöffnet.",
     "session_launched": "Remote-Desktop-Sitzung für {{name}} gestartet",
     "launch_failed": "Fehler beim Starten des Remote-Desktops: {{error}}"
+  },
+  "hostkey": {
+    "title": "Unbekannter Serverschlüssel",
+    "first_connection": "Dies ist die erste Verbindung zu diesem Server. Prüfen Sie vor dem Fortfahren, ob der unten angezeigte Fingerabdruck mit dem des Servers übereinstimmt — andernfalls könnte jemand die Verbindung abfangen.",
+    "server": "Server",
+    "fingerprint": "Schlüssel-Fingerabdruck (SHA-256)",
+    "verify_hint": "Zum Prüfen auf der Serverkonsole ausführen:",
+    "trust": "Vertrauen und verbinden",
+    "reject": "Abbrechen"
   }
 }

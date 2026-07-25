@@ -450,5 +450,14 @@
     "session_info": "远程桌面会话已在单独的窗口中打开。",
     "session_launched": "已为{{name}}启动远程桌面会话",
     "launch_failed": "启动远程桌面失败：{{error}}"
+  },
+  "hostkey": {
+    "title": "未知的服务器密钥",
+    "first_connection": "这是首次连接到此服务器。请在继续之前确认下方的指纹与服务器一致 — 如果不一致，可能有人正在拦截此连接。",
+    "server": "服务器",
+    "fingerprint": "密钥指纹 (SHA-256)",
+    "verify_hint": "要核对指纹，请在服务器控制台运行:",
+    "trust": "信任并连接",
+    "reject": "取消"
   }
 }

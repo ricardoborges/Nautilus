@@ -30,9 +30,15 @@ export class TerminalSession {
 
     start(): void {
         const verifier = new HostKeyVerifier(this.sshConfig.host, this.sshConfig.port);
+        const disarm = verifier.armTimeout((err) => {
+            this.client.end();
+            logger.error(`[Terminal-${this.terminalId}] ${err.message}`);
+            this.onData(Buffer.from(`\r\n\x1b[31m${err.message}\x1b[0m\r\n`).toString('base64'));
+        });
 
         this.client
             .on('ready', () => {
+                disarm();
                 logger.info(`[Terminal-${this.terminalId}] Conexão SSH pronta para ${this.sshConfig.host}.`);
 
                 const ptyOptions = {
@@ -77,6 +83,7 @@ export class TerminalSession {
                 });
             })
             .on('error', (err) => {
+                disarm();
                 const reason = verifier.wrapError(err).message;
                 logger.error(`[Terminal-${this.terminalId}] Erro de conexão SSH: ${reason}`);
                 this.onData(Buffer.from(`\r\n\x1b[31mErro de conexão SSH: ${reason}\x1b[0m\r\n`).toString('base64'));
@@ -84,8 +91,8 @@ export class TerminalSession {
             .connect({
                 keepaliveInterval: 15000,
                 keepaliveCountMax: 3,
-                readyTimeout: 20000,
                 ...this.sshConfig,
+                readyTimeout: verifier.readyTimeout,
                 hostVerifier: verifier.verify
             });
     }

@@ -25,6 +25,7 @@ import koKR from 'antd/locale/ko_KR';
 import { ConnectionProvider } from './context/ConnectionContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { SplashScreen } from './components/SplashScreen';
+import { HostKeyPrompt } from './components/modals/HostKeyPrompt';
 import { MainLayout } from './layouts/MainLayout';
 import { getThemeConfig } from './theme/themeConfig';
 
@@ -164,6 +165,7 @@ const AppContent: React.FC = () => {
                 <AntApp>
                     <ConnectionProvider>
                         <MainLayout />
+                        <HostKeyPrompt />
                     </ConnectionProvider>
                 </AntApp>
             </ConfigProvider>

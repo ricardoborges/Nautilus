@@ -450,5 +450,14 @@
     "session_info": "La session Bureau à Distance a été ouverte dans une fenêtre séparée.",
     "session_launched": "Session Bureau à Distance lancée pour {{name}}",
     "launch_failed": "Échec du lancement du Bureau à Distance : {{error}}"
+  },
+  "hostkey": {
+    "title": "Clé du serveur inconnue",
+    "first_connection": "Il s'agit de la première connexion à ce serveur. Vérifiez que l'empreinte ci-dessous correspond à celle du serveur avant de continuer — sinon, quelqu'un pourrait intercepter la connexion.",
+    "server": "Serveur",
+    "fingerprint": "Empreinte de la clé (SHA-256)",
+    "verify_hint": "Pour la vérifier, exécutez ceci sur la console du serveur :",
+    "trust": "Faire confiance et se connecter",
+    "reject": "Annuler"
   }
 }

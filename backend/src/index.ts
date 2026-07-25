@@ -10,7 +10,12 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
 import { connectionManager } from './features/connections';
-import { listKnownHosts, forgetKnownHost } from './features/connections/hostkey.service';
+import {
+    listKnownHosts,
+    forgetKnownHost,
+    setHostKeyPromptHandler,
+    type HostKeyPromptRequest
+} from './features/connections/hostkey.service';
 import { SFTPClient, SSHClient, TerminalSession } from './features/terminal';
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
@@ -472,6 +477,17 @@ const handlers: HandlerRegistry = {
     // Known hosts handlers (SSH host key pinning)
     'ssm:hostkeys:list': async () => {
         return listKnownHosts();
+    },
+
+    'ssm:hostkeys:respond': async (args) => {
+        const { requestId, accept } = args as { requestId: string; accept: boolean };
+        const pending = pendingHostKeyPrompts.get(requestId);
+        if (!pending) {
+            // Already answered, timed out, or never existed
+            return { success: false };
+        }
+        pending.settle(accept === true);
+        return { success: true };
     },
 
     'ssm:hostkeys:forget': async (args) => {
@@ -1301,6 +1317,62 @@ function broadcastEvent(channel: string, data: unknown): void {
         }
     });
 }
+
+// ============================================================
+// Host key confirmation
+//
+// An unknown host key suspends the SSH handshake while the user is asked to
+// confirm the fingerprint, so nothing is trusted silently. Requests for the
+// same key are coalesced into a single dialog.
+// ============================================================
+
+const HOSTKEY_PROMPT_TIMEOUT_MS = 120000;
+
+interface PendingHostKeyPrompt {
+    promise: Promise<boolean>;
+    settle: (accept: boolean) => void;
+}
+
+const pendingHostKeyPrompts = new Map<string, PendingHostKeyPrompt>();
+
+function promptForHostKey(request: HostKeyPromptRequest): Promise<boolean> {
+    const requestId = `${request.host}:${request.port}:${request.fingerprint}`;
+
+    const existing = pendingHostKeyPrompts.get(requestId);
+    if (existing) return existing.promise;
+
+    // Without a listening UI nobody can confirm, so refuse instead of hanging
+    const subscribers = eventSubscribers.get('events') || [];
+    if (subscribers.length === 0) {
+        logger.warn(`[HostKey] No UI connected to confirm ${request.host}:${request.port}`);
+        return Promise.resolve(false);
+    }
+
+    let settle!: (accept: boolean) => void;
+    const promise = new Promise<boolean>((resolve) => {
+        const timer = setTimeout(() => {
+            logger.warn(`[HostKey] Confirmation timed out for ${request.host}:${request.port}`);
+            pendingHostKeyPrompts.delete(requestId);
+            resolve(false);
+        }, HOSTKEY_PROMPT_TIMEOUT_MS);
+
+        settle = (accept: boolean) => {
+            clearTimeout(timer);
+            pendingHostKeyPrompts.delete(requestId);
+            logger.info(`[HostKey] ${accept ? 'Accepted' : 'Rejected'} key for ${request.host}:${request.port}`);
+            resolve(accept);
+        };
+    });
+
+    pendingHostKeyPrompts.set(requestId, { promise, settle });
+
+    logger.info(`[HostKey] Asking user to confirm ${request.host}:${request.port} (${request.fingerprint})`);
+    broadcastEvent('ssm:hostkey:prompt', { requestId, ...request });
+
+    return promise;
+}
+
+setHostKeyPromptHandler(promptForHostKey);
 
 // HTTP Server
 const AUTH_TOKEN = process.env.NAUTILUS_AUTH_TOKEN || '';

@@ -15,18 +15,25 @@ export class SSHClient {
         const verifier = new HostKeyVerifier(this.config.host, this.config.port);
 
         return new Promise((resolve, reject) => {
+            const disarm = verifier.armTimeout((err) => {
+                this.client.end();
+                reject(err);
+            });
+
             this.client
                 .on('ready', () => {
+                    disarm();
                     resolve();
                 })
                 .on('error', (err) => {
+                    disarm();
                     reject(verifier.wrapError(err));
                 })
                 .connect({
                     keepaliveInterval: 15000,
                     keepaliveCountMax: 3,
-                    readyTimeout: 20000,
                     ...this.config,
+                    readyTimeout: verifier.readyTimeout,
                     hostVerifier: verifier.verify
                 });
         });

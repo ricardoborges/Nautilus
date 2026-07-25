@@ -167,6 +167,13 @@ export interface KnownHost {
     createdAt: string;
 }
 
+export interface HostKeyPromptEvent {
+    requestId: string;
+    host: string;
+    port: number;
+    fingerprint: string;
+}
+
 // ========================
 // Docker Types
 // ========================
@@ -348,6 +355,8 @@ export interface SSMAPI {
     // SSH known hosts (host key pinning)
     hostKeysList: () => Promise<KnownHost[]>;
     hostKeyForget: (host: string, port: number) => Promise<{ success: boolean }>;
+    hostKeyRespond: (requestId: string, accept: boolean) => Promise<{ success: boolean }>;
+    onHostKeyPrompt: (callback: (event: HostKeyPromptEvent) => void) => () => void;
 
     // Docker
     dockerCheckAvailable: (connectionId: string) => Promise<DockerInfo>;
