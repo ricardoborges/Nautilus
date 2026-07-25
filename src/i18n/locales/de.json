@@ -260,7 +260,12 @@
     "auto_connect": "Automatisch beim Start verbinden",
     "test_success": "Verbindung erfolgreich getestet!",
     "connection_updated": "Verbindung erfolgreich aktualisiert!",
-    "connection_created": "Verbindung erfolgreich erstellt!"
+    "connection_created": "Verbindung erfolgreich erstellt!",
+    "environment": "Umgebung",
+    "env_production": "Produktion",
+    "env_staging": "Staging",
+    "env_development": "Entwicklung",
+    "env_other": "Sonstige"
   },
   "snippet": {
     "new_snippet": "Neues Snippet",
@@ -445,19 +450,5 @@
     "session_info": "Die Remote-Desktop-Sitzung wurde in einem separaten Fenster geöffnet.",
     "session_launched": "Remote-Desktop-Sitzung für {{name}} gestartet",
     "launch_failed": "Fehler beim Starten des Remote-Desktops: {{error}}"
-  },
-  "lzy_cli": {
-    "title": "Lzy-CLI",
-    "description": "Lzy ist ein Kommandozeilen-Tool, das KI nutzt, um natürliche Sprache in Linux-Bash-Befehle zu übersetzen, erklärt, was der Befehl bewirkt, und Sie wählen lässt, ob die Ausführung gestartet, bearbeitet oder abgebrochen wird.",
-    "what_it_does": "Damit kannst du",
-    "feature_1": "Häufige Admin-Aufgaben mit kürzeren, freundlicheren Befehlen ausführen",
-    "feature_2": "Dienste, Prozesse und Logs aus einer einzigen CLI verwalten",
-    "feature_3": "Routinen auf den über Nautilus verbundenen Servern beschleunigen",
-    "install_command": "Installationsbefehl",
-    "install_hint": "Beim Klick auf Installieren wechselt die Ansicht zum Terminal und führt den Befehl auf dem verbundenen Server aus.",
-    "install": "Installieren",
-    "view_on_github": "Auf GitHub ansehen",
-    "command_sent": "Installationsbefehl an das Terminal gesendet.",
-    "terminal_not_ready": "Keine aktive Terminal-Sitzung. Öffne zuerst ein Terminal."
   }
 }

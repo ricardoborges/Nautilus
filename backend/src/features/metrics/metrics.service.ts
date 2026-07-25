@@ -37,41 +37,37 @@ export class SystemMonitor {
 
     async fetchAndEmitMetrics(): Promise<void> {
         try {
-            const commands = {
-                uptime: "uptime",
-                memory: "free -m",
-                disk: "df -h /",
-                cpu: "top -b -n 1 | grep '^%Cpu' | awk '{print $2+$4}'",
-                system: "uname -srmo && cat /etc/os-release | grep PRETTY_NAME | cut -d '\"' -f 2 && lscpu | grep 'Model name:' | sed 's/Model name:[[:space:]]*//'",
-                network: "cat /proc/net/dev"
-            };
-
+            const DELIMITER = '===NAUTILUS_SPLIT===';
             const services = this.connection.monitoredServices || [];
-            const serviceCommands = services.map(s => `systemctl is-active ${s.trim()}`);
-            const servicePromises = serviceCommands.map(cmd =>
-                this.sshClient.exec(cmd).catch(() => ({ stdout: 'failed', stderr: '' }))
-            );
+            
+            const serviceCmds = services.map(s => {
+                const safeName = s.trim().replace(/[^a-zA-Z0-9_.-]/g, '');
+                return `echo '${DELIMITER}'; systemctl is-active ${safeName} 2>/dev/null || echo 'failed'`;
+            }).join('; ');
 
-            const [uptime, memory, disk, cpu, system, network, ...serviceResults] = await Promise.all([
-                this.sshClient.exec(commands.uptime),
-                this.sshClient.exec(commands.memory),
-                this.sshClient.exec(commands.disk),
-                this.sshClient.exec(commands.cpu),
-                this.sshClient.exec(commands.system),
-                this.sshClient.exec(commands.network),
-                ...servicePromises
-            ]);
+            const compoundCmd = `{ uptime; echo '${DELIMITER}'; free -m; echo '${DELIMITER}'; df -h /; echo '${DELIMITER}'; top -b -n 1 | grep '^%Cpu' | awk '{print $2+$4}'; echo '${DELIMITER}'; uname -srmo && cat /etc/os-release | grep PRETTY_NAME | cut -d '"' -f 2 && lscpu | grep 'Model name:' | sed 's/Model name:[[:space:]]*//'; echo '${DELIMITER}'; cat /proc/net/dev; ${serviceCmds ? serviceCmds + '; ' : ''}}`;
+
+            const execResult = await this.sshClient.exec(compoundCmd);
+            const parts = execResult.stdout.split(DELIMITER).map(p => p.trim());
+
+            const uptimeStr = parts[0] || '';
+            const memoryStr = parts[1] || '';
+            const diskStr = parts[2] || '';
+            const cpuStr = parts[3] || '0';
+            const systemStr = parts[4] || '';
+            const networkStr = parts[5] || '';
+            const serviceResults = parts.slice(6);
 
             const metrics: MetricsData = {
-                uptime: uptime.stdout.trim(),
-                memory: this.parseMemory(memory.stdout),
-                disk: this.parseDisk(disk.stdout),
-                cpu: parseFloat(cpu.stdout.trim()).toFixed(1),
-                system: this.parseSystem(system.stdout),
-                network: this.parseNetwork(network.stdout),
+                uptime: uptimeStr,
+                memory: this.parseMemory(memoryStr),
+                disk: this.parseDisk(diskStr),
+                cpu: parseFloat(cpuStr || '0').toFixed(1),
+                system: this.parseSystem(systemStr),
+                network: this.parseNetwork(networkStr),
                 services: services.map((name, i): ServiceStatus => ({
                     name,
-                    status: serviceResults[i].stdout.trim()
+                    status: (serviceResults[i] || 'failed').trim()
                 }))
             };
 

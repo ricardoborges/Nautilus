@@ -260,7 +260,12 @@
     "auto_connect": "启动时自动连接",
     "test_success": "连接测试成功！",
     "connection_updated": "连接更新成功！",
-    "connection_created": "连接创建成功！"
+    "connection_created": "连接创建成功！",
+    "environment": "环境",
+    "env_production": "生产",
+    "env_staging": "预发布",
+    "env_development": "开发",
+    "env_other": "其他"
   },
   "snippet": {
     "new_snippet": "新建代码片段",
@@ -445,19 +450,5 @@
     "session_info": "远程桌面会话已在单独的窗口中打开。",
     "session_launched": "已为{{name}}启动远程桌面会话",
     "launch_failed": "启动远程桌面失败：{{error}}"
-  },
-  "lzy_cli": {
-    "title": "Lzy-CLI",
-    "description": "Lzy 是一款使用 AI 将自然语言翻译为 Linux bash 命令的命令行工具，它会解释命令的作用，并让你选择执行、编辑或中止执行。",
-    "what_it_does": "你可以用它做什么",
-    "feature_1": "使用更短、更友好的命令执行常见管理任务",
-    "feature_2": "通过单一 CLI 管理服务、进程和日志",
-    "feature_3": "加速在 Nautilus 中连接的服务器上的日常操作",
-    "install_command": "安装命令",
-    "install_hint": "点击「安装」将切换到终端标签页，并在已连接的服务器上执行该命令。",
-    "install": "安装",
-    "view_on_github": "在 GitHub 查看",
-    "command_sent": "安装命令已发送到终端。",
-    "terminal_not_ready": "没有活动的终端会话，请先打开一个终端。"
   }
 }

@@ -19,6 +19,7 @@ import {
     message,
     Divider,
     InputNumber,
+    Select,
 } from 'antd';
 import {
     KeyOutlined,
@@ -76,6 +77,8 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     rdpAuthMethod: connection.rdpAuthMethod || 'credentials',
                     domain: connection.domain || '',
                     port: connection.port,
+                    environment: connection.environment || 'other',
+                    tags: connection.tags || [],
                 });
                 // Load password if editing
                 window.ssm.getPassword(connection.id).then(pwd => {
@@ -94,6 +97,8 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     rdpAuthMethod: 'credentials',
                     domain: '',
                     port: undefined,
+                    environment: 'other',
+                    tags: [],
                 });
                 setPassword('');
             }
@@ -171,6 +176,8 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 rdpAuthMethod: values.connectionType === 'rdp' ? values.rdpAuthMethod : undefined,
                 domain: values.connectionType === 'rdp' ? values.domain : undefined,
                 port: values.port,
+                environment: values.environment || 'other',
+                tags: values.tags || [],
             };
 
             // Validate password for SSH connections with password auth
@@ -326,6 +333,35 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                             min={1}
                             max={65535}
                             style={{ width: '100%' }}
+                        />
+                    </Form.Item>
+                </Space>
+
+                {/* Environment & Tags */}
+                <Space style={{ display: 'flex' }} align="start">
+                    <Form.Item
+                        name="environment"
+                        label="Ambiente"
+                        style={{ width: 160 }}
+                    >
+                        <Select
+                            options={[
+                                { label: '🔴 Produção', value: 'production' },
+                                { label: '🟡 Staging', value: 'staging' },
+                                { label: '🟢 Dev', value: 'development' },
+                                { label: '⚪ Outros', value: 'other' },
+                            ]}
+                        />
+                    </Form.Item>
+                    <Form.Item
+                        name="tags"
+                        label="Tags / Etiquetas"
+                        style={{ flex: 1 }}
+                    >
+                        <Select
+                            mode="tags"
+                            placeholder="Digite e Enter (ex: web, db, aws)"
+                            tokenSeparators={[',']}
                         />
                     </Form.Item>
                 </Space>

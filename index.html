@@ -7,38 +7,14 @@
     <meta name="theme-color" content="#0f172a" />
     <title>Nautilus - Server Manager</title>
     <meta name="description" content="Aplicação para gerenciamento de servidores Linux via SSH" />
-    <style>
-        /* Loading state before React mounts */
-        #root:empty::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #0f172a;
-        }
-
-        #root:empty::after {
-            content: '';
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 40px;
-            height: 40px;
-            border: 3px solid #334155;
-            border-top-color: #3b82f6;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to {
-                transform: translate(-50%, -50%) rotate(360deg);
-            }
-        }
-    </style>
+    <!--
+      NOTE: do not add inline <style> or <script> tags to this file.
+      Tauri stamps a nonce onto every inline <style> at build time and adds it to
+      the style-src CSP directive at runtime, which per the CSP spec makes
+      'unsafe-inline' be ignored - that blocks every style Ant Design injects at
+      runtime and leaves the whole UI unstyled. Keep pre-mount styles in
+      src/index.css and pre-mount scripts in src/main.tsx instead.
+    -->
 </head>
 
 <body class="overflow-hidden h-screen w-screen select-none">
@@ -47,12 +23,6 @@
 
     <!-- React Entry Point -->
     <script type="module" src="/src/main.tsx"></script>
-    <!-- Show body after load -->
-    <script>
-        // Set initial theme background to prevent flash
-        const savedTheme = localStorage.getItem('nautilus-theme') || 'light';
-        document.body.style.backgroundColor = savedTheme === 'dark' ? '#141414' : '#f5f5f5';
-    </script>
 </body>
 
 </html>

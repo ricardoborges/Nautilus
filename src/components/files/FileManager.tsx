@@ -258,14 +258,30 @@ export const FileManager: React.FC<FileManagerProps> = ({ connectionId: propConn
         setIsSaving(true);
         try {
             await window.ssm.sftpWriteFile(activeConnectionId, openFile.path, editorContent);
+            setOpenFile({ ...openFile, content: editorContent });
             setIsEditorDirty(false);
-            message.success(t('files.file_saved'));
+            message.success(t('files.save_success'));
         } catch (err) {
-            message.error(t('files.save_error', { message: (err as Error).message }));
+            message.error(t('files.save_error'));
+            console.error('Failed to save file:', err);
         } finally {
             setIsSaving(false);
         }
-    }, [activeConnectionId, openFile, editorContent, t]);
+    }, [openFile, activeConnectionId, editorContent, t]);
+
+    // Ctrl+S Keyboard Shortcut for Saving File
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                if (openFile && isEditorDirty) {
+                    e.preventDefault();
+                    handleSaveFile();
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [openFile, isEditorDirty, handleSaveFile]);
 
     // Handle download
     const handleDownload = async () => {

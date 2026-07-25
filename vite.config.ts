@@ -28,6 +28,32 @@ export default defineConfig({
     build: {
         outDir: 'dist',
         emptyOutDir: true,
+        rollupOptions: {
+            output: {
+                /**
+                 * Only split off dependency *leaves* (packages that import nothing
+                 * from other chunks). Splitting antd / codemirror / the catch-all
+                 * "vendor" apart creates circular chunk imports, and the chunk that
+                 * gets evaluated first then touches bindings that don't exist yet
+                 * ("Cannot access X before initialization"), which kills the app
+                 * before React can mount.
+                 */
+                manualChunks(id) {
+                    const parts = id.split('node_modules/');
+                    if (parts.length < 2) return;
+                    const pkgPath = parts[parts.length - 1];
+
+                    // react + react-dom + scheduler have no external deps -> safe leaf
+                    if (/^(react|react-dom|scheduler)\//.test(pkgPath)) {
+                        return 'vendor-react';
+                    }
+                    // chart.js only depends on @kurkle/color -> safe leaf
+                    if (/^(chart\.js|@kurkle)\//.test(pkgPath)) {
+                        return 'vendor-charts';
+                    }
+                }
+            }
+        }
     },
 
     server: {

@@ -26,14 +26,58 @@ let db: SqlJsDatabase | null = null;
 let dbInitialized = false;
 let initPromise: Promise<void> | null = null;
 
+let saveTimeout: NodeJS.Timeout | null = null;
+let isSaving = false;
+let pendingSave = false;
+
 /**
- * Save database to file
+ * Save database to file asynchronously with debouncing (100ms)
+ * to prevent blocking the Node.js event loop on write bursts.
  */
 function saveDatabase(): void {
+    if (!db) return;
+
+    if (saveTimeout) {
+        clearTimeout(saveTimeout);
+    }
+
+    saveTimeout = setTimeout(async () => {
+        if (isSaving) {
+            pendingSave = true;
+            return;
+        }
+
+        try {
+            isSaving = true;
+            if (db) {
+                const data = db.export();
+                const buffer = Buffer.from(data);
+                await fs.promises.writeFile(DB_FILE, buffer);
+            }
+        } catch (err) {
+            console.error('[Database] Error saving database:', err);
+        } finally {
+            isSaving = false;
+            if (pendingSave) {
+                pendingSave = false;
+                saveDatabase();
+            }
+        }
+    }, 100);
+}
+
+/**
+ * Save database synchronously (used for app shutdown)
+ */
+function saveDatabaseSync(): void {
     if (db) {
-        const data = db.export();
-        const buffer = Buffer.from(data);
-        fs.writeFileSync(DB_FILE, buffer);
+        try {
+            const data = db.export();
+            const buffer = Buffer.from(data);
+            fs.writeFileSync(DB_FILE, buffer);
+        } catch (err) {
+            console.error('[Database] Error saving database sync:', err);
+        }
     }
 }
 
@@ -74,10 +118,16 @@ export async function initializeDatabase(): Promise<void> {
                 auto_connect INTEGER DEFAULT 0,
                 rdp_auth_method TEXT,
                 domain TEXT,
+                tags TEXT DEFAULT '[]',
+                environment TEXT DEFAULT 'other',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
+        // Migration for existing databases
+        try { db.run("ALTER TABLE connections ADD COLUMN tags TEXT DEFAULT '[]'"); } catch {}
+        try { db.run("ALTER TABLE connections ADD COLUMN environment TEXT DEFAULT 'other'"); } catch {}
 
         // Create snippets table (for future migration)
         db.run(`
@@ -157,7 +207,8 @@ export function queryOne<T = unknown>(sql: string, params?: BindParams): T | nul
  */
 export function closeDatabase(): void {
     if (db) {
-        saveDatabase();
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveDatabaseSync();
         db.close();
         db = null;
         dbInitialized = false;

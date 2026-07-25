@@ -9,6 +9,7 @@ import React, { useState, useMemo } from 'react';
 import {
     Modal,
     Input,
+    Select,
     List,
     Button,
     Space,
@@ -21,6 +22,7 @@ import {
 } from 'antd';
 import {
     SearchOutlined,
+    FilterOutlined,
     PlusOutlined,
     WindowsOutlined,
     LinuxOutlined,
@@ -62,20 +64,68 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
     const { themeMode } = useTheme();
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [environmentFilter, setEnvironmentFilter] = useState<string[]>([]);
 
     // Define border color based on theme
     const borderColor = themeMode === 'dark' ? '#434343' : '#d9d9d9';
 
-    // Filter connections based on search term
+    // Filter connections based on search term and environment
     const filteredConnections = useMemo(() => {
-        if (!searchTerm) return connections;
-        const term = searchTerm.toLowerCase();
-        return connections.filter(conn =>
-            conn.name.toLowerCase().includes(term) ||
-            conn.host.toLowerCase().includes(term) ||
-            conn.user?.toLowerCase().includes(term)
-        );
-    }, [connections, searchTerm]);
+        const term = searchTerm.trim().toLowerCase();
+
+        return connections.filter(conn => {
+            // Connections without an environment are treated as "other"
+            const env = conn.environment || 'other';
+            if (environmentFilter.length > 0 && !environmentFilter.includes(env)) {
+                return false;
+            }
+
+            if (!term) return true;
+
+            return (
+                conn.name.toLowerCase().includes(term) ||
+                conn.host.toLowerCase().includes(term) ||
+                conn.user?.toLowerCase().includes(term) ||
+                conn.environment?.toLowerCase().includes(term) ||
+                conn.tags?.some(tag => tag.toLowerCase().includes(term))
+            );
+        });
+    }, [connections, searchTerm, environmentFilter]);
+
+    // Environment options with the amount of connections in each one
+    const environmentOptions = useMemo(() => {
+        const counts: Record<string, number> = {};
+        connections.forEach(conn => {
+            const env = conn.environment || 'other';
+            counts[env] = (counts[env] || 0) + 1;
+        });
+
+        return [
+            { emoji: '🔴', value: 'production', labelKey: 'connection.env_production' },
+            { emoji: '🟡', value: 'staging', labelKey: 'connection.env_staging' },
+            { emoji: '🟢', value: 'development', labelKey: 'connection.env_development' },
+            { emoji: '⚪', value: 'other', labelKey: 'connection.env_other' },
+        ].map(opt => ({
+            value: opt.value,
+            label: `${opt.emoji} ${t(opt.labelKey)} (${counts[opt.value] || 0})`,
+        }));
+    }, [connections, t]);
+
+    const hasFilters = Boolean(searchTerm) || environmentFilter.length > 0;
+
+    const envColorMap: Record<string, string> = {
+        production: 'red',
+        staging: 'warning',
+        development: 'processing',
+        other: 'default',
+    };
+
+    const envLabelMap: Record<string, string> = {
+        production: 'PROD',
+        staging: 'STAGING',
+        development: 'DEV',
+        other: '',
+    };
 
     const handleConnect = async (conn: Connection) => {
         if (conn.connectionType === 'rdp') {
@@ -131,21 +181,34 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
             style={{ maxWidth: 1000, paddingBottom: 0 }}
             styles={{ body: { height: '60vh', overflowY: 'auto', overflowX: 'hidden', paddingRight: 8 } }}
         >
-            <Input
-                placeholder={t('common.search_connections')}
-                prefix={<SearchOutlined />}
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                style={{ marginBottom: 16 }}
-                autoFocus
-                allowClear
-                size="large"
-            />
+            <Space.Compact style={{ display: 'flex', marginBottom: 16 }}>
+                <Input
+                    placeholder={t('common.search_connections')}
+                    prefix={<SearchOutlined />}
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    style={{ flex: 1 }}
+                    autoFocus
+                    allowClear
+                    size="large"
+                />
+                <Select
+                    mode="multiple"
+                    placeholder={<Space size={4}><FilterOutlined />{t('connection.environment')}</Space>}
+                    value={environmentFilter}
+                    onChange={setEnvironmentFilter}
+                    options={environmentOptions}
+                    style={{ minWidth: 220, maxWidth: 360 }}
+                    size="large"
+                    allowClear
+                    maxTagCount="responsive"
+                />
+            </Space.Compact>
 
             {filteredConnections.length === 0 ? (
                 <Empty
                     description={
-                        searchTerm
+                        hasFilters
                             ? t('common.no_results')
                             : t('common.no_connections_yet')
                     }
@@ -201,13 +264,27 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                                         )}
                                     </div>
 
-                                    {item.description && (
-                                        <div style={{ marginBottom: 8, flex: 1 }}>
+                                     {item.description && (
+                                        <div style={{ marginBottom: 6, flex: 1 }}>
                                             <Typography.Paragraph type="secondary" style={{ fontSize: 11, marginBottom: 0, lineHeight: '1.4' }} ellipsis={{ rows: 2, tooltip: true }}>
                                                 {item.description}
                                             </Typography.Paragraph>
                                         </div>
                                     )}
+
+                                    {/* Environment and Tags */}
+                                    <div style={{ marginBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                        {item.environment && item.environment !== 'other' && (
+                                            <Tag color={envColorMap[item.environment] || 'default'} style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px', fontWeight: 600 }}>
+                                                {envLabelMap[item.environment] || item.environment}
+                                            </Tag>
+                                        )}
+                                        {item.tags?.map(tag => (
+                                            <Tag key={tag} style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>
+                                                #{tag}
+                                            </Tag>
+                                        ))}
+                                    </div>
 
                                     <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '1px solid var(--ant-color-border-secondary)', display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
                                         <Tooltip title={isActive ? t('common.disconnect') : t('common.connect')}>

@@ -14,6 +14,7 @@ import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
 import logger from './shared/utils/logger';
 import { initializeDatabase, closeDatabase, exportDatabase, importDatabase } from './shared/database';
+import { validateId, escapeShellArg } from './shared/utils/security.utils';
 import type {
     SSHConfig,
     ConnectionData,
@@ -586,6 +587,74 @@ const handlers: HandlerRegistry = {
                 throw new Error(result.stderr);
             }
             return { success: true };
+        } finally {
+            ssh.end();
+        }
+    },
+
+    'ssm:docker:execTerminal': async (args) => {
+        const { connectionId, terminalId, containerId, cols, rows } = args as {
+            connectionId: string;
+            terminalId: string;
+            containerId: string;
+            cols?: number;
+            rows?: number;
+        };
+
+        const safeContainerId = validateId(containerId, 'Container ID');
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+
+        // O usuário SSH pode não pertencer ao grupo "docker". Detectamos o acesso
+        // ao daemon antes do exec e caímos para "sudo docker" quando necessário
+        // (como há PTY, o sudo pode pedir a senha diretamente no terminal).
+        // Dentro do container preferimos bash e usamos sh como alternativa.
+        const innerShell = `sh -c 'command -v bash >/dev/null 2>&1 && exec bash || exec sh'`;
+        const initialCmd = [
+            'clear',
+            'if docker info >/dev/null 2>&1; then DK=docker; else DK="sudo docker"; fi',
+            `$DK exec -it ${safeContainerId} ${innerShell}`,
+        ].join('; ');
+
+        const session = new TerminalSession(
+            authConfig,
+            (data: string) => broadcastEvent('ssm:terminal:data', { id: terminalId, data }),
+            terminalId,
+            initialCmd,
+            typeof cols === 'number' && typeof rows === 'number' ? { cols, rows } : undefined
+        );
+
+        activeTerminals.set(terminalId, session);
+        session.start();
+        return { success: true };
+    },
+
+    'ssm:docker:stats': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const ssh = new SSHClient(authConfig);
+        try {
+            await ssh.connect();
+            const result = await ssh.exec('docker stats --no-stream --format "{{.ID}}|{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}" 2>/dev/null || echo ""');
+            const lines = result.stdout.trim().split('\n').filter(l => l.trim());
+            const stats = lines.map(l => {
+                const [id, name, cpu, memUsage, memPerc, netIO, blockIO] = l.split('|');
+                return {
+                    id: id || '',
+                    name: name || '',
+                    cpu: cpu || '0%',
+                    memUsage: memUsage || '0B',
+                    memPerc: memPerc || '0%',
+                    netIO: netIO || '0B',
+                    blockIO: blockIO || '0B'
+                };
+            });
+            return stats;
         } finally {
             ssh.end();
         }
@@ -1190,11 +1259,13 @@ function broadcastEvent(channel: string, data: unknown): void {
 }
 
 // HTTP Server
+const AUTH_TOKEN = process.env.NAUTILUS_AUTH_TOKEN || '';
+
 const server = http.createServer(async (req: IncomingMessage, res: ServerResponse) => {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Nautilus-Auth');
 
     if (req.method === 'OPTIONS') {
         res.writeHead(204);
@@ -1202,8 +1273,28 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
         return;
     }
 
+    // Health check (unauthenticated for startup readiness check)
+    if (req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok' }));
+        return;
+    }
+
+    // Authenticate all API and event requests if token is configured
+    if (AUTH_TOKEN) {
+        const reqUrl = new URL(req.url || '', 'http://127.0.0.1');
+        const reqToken = req.headers['x-nautilus-auth'] || reqUrl.searchParams.get('token');
+
+        if (reqToken !== AUTH_TOKEN) {
+            logger.warn(`[Auth] Unauthorized request attempt to '${req.url}'`);
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Unauthorized' }));
+            return;
+        }
+    }
+
     // Server-Sent Events for streaming updates
-    if (req.url === '/events' && req.method === 'GET') {
+    if (req.url?.startsWith('/events') && req.method === 'GET') {
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
@@ -1266,13 +1357,6 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
                 res.end(JSON.stringify({ success: false, error: 'Invalid JSON' }));
             }
         });
-        return;
-    }
-
-    // Health check
-    if (req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok' }));
         return;
     }
 

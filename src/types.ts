@@ -17,6 +17,8 @@ export interface Connection {
     keyPath?: string;
     monitoredServices?: string[];
     autoConnect?: boolean;
+    tags?: string[];
+    environment?: 'production' | 'staging' | 'development' | 'other';
     // RDP specific fields
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
@@ -27,6 +29,8 @@ export interface ConnectionFormData extends Omit<Connection, 'id'> {
     id?: string;
     description?: string;
     password?: string;
+    tags?: string[];
+    environment?: 'production' | 'staging' | 'development' | 'other';
     // RDP specific
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
@@ -209,11 +213,24 @@ export interface DockerStack {
     created: string;
 }
 
+export interface DockerStatItem {
+    id: string;
+    name: string;
+    cpu: string;
+    memUsage: string;
+    memPerc: string;
+    netIO: string;
+    blockIO: string;
+}
+
 export interface DockerInfo {
     available: boolean;
     version?: string;
     containers?: number;
     imagesCount?: number;
+    runningCount?: number;
+    stoppedCount?: number;
+    error?: string;
 }
 
 // ========================
@@ -335,6 +352,8 @@ export interface SSMAPI {
     dockerNetworkAction: (connectionId: string, networkId: string, action: 'remove') => Promise<void>;
     dockerDeployStack: (connectionId: string, stackName: string, composeContent: string, stacksDirectory: string) => Promise<void>;
     dockerConvertRun: (connectionId: string, dockerRunCommand: string) => Promise<string>;
+    dockerExecTerminal: (connectionId: string, terminalId: string, containerId: string, cols?: number, rows?: number) => Promise<void>;
+    dockerStats: (connectionId: string) => Promise<DockerStatItem[]>;
 
     // RDP
     rdpConnect: (options: RdpConnectOptions) => Promise<RdpConnectResponse>;

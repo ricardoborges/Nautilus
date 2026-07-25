@@ -260,7 +260,12 @@
     "rdp_test_not_available": "Teste de conexão não disponível para RDP. A conexão será validada ao conectar.",
     "test_success": "Conexão testada com sucesso!",
     "connection_updated": "Conexão atualizada com sucesso!",
-    "connection_created": "Conexão criada com sucesso!"
+    "connection_created": "Conexão criada com sucesso!",
+    "environment": "Ambiente",
+    "env_production": "Produção",
+    "env_staging": "Homologação",
+    "env_development": "Desenvolvimento",
+    "env_other": "Outros"
   },
   "snippet": {
     "new_snippet": "Novo Snippet",
@@ -445,19 +450,5 @@
     "session_info": "A sessão de Área de Trabalho Remota foi aberta em uma janela separada. Use o botão Desconectar para encerrar a sessão.",
     "session_launched": "Sessão de Área de Trabalho Remota aberta para {{name}}",
     "launch_failed": "Falha ao abrir Área de Trabalho Remota: {{error}}"
-  },
-  "lzy_cli": {
-    "title": "Lzy-CLI",
-    "description": "Lzy é uma ferramenta de linha de comando que usa IA para traduzir linguagem natural em comandos bash do Linux, explica o que o comando faz e permite que você escolha entre executar, editar ou abortar a execução.",
-    "what_it_does": "O que você pode fazer com ele",
-    "feature_1": "Executar tarefas administrativas comuns com comandos mais curtos e amigáveis",
-    "feature_2": "Gerenciar serviços, processos e logs a partir de um único CLI",
-    "feature_3": "Acelerar rotinas nos servidores que você conecta pelo Nautilus",
-    "install_command": "Comando de instalação",
-    "install_hint": "Ao clicar em Instalar, o app abrirá a aba Terminal e executará o comando no servidor conectado.",
-    "install": "Instalar",
-    "view_on_github": "Ver no GitHub",
-    "command_sent": "Comando de instalação enviado ao terminal.",
-    "terminal_not_ready": "Nenhuma sessão de terminal ativa. Abra um terminal primeiro."
   }
 }

@@ -21,7 +21,7 @@ import {
     ExportOutlined,
     ImportOutlined,
 } from '@ant-design/icons';
-import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input, InputNumber, Popconfirm, Row, Col } from 'antd';
+import { Button, Dropdown, Modal, Space, Typography, Divider, Radio, Form, App, Select, Input, InputNumber, Popconfirm, Row, Col, Tag } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { MenuProps } from 'antd';
 import { useTheme } from '../context/ThemeContext';
@@ -32,8 +32,9 @@ import { ConnectionModal } from '../components/modals/ConnectionModal';
 import { ConnectionManager } from '../components/connections/ConnectionManager';
 import type { Connection } from '../types';
 import splashScreen from '../assets/splash-screen.png';
+import pkg from '../../package.json';
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 
 export const MainLayout: React.FC = () => {
     const { t, i18n } = useTranslation();
@@ -164,10 +165,18 @@ export const MainLayout: React.FC = () => {
                         style={{
                             maxWidth: '100%',
                             height: 'auto',
-                            marginBottom: 24,
+                            marginBottom: 16,
                             borderRadius: 8
                         }}
                     />
+                    <div style={{ marginBottom: 12 }}>
+                        <Title level={4} style={{ margin: '0 0 4px 0' }}>
+                            Nautilus Server Manager
+                        </Title>
+                        <Tag color="blue" style={{ fontSize: 12, padding: '2px 8px', fontWeight: 600 }}>
+                            v{pkg.version}
+                        </Tag>
+                    </div>
                     <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic' }}>
                         <a href="https://github.com/ricardoborges/nautilus" target="_blank" rel="noopener noreferrer">
                             github.com/ricardoborges/nautilus

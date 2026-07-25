@@ -260,7 +260,12 @@
     "auto_connect": "Connetti automaticamente all'avvio",
     "test_success": "Connessione testata con successo!",
     "connection_updated": "Connessione aggiornata con successo!",
-    "connection_created": "Connessione creata con successo!"
+    "connection_created": "Connessione creata con successo!",
+    "environment": "Ambiente",
+    "env_production": "Produzione",
+    "env_staging": "Staging",
+    "env_development": "Sviluppo",
+    "env_other": "Altri"
   },
   "snippet": {
     "new_snippet": "Nuovo Frammento",
@@ -445,19 +450,5 @@
     "session_info": "La sessione Desktop Remoto è stata aperta in una finestra separata.",
     "session_launched": "Sessione Desktop Remoto avviata per {{name}}",
     "launch_failed": "Errore nell'avvio del Desktop Remoto: {{error}}"
-  },
-  "lzy_cli": {
-    "title": "Lzy-CLI",
-    "description": "Lzy è uno strumento da riga di comando che usa l'IA per tradurre il linguaggio naturale in comandi bash Linux, spiega cosa fa il comando e ti permette di scegliere se eseguirlo, modificarlo o annullare l'esecuzione.",
-    "what_it_does": "Cosa puoi farci",
-    "feature_1": "Eseguire attività amministrative comuni con comandi più brevi",
-    "feature_2": "Gestire servizi, processi e log da una sola CLI",
-    "feature_3": "Velocizzare le routine sui server collegati da Nautilus",
-    "install_command": "Comando di installazione",
-    "install_hint": "Cliccando Installa verrà aperta la scheda Terminale e il comando sarà eseguito sul server connesso.",
-    "install": "Installa",
-    "view_on_github": "Vedi su GitHub",
-    "command_sent": "Comando di installazione inviato al terminale.",
-    "terminal_not_ready": "Nessuna sessione di terminale attiva. Apri prima un terminale."
   }
 }

@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { Layout, Menu, Button, Tooltip, Modal, Typography, Space, message } from 'antd';
+import { Layout, Menu, Button, Tooltip } from 'antd';
 import {
     DashboardOutlined,
     CodeOutlined,
@@ -16,9 +16,6 @@ import {
     ContainerOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
-    ThunderboltOutlined,
-    DownloadOutlined,
-    GithubOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,9 +25,6 @@ import { FileManager } from '../files/FileManager';
 import { ProcessManager } from '../processes/ProcessManager';
 import { CronManager } from '../cron/CronManager';
 import { DockerDashboard } from '../docker/DockerDashboard';
-import { terminalService } from '../../hooks/useTerminal';
-
-const LZY_CLI_INSTALL_COMMAND = 'sudo pip install lzycli';
 
 const { Sider, Content } = Layout;
 
@@ -53,21 +47,6 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
     const { themeMode } = useTheme();
     const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
     const [collapsed, setCollapsed] = useState(false);
-    const [lzyModalOpen, setLzyModalOpen] = useState(false);
-
-    const handleInstallLzyCli = () => {
-        setActiveTab('terminal');
-        setLzyModalOpen(false);
-        // Aguarda a aba do terminal montar/ficar ativa antes de enviar o comando
-        setTimeout(() => {
-            if (!terminalService.isReady) {
-                message.warning(t('lzy_cli.terminal_not_ready'));
-                return;
-            }
-            terminalService.writeToActive(LZY_CLI_INSTALL_COMMAND + '\n');
-            message.success(t('lzy_cli.command_sent'));
-        }, 300);
-    };
 
     const isDark = themeMode === 'dark';
 
@@ -102,11 +81,6 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
             icon: <ContainerOutlined />,
             label: t('common.docker'),
         },
-        {
-            key: 'lzy-cli',
-            icon: <ThunderboltOutlined />,
-            label: 'Lzy-CLI',
-        },
     ];
 
     const tabStyle = (tab: TabKey): React.CSSProperties => ({
@@ -140,13 +114,7 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
                     <Menu
                         mode="inline"
                         selectedKeys={[activeTab]}
-                        onClick={(info) => {
-                            if (info.key === 'lzy-cli') {
-                                setLzyModalOpen(true);
-                                return;
-                            }
-                            setActiveTab(info.key as TabKey);
-                        }}
+                        onClick={(info) => setActiveTab(info.key as TabKey)}
                         items={menuItems}
                         theme={isDark ? 'dark' : 'light'}
                         style={{
@@ -212,66 +180,6 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
                     />
                 </div>
             </Content>
-
-            <Modal
-                title={
-                    <Space>
-                        <ThunderboltOutlined style={{ color: '#faad14' }} />
-                        <span>{t('lzy_cli.title')}</span>
-                    </Space>
-                }
-                open={lzyModalOpen}
-                onCancel={() => setLzyModalOpen(false)}
-                width={560}
-                footer={[
-                    <Button
-                        key="github"
-                        icon={<GithubOutlined />}
-                        onClick={() => window.open('https://github.com/ricardoborges/lzy-cli', '_blank', 'noopener,noreferrer')}
-                    >
-                        {t('lzy_cli.view_on_github')}
-                    </Button>,
-                    <Button
-                        key="install"
-                        type="primary"
-                        icon={<DownloadOutlined />}
-                        onClick={handleInstallLzyCli}
-                    >
-                        {t('lzy_cli.install')}
-                    </Button>,
-                ]}
-            >
-                <Typography.Paragraph>
-                    {t('lzy_cli.description')}
-                </Typography.Paragraph>
-                <Typography.Title level={5} style={{ marginTop: 16 }}>
-                    {t('lzy_cli.what_it_does')}
-                </Typography.Title>
-                <ul style={{ paddingLeft: 20, marginBottom: 16 }}>
-                    <li>{t('lzy_cli.feature_1')}</li>
-                    <li>{t('lzy_cli.feature_2')}</li>
-                    <li>{t('lzy_cli.feature_3')}</li>
-                </ul>
-                <Typography.Title level={5}>
-                    {t('lzy_cli.install_command')}
-                </Typography.Title>
-                <div
-                    style={{
-                        background: isDark ? '#1e1e1e' : '#f5f5f5',
-                        color: isDark ? '#d4d4d4' : '#262626',
-                        padding: '12px 14px',
-                        borderRadius: 6,
-                        fontFamily: 'Consolas, "Cascadia Code", monospace',
-                        fontSize: 13,
-                        border: `1px solid ${isDark ? '#303030' : '#e8e8e8'}`,
-                    }}
-                >
-                    $ {LZY_CLI_INSTALL_COMMAND}
-                </div>
-                <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, fontSize: 12 }}>
-                    {t('lzy_cli.install_hint')}
-                </Typography.Paragraph>
-            </Modal>
         </Layout>
     );
 };

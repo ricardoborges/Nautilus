@@ -260,7 +260,12 @@
     "auto_connect": "Connect automatically on startup",
     "test_success": "Connection tested successfully!",
     "connection_updated": "Connection updated successfully!",
-    "connection_created": "Connection created successfully!"
+    "connection_created": "Connection created successfully!",
+    "environment": "Environment",
+    "env_production": "Production",
+    "env_staging": "Staging",
+    "env_development": "Development",
+    "env_other": "Other"
   },
   "snippet": {
     "new_snippet": "New Snippet",
@@ -445,19 +450,5 @@
     "session_info": "The Remote Desktop session has been opened in a separate window. Use the Disconnect button to end the session.",
     "session_launched": "Remote Desktop session launched for {{name}}",
     "launch_failed": "Failed to launch Remote Desktop: {{error}}"
-  },
-  "lzy_cli": {
-    "title": "Lzy-CLI",
-    "description": "Lzy is a command-line tool that uses AI to translate natural language into Linux bash commands, explains what the command does, and lets you choose whether to run, edit, or abort the execution.",
-    "what_it_does": "What you can do with it",
-    "feature_1": "Run common admin tasks with shorter, friendlier commands",
-    "feature_2": "Manage services, processes and logs from a single CLI",
-    "feature_3": "Speed up routines on the servers you connect to from Nautilus",
-    "install_command": "Install command",
-    "install_hint": "Clicking Install will switch to the Terminal tab and run the command on the connected server.",
-    "install": "Install",
-    "view_on_github": "View on GitHub",
-    "command_sent": "Install command sent to the terminal.",
-    "terminal_not_ready": "No active terminal session. Open a terminal first."
   }
 }
