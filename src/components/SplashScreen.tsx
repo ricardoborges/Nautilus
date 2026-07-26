@@ -94,7 +94,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
                 color: 'rgba(255, 255, 255, 0.6)',
                 fontSize: 12,
             }}>
-                NTI • MPBA
+                Nautilus
             </div>
         </div>
     );
