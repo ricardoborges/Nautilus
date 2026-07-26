@@ -80,7 +80,8 @@
     "loading_settings": "Loading settings...",
     "preparing_interface": "Preparing interface...",
     "ready": "Ready!",
-    "error_starting": "Error starting. Check the backend."
+    "error_starting": "Error starting. Check the backend.",
+    "backend_timeout": "The backend process did not respond in time."
   },
   "dashboard": {
     "cpu_usage": "CPU Usage",

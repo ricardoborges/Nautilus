@@ -80,7 +80,8 @@
     "loading_settings": "설정 로딩 중...",
     "preparing_interface": "인터페이스 준비 중...",
     "ready": "준비 완료!",
-    "error_starting": "시작 오류. 백엔드를 확인하세요."
+    "error_starting": "시작 오류. 백엔드를 확인하세요.",
+    "backend_timeout": "백엔드 프로세스가 제시간에 응답하지 않았습니다."
   },
   "dashboard": {
     "cpu_usage": "CPU 사용률",

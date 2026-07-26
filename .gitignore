@@ -3,3 +3,8 @@ dist/
 release/
 
 **/*.exe
+
+# Backend sidecars are build output (~60 MB each) — rebuild with `npm run build:backend`
+src-tauri/binaries/
+
+.DS_Store

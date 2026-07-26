@@ -80,7 +80,8 @@
     "loading_settings": "Einstellungen laden...",
     "preparing_interface": "Oberfläche vorbereiten...",
     "ready": "Bereit!",
-    "error_starting": "Fehler beim Starten. Überprüfen Sie das Backend."
+    "error_starting": "Fehler beim Starten. Überprüfen Sie das Backend.",
+    "backend_timeout": "Der Backend-Prozess hat nicht rechtzeitig geantwortet."
   },
   "dashboard": {
     "cpu_usage": "CPU-Auslastung",

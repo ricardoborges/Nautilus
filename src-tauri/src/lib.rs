@@ -67,37 +67,58 @@ fn get_auth_token(state: tauri::State<'_, AppState>) -> String {
     state.auth_token.clone()
 }
 
-fn get_sidecar_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+/// Sidecar file names to look for, most preferred first.
+///
+/// The name carries the Rust target triple, so it must match the host
+/// architecture — not just the OS. On macOS we accept the x86_64 build as a
+/// fallback because it still runs under Rosetta on Apple Silicon.
+fn sidecar_names() -> Vec<&'static str> {
     #[cfg(target_os = "windows")]
-    let sidecar_name = "nautilus-backend-x86_64-pc-windows-msvc.exe";
+    return vec!["nautilus-backend-x86_64-pc-windows-msvc.exe"];
 
     #[cfg(target_os = "linux")]
-    let sidecar_name = "nautilus-backend-x86_64-unknown-linux-gnu";
+    return vec![if cfg!(target_arch = "aarch64") {
+        "nautilus-backend-aarch64-unknown-linux-gnu"
+    } else {
+        "nautilus-backend-x86_64-unknown-linux-gnu"
+    }];
 
     #[cfg(target_os = "macos")]
-    let sidecar_name = "nautilus-backend-x86_64-apple-darwin";
+    return if cfg!(target_arch = "aarch64") {
+        vec![
+            "nautilus-backend-aarch64-apple-darwin",
+            "nautilus-backend-x86_64-apple-darwin",
+        ]
+    } else {
+        vec!["nautilus-backend-x86_64-apple-darwin"]
+    };
+}
 
-    let mut candidates = Vec::new();
+fn get_sidecar_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    let names = sidecar_names();
+
+    // Directories that may hold the sidecar, most likely first.
+    let mut dirs: Vec<std::path::PathBuf> = Vec::new();
 
     // 1. Resource dir (production build / installed app)
     if let Ok(resource_dir) = app.path().resource_dir() {
-        candidates.push(resource_dir.join("binaries").join(sidecar_name));
-        candidates.push(resource_dir.join(sidecar_name));
+        dirs.push(resource_dir.join("binaries"));
+        dirs.push(resource_dir);
     }
 
-    // 2. Relative to current executable location (e.g. target/release/nautilus.exe)
+    // 2. Relative to current executable location (e.g. target/release/nautilus)
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            candidates.push(exe_dir.join("binaries").join(sidecar_name));
-            candidates.push(exe_dir.join(sidecar_name));
+            dirs.push(exe_dir.join("binaries"));
+            dirs.push(exe_dir.to_path_buf());
 
             if let Some(parent1) = exe_dir.parent() {
-                candidates.push(parent1.join("binaries").join(sidecar_name));
-                candidates.push(parent1.join("src-tauri").join("binaries").join(sidecar_name));
+                dirs.push(parent1.join("binaries"));
+                dirs.push(parent1.join("src-tauri").join("binaries"));
 
                 if let Some(parent2) = parent1.parent() {
-                    candidates.push(parent2.join("binaries").join(sidecar_name));
-                    candidates.push(parent2.join("src-tauri").join("binaries").join(sidecar_name));
+                    dirs.push(parent2.join("binaries"));
+                    dirs.push(parent2.join("src-tauri").join("binaries"));
                 }
             }
         }
@@ -105,22 +126,32 @@ fn get_sidecar_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 
     // 3. Relative to current working directory
     if let Ok(current_dir) = std::env::current_dir() {
-        candidates.push(current_dir.join("binaries").join(sidecar_name));
-        candidates.push(current_dir.join("src-tauri").join("binaries").join(sidecar_name));
+        dirs.push(current_dir.join("binaries"));
+        dirs.push(current_dir.join("src-tauri").join("binaries"));
         if let Some(p1) = current_dir.parent() {
-            candidates.push(p1.join("binaries").join(sidecar_name));
-            candidates.push(p1.join("src-tauri").join("binaries").join(sidecar_name));
+            dirs.push(p1.join("binaries"));
+            dirs.push(p1.join("src-tauri").join("binaries"));
         }
     }
 
-    for path in candidates {
-        if path.exists() {
-            log::info!("Found sidecar binary at: {:?}", path);
-            return Ok(path);
+    // Architecture preference wins over directory preference: a native build
+    // further down the search path beats a Rosetta fallback next to the exe.
+    for name in &names {
+        for dir in &dirs {
+            let path = dir.join(name);
+            if path.exists() {
+                log::info!("Found sidecar binary at: {:?}", path);
+                return Ok(path);
+            }
         }
     }
 
-    Err(format!("Sidecar {} not found", sidecar_name))
+    Err(format!(
+        "Sidecar not found. Looked for {} in {} location(s). \
+         Build it with `npm run build:backend`.",
+        names.join(" or "),
+        dirs.len()
+    ))
 }
 
 fn start_backend_process(app: &AppHandle, auth_token: &str) -> Result<std::process::Child, String> {

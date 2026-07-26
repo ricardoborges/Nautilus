@@ -80,7 +80,8 @@
     "loading_settings": "Chargement des paramètres...",
     "preparing_interface": "Préparation de l'interface...",
     "ready": "Prêt !",
-    "error_starting": "Erreur au démarrage. Vérifiez le backend."
+    "error_starting": "Erreur au démarrage. Vérifiez le backend.",
+    "backend_timeout": "Le processus backend n'a pas répondu à temps."
   },
   "dashboard": {
     "cpu_usage": "Utilisation CPU",

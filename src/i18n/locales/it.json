@@ -80,7 +80,8 @@
     "loading_settings": "Caricamento impostazioni...",
     "preparing_interface": "Preparazione interfaccia...",
     "ready": "Pronto!",
-    "error_starting": "Errore all'avvio. Controlla il backend."
+    "error_starting": "Errore all'avvio. Controlla il backend.",
+    "backend_timeout": "Il processo backend non ha risposto in tempo."
   },
   "dashboard": {
     "cpu_usage": "Utilizzo CPU",

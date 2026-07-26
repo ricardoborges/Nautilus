@@ -80,7 +80,8 @@
     "loading_settings": "加载设置...",
     "preparing_interface": "准备界面...",
     "ready": "就绪！",
-    "error_starting": "启动错误。请检查后端。"
+    "error_starting": "启动错误。请检查后端。",
+    "backend_timeout": "后端进程未能及时响应。"
   },
   "dashboard": {
     "cpu_usage": "CPU使用率",

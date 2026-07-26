@@ -93,7 +93,7 @@ const AppContent: React.FC = () => {
                     attempts++;
                     if (attempts >= maxAttempts) {
                         window.removeEventListener('ssm-ready', handleReady);
-                        reject(new Error('Erro: O processo backend (nautilus-backend.exe) não respondeu a tempo.'));
+                        reject(new Error(t('splash.backend_timeout')));
                     } else {
                         setTimeout(check, 500);
                     }

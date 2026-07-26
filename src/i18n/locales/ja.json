@@ -80,7 +80,8 @@
     "loading_settings": "設定を読み込み中...",
     "preparing_interface": "インターフェースを準備中...",
     "ready": "準備完了！",
-    "error_starting": "起動エラー。バックエンドを確認してください。"
+    "error_starting": "起動エラー。バックエンドを確認してください。",
+    "backend_timeout": "バックエンドプロセスが時間内に応答しませんでした。"
   },
   "dashboard": {
     "cpu_usage": "CPU使用率",
