@@ -157,26 +157,32 @@ export const MainLayout: React.FC = () => {
     const showAbout = () => {
         modal.info({
             title: t('common.about_nautilus'),
+            icon: null,
+            className: 'about-modal',
             content: (
-                <div style={{ textAlign: 'center' }}>
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 12,
+                    textAlign: 'center',
+                }}>
                     <img
                         src={splashScreen}
                         alt="Nautilus"
                         style={{
+                            width: 128,
+                            height: 128,
                             maxWidth: '100%',
-                            height: 'auto',
-                            marginBottom: 16,
-                            borderRadius: 8
+                            borderRadius: 8,
                         }}
                     />
-                    <div style={{ marginBottom: 12 }}>
-                        <Title level={4} style={{ margin: '0 0 4px 0' }}>
-                            Nautilus Server Manager
-                        </Title>
-                        <Tag color="blue" style={{ fontSize: 12, padding: '2px 8px', fontWeight: 600 }}>
-                            v{pkg.version}
-                        </Tag>
-                    </div>
+                    <Title level={4} style={{ margin: 0 }}>
+                        Nautilus Server Manager
+                    </Title>
+                    <Tag color="blue" style={{ margin: 0, fontSize: 12, padding: '2px 8px', fontWeight: 600 }}>
+                        v{pkg.version}
+                    </Tag>
                     <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic' }}>
                         <a href="https://github.com/ricardoborges/nautilus" target="_blank" rel="noopener noreferrer">
                             github.com/ricardoborges/nautilus
@@ -185,7 +191,7 @@ export const MainLayout: React.FC = () => {
                 </div>
             ),
             okText: t('common.close'),
-            width: 500,
+            width: 360,
         });
     };
 

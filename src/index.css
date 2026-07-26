@@ -349,3 +349,26 @@ body.dark-theme .ant-descriptions-item-label {
 body.dark-theme .ant-descriptions-item-content {
     color: rgba(255, 255, 255, 0.85);
 }
+
+/* About modal - fully centered / symmetric layout */
+.about-modal .ant-modal-confirm-body {
+    display: block;
+}
+
+.about-modal .ant-modal-confirm-title {
+    display: block;
+    width: 100%;
+    text-align: center;
+}
+
+.about-modal .ant-modal-confirm-content {
+    width: 100%;
+    max-width: 100%;
+    margin-block-start: 16px;
+    margin-inline-start: 0;
+}
+
+.about-modal .ant-modal-confirm-btns {
+    text-align: center;
+    margin-top: 20px;
+}
