@@ -58,12 +58,14 @@ export interface SnippetData {
     id?: string;
     name: string;
     command: string;
+    isSecret?: boolean;
 }
 
 export interface Snippet {
     id: string;
     name: string;
     command: string;
+    isSecret?: boolean;
 }
 
 // ========================

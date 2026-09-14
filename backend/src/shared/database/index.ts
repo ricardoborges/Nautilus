@@ -115,16 +115,20 @@ function createSchema(database: SqlJsDatabase): void {
     try { database.run("ALTER TABLE connections ADD COLUMN tags TEXT DEFAULT '[]'"); } catch {}
     try { database.run("ALTER TABLE connections ADD COLUMN environment TEXT DEFAULT 'other'"); } catch {}
 
-    // Create snippets table (for future migration)
+    // Create snippets table
     database.run(`
         CREATE TABLE IF NOT EXISTS snippets (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             command TEXT NOT NULL,
+            is_secret INTEGER DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     `);
+
+    // Migration for existing databases
+    try { database.run("ALTER TABLE snippets ADD COLUMN is_secret INTEGER DEFAULT 0"); } catch {}
 
     // Create known_hosts table (SSH host key pinning / TOFU)
     database.run(`

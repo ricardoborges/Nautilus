@@ -281,7 +281,14 @@
     "save_tip": "Consejo: Use Ctrl+Enter para guardar rápidamente",
     "snippet_updated": "Fragmento actualizado con éxito",
     "snippet_created": "Fragmento creado con éxito",
-    "executing": "Ejecutando fragmento: {{name}}"
+    "executing": "Ejecutando fragmento: {{name}}",
+    "is_secret": "Secret",
+    "secret_value": "Secreto",
+    "secret_placeholder": "••••••••••••",
+    "secret_required": "Ingrese un valor de secreto",
+    "secret_tip": "Este secreto se almacena de forma segura y se oculta de la vista",
+    "show_secret": "Mostrar secreto",
+    "hide_secret": "Ocultar secreto"
   },
   "docker": {
     "select_connection": "Seleccione una conexión",

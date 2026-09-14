@@ -6,14 +6,17 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { List, Button, Tooltip, Space, Typography, Input, Empty, Popconfirm, message, theme } from 'antd';
+import { List, Button, Tooltip, Space, Typography, Input, Empty, Popconfirm, message, theme, Tag } from 'antd';
 import {
     PlusOutlined,
     EditOutlined,
     DeleteOutlined,
     PlayCircleOutlined,
     SearchOutlined,
-    CodeOutlined
+    CodeOutlined,
+    LockOutlined,
+    EyeOutlined,
+    EyeInvisibleOutlined
 } from '@ant-design/icons';
 import { terminalService } from '../../hooks/useTerminal';
 import { SnippetModal } from '../modals/SnippetModal';
@@ -28,6 +31,7 @@ export const SnippetSidebar: React.FC = () => {
     const [filteredSnippets, setFilteredSnippets] = useState<Snippet[]>([]);
     const [searchText, setSearchText] = useState('');
     const [loading, setLoading] = useState(false);
+    const [visibleSecrets, setVisibleSecrets] = useState<Record<string, boolean>>({});
     
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -54,10 +58,18 @@ export const SnippetSidebar: React.FC = () => {
     useEffect(() => {
         const filtered = snippets.filter(s => 
             s.name.toLowerCase().includes(searchText.toLowerCase()) ||
-            s.command.toLowerCase().includes(searchText.toLowerCase())
+            (!s.isSecret && s.command.toLowerCase().includes(searchText.toLowerCase()))
         );
         setFilteredSnippets(filtered);
     }, [searchText, snippets]);
+
+    const handleToggleSecretVisibility = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setVisibleSecrets(prev => ({
+            ...prev,
+            [id]: !prev[id]
+        }));
+    };
 
     const handleExecute = (snippet: Snippet) => {
         if (!terminalService.isReady) {
@@ -127,63 +139,97 @@ export const SnippetSidebar: React.FC = () => {
                 {filteredSnippets.length > 0 ? (
                     <List
                         dataSource={filteredSnippets}
-                        renderItem={(snippet) => (
-                            <List.Item
-                                style={{ 
-                                    padding: '8px 16px', 
-                                    cursor: 'pointer',
-                                    transition: 'background 0.3s'
-                                }}
-                                className="snippet-item"
-                                actions={[
-                                    <Tooltip title={t('common.edit')}>
-                                        <Button 
-                                            type="text" 
-                                            size="small" 
-                                            icon={<EditOutlined />} 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleEdit(snippet);
-                                            }} 
-                                        />
-                                    </Tooltip>,
-                                    <Popconfirm
-                                        title={t('common.delete')}
-                                        description={t('common.confirm_delete')}
-                                        onConfirm={(e) => {
-                                            e?.stopPropagation();
-                                            handleDelete(snippet.id);
-                                        }}
-                                        onCancel={(e) => e?.stopPropagation()}
-                                        okText={t('common.yes')}
-                                        cancelText={t('common.no')}
-                                    >
-                                        <Button 
-                                            type="text" 
-                                            size="small" 
-                                            danger 
-                                            icon={<DeleteOutlined />} 
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
-                                    </Popconfirm>
-                                ]}
-                                onClick={() => handleExecute(snippet)}
-                            >
-                                <List.Item.Meta
-                                    title={
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <PlayCircleOutlined style={{ color: '#52c41a' }} />
-                                            <Text strong style={{ fontSize: 13 }}>{snippet.name}</Text>
-                                        </div>
-                                    }
-                                    description={
-                                        <Text type="secondary" style={{ fontSize: 11 }} ellipsis={{ tooltip: snippet.command }}>
-                                            {snippet.command}
-                                        </Text>
-                                    }
-                                />
-                            </List.Item>
-                        )}
+                        renderItem={(snippet) => {
+                            const isSecret = Boolean(snippet.isSecret);
+                            const isRevealed = Boolean(visibleSecrets[snippet.id]);
+                            const displayedCommand = isSecret && !isRevealed ? '••••••••••••' : snippet.command;
+
+                            return (
+                                <List.Item
+                                    style={{ 
+                                        padding: '8px 16px', 
+                                        cursor: 'pointer',
+                                        transition: 'background 0.3s'
+                                    }}
+                                    className="snippet-item"
+                                    actions={[
+                                        isSecret && (
+                                            <Tooltip key="toggle" title={isRevealed ? (t('snippet.hide_secret') || 'Hide') : (t('snippet.show_secret') || 'Reveal')}>
+                                                <Button 
+                                                    type="text" 
+                                                    size="small" 
+                                                    icon={isRevealed ? <EyeInvisibleOutlined /> : <EyeOutlined />} 
+                                                    onClick={(e) => handleToggleSecretVisibility(snippet.id, e)} 
+                                                />
+                                            </Tooltip>
+                                        ),
+                                        <Tooltip key="edit" title={t('common.edit')}>
+                                            <Button 
+                                                type="text" 
+                                                size="small" 
+                                                icon={<EditOutlined />} 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleEdit(snippet);
+                                                }} 
+                                            />
+                                        </Tooltip>,
+                                        <Popconfirm
+                                            key="delete"
+                                            title={t('common.delete')}
+                                            description={t('common.confirm_delete')}
+                                            onConfirm={(e) => {
+                                                e?.stopPropagation();
+                                                handleDelete(snippet.id);
+                                            }}
+                                            onCancel={(e) => e?.stopPropagation()}
+                                            okText={t('common.yes')}
+                                            cancelText={t('common.no')}
+                                        >
+                                            <Button 
+                                                type="text" 
+                                                size="small" 
+                                                danger 
+                                                icon={<DeleteOutlined />} 
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                        </Popconfirm>
+                                    ].filter(Boolean)}
+                                    onClick={() => handleExecute(snippet)}
+                                >
+                                    <List.Item.Meta
+                                        title={
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                                                    <PlayCircleOutlined style={{ color: '#52c41a', flexShrink: 0 }} />
+                                                    <Text strong style={{ fontSize: 13 }} ellipsis={{ tooltip: snippet.name }}>
+                                                        {snippet.name}
+                                                    </Text>
+                                                </div>
+                                                {isSecret && (
+                                                    <Tag 
+                                                        color="warning" 
+                                                        icon={<LockOutlined />} 
+                                                        style={{ margin: 0, fontSize: 10, padding: '0 4px', lineHeight: '18px', flexShrink: 0 }}
+                                                    >
+                                                        Secret
+                                                    </Tag>
+                                                )}
+                                            </div>
+                                        }
+                                        description={
+                                            <Text 
+                                                type="secondary" 
+                                                style={{ fontSize: 11, fontFamily: isSecret && !isRevealed ? 'monospace' : undefined }} 
+                                                ellipsis={{ tooltip: isSecret && !isRevealed ? 'Secret' : snippet.command }}
+                                            >
+                                                {displayedCommand}
+                                            </Text>
+                                        }
+                                    />
+                                </List.Item>
+                            );
+                        }}
                     />
                 ) : (
                     <Empty 

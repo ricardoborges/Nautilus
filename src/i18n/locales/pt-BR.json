@@ -281,7 +281,14 @@
     "save_tip": "Dica: Use Ctrl+Enter para salvar rapidamente",
     "snippet_updated": "Snippet atualizado com sucesso",
     "snippet_created": "Snippet criado com sucesso",
-    "executing": "Executando snippet: {{name}}"
+    "executing": "Executando snippet: {{name}}",
+    "is_secret": "Secret",
+    "secret_value": "Segredo",
+    "secret_placeholder": "••••••••••••",
+    "secret_required": "Informe o valor do segredo",
+    "secret_tip": "Este segredo é armazenado de forma segura e protegido contra visualização",
+    "show_secret": "Mostrar segredo",
+    "hide_secret": "Ocultar segredo"
   },
   "docker": {
     "select_connection": "Selecione uma conexão",

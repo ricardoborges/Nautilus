@@ -469,11 +469,11 @@ const handlers: HandlerRegistry = {
     },
 
     'ssm:snippets:add': async (args) => {
-        return await snippetManager.add(args as { name: string; command: string });
+        return await snippetManager.add(args as { name: string; command: string; isSecret?: boolean });
     },
 
     'ssm:snippets:update': async (args) => {
-        return await snippetManager.update(args as { id: string; name: string; command: string });
+        return await snippetManager.update(args as { id: string; name: string; command: string; isSecret?: boolean });
     },
 
     'ssm:snippets:remove': async (args) => {

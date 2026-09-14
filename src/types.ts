@@ -157,6 +157,7 @@ export interface Snippet {
     id: string;
     name: string;
     command: string;
+    isSecret?: boolean;
     isSystem?: boolean;
 }
 

@@ -12,6 +12,7 @@ interface SnippetRow {
     id: string;
     name: string;
     command: string;
+    is_secret?: number | null;
     created_at: string;
     updated_at: string;
 }
@@ -21,6 +22,7 @@ function rowToSnippet(row: SnippetRow): Snippet {
         id: row.id,
         name: row.name,
         command: row.command,
+        isSecret: Boolean(row.is_secret),
     };
 }
 
@@ -47,20 +49,29 @@ export class SnippetRepository {
     create(data: SnippetData): Snippet {
         const db = getDatabase();
         const id = data.id || crypto.randomUUID();
+        const isSecret = Boolean(data.isSecret);
+        // If secret, do not store sensitive content in plain text in sqlite
+        const storedCommand = isSecret ? '' : data.command;
 
         const params: BindParams = [
             id,
             data.name,
-            data.command,
+            storedCommand,
+            isSecret ? 1 : 0,
         ];
 
         db.run(`
-            INSERT INTO snippets (id, name, command)
-            VALUES (?, ?, ?)
+            INSERT INTO snippets (id, name, command, is_secret)
+            VALUES (?, ?, ?, ?)
         `, params);
 
         saveDatabase();
-        return this.findById(id)!;
+        return {
+            id,
+            name: data.name,
+            command: data.command,
+            isSecret,
+        };
     }
 
     /**
@@ -73,10 +84,14 @@ export class SnippetRepository {
         if (!existing) return null;
 
         const db = getDatabase();
+        const isSecret = data.isSecret !== undefined ? Boolean(data.isSecret) : Boolean(existing.isSecret);
+        const newCommand = data.command ?? existing.command;
+        const storedCommand = isSecret ? '' : newCommand;
 
         const params: BindParams = [
             data.name ?? existing.name,
-            data.command ?? existing.command,
+            storedCommand,
+            isSecret ? 1 : 0,
             data.id,
         ];
 
@@ -84,12 +99,18 @@ export class SnippetRepository {
             UPDATE snippets SET
                 name = ?,
                 command = ?,
+                is_secret = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `, params);
 
         saveDatabase();
-        return this.findById(data.id);
+        return {
+            id: data.id,
+            name: data.name ?? existing.name,
+            command: newCommand,
+            isSecret,
+        };
     }
 
     /**

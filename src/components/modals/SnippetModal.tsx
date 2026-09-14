@@ -7,8 +7,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Form, Input, Alert, message } from 'antd';
-import { CodeOutlined } from '@ant-design/icons';
+import { Modal, Form, Input, Alert, message, Checkbox } from 'antd';
+import { CodeOutlined, LockOutlined } from '@ant-design/icons';
 import type { Snippet } from '../../types';
 
 const { TextArea } = Input;
@@ -29,6 +29,7 @@ export const SnippetModal: React.FC<SnippetModalProps> = ({
     const { t } = useTranslation();
     const [form] = Form.useForm();
     const isEditing = !!snippet;
+    const isSecret = Form.useWatch('isSecret', form);
 
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -40,9 +41,13 @@ export const SnippetModal: React.FC<SnippetModalProps> = ({
                 form.setFieldsValue({
                     name: snippet.name,
                     command: snippet.command,
+                    isSecret: Boolean(snippet.isSecret),
                 });
             } else {
                 form.resetFields();
+                form.setFieldsValue({
+                    isSecret: false,
+                });
             }
             setError(null);
         }
@@ -55,17 +60,22 @@ export const SnippetModal: React.FC<SnippetModalProps> = ({
             setIsSaving(true);
             setError(null);
 
+            const isSecretValue = Boolean(values.isSecret);
+            const commandValue = values.command;
+
             if (isEditing && snippet) {
                 await window.ssm.snippetUpdate({
                     id: snippet.id,
                     name: values.name.trim(),
-                    command: values.command.trim()
+                    command: commandValue,
+                    isSecret: isSecretValue,
                 });
                 message.success(t('snippet.snippet_updated'));
             } else {
                 await window.ssm.snippetAdd({
                     name: values.name.trim(),
-                    command: values.command.trim()
+                    command: commandValue,
+                    isSecret: isSecretValue,
                 });
                 message.success(t('snippet.snippet_created'));
             }
@@ -86,7 +96,11 @@ export const SnippetModal: React.FC<SnippetModalProps> = ({
         <Modal
             title={
                 <span>
-                    <CodeOutlined style={{ marginRight: 8, color: '#1677ff' }} />
+                    {isSecret ? (
+                        <LockOutlined style={{ marginRight: 8, color: '#faad14' }} />
+                    ) : (
+                        <CodeOutlined style={{ marginRight: 8, color: '#1677ff' }} />
+                    )}
                     {isEditing ? t('snippet.edit_snippet') : t('snippet.new_snippet')}
                 </span>
             }
@@ -115,23 +129,46 @@ export const SnippetModal: React.FC<SnippetModalProps> = ({
                     />
                 </Form.Item>
 
-                {/* Command */}
+                {/* Secret Checkbox */}
+                <Form.Item
+                    name="isSecret"
+                    valuePropName="checked"
+                    style={{ marginBottom: 16 }}
+                >
+                    <Checkbox>
+                        <span style={{ fontWeight: 500 }}>Secret</span>
+                    </Checkbox>
+                </Form.Item>
+
+                {/* Command or Secret */}
                 <Form.Item
                     name="command"
-                    label={t('snippet.command')}
-                    rules={[{ required: true, message: t('snippet.command_required') }]}
-                    extra={t('snippet.save_tip')}
+                    label={isSecret ? (t('snippet.secret_value') || 'Secret') : t('snippet.command')}
+                    rules={[{ required: true, message: isSecret ? (t('snippet.secret_required') || 'Please enter secret value') : t('snippet.command_required') }]}
+                    extra={isSecret ? (t('snippet.secret_tip') || 'This secret is stored securely and hidden from view') : t('snippet.save_tip')}
                 >
-                    <TextArea
-                        placeholder={t('snippet.command_placeholder')}
-                        rows={12}
-                        style={{ fontFamily: 'monospace' }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && e.ctrlKey) {
-                                handleSave();
-                            }
-                        }}
-                    />
+                    {isSecret ? (
+                        <Input.Password
+                            placeholder={t('snippet.secret_placeholder') || '••••••••••••'}
+                            style={{ fontFamily: 'monospace' }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleSave();
+                                }
+                            }}
+                        />
+                    ) : (
+                        <TextArea
+                            placeholder={t('snippet.command_placeholder')}
+                            rows={12}
+                            style={{ fontFamily: 'monospace' }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && e.ctrlKey) {
+                                    handleSave();
+                                }
+                            }}
+                        />
+                    )}
                 </Form.Item>
 
                 {/* Error Message */}
