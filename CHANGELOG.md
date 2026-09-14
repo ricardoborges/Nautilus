@@ -5,6 +5,26 @@ All notable changes to Nautilus are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-09-14
+
+### Added
+
+- **Secret snippets.** Snippets can now be marked as secret. Secret snippets
+  have their commands masked with asterisks in the sidebar and are protected
+  against accidental terminal execution, with a copy button provided to paste
+  values directly to the clipboard when needed.
+
+### Fixed
+
+- **macOS backend sidecar bundling.** Fixed `pkg` architecture cache conflicts
+  between x86_64 and arm64 in `build-sidecar.mjs` and improved native binary path
+  discovery in the sidecar supervisor.
+
+### Changed
+
+- **Splash screen and About modal.** Updated application assets, version display,
+  and layout styling.
+
 ## [2.0.0] - 2026-07-25
 
 This release closes several security holes in how Nautilus talks to remote
@@ -94,5 +114,6 @@ version. Version 1.5.0 was never published — everything below lands on top of
 - Connection handling issues when opening and switching between servers.
 - Several fixes in the environment files tab following its introduction.
 
+[2.0.1]: https://github.com/ricardoborges/Nautilus/releases/tag/v2.0.1
 [2.0.0]: https://github.com/ricardoborges/Nautilus/releases/tag/v2.0.0
 [v1.4.0]: https://github.com/ricardoborges/Nautilus/releases/tag/v1.4.0

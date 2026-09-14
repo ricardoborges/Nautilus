@@ -1885,7 +1885,7 @@ dependencies = [
 
 [[package]]
 name = "nautilus"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "getrandom 0.2.16",
  "log",
