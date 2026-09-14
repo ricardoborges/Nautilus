@@ -147,7 +147,7 @@ export const SnippetSidebar: React.FC = () => {
                             return (
                                 <List.Item
                                     style={{ 
-                                        padding: '8px 16px', 
+                                        padding: '8px 12px', 
                                         cursor: 'pointer',
                                         transition: 'background 0.3s'
                                     }}
@@ -199,13 +199,11 @@ export const SnippetSidebar: React.FC = () => {
                                 >
                                     <List.Item.Meta
                                         title={
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
-                                                    <PlayCircleOutlined style={{ color: '#52c41a', flexShrink: 0 }} />
-                                                    <Text strong style={{ fontSize: 13 }} ellipsis={{ tooltip: snippet.name }}>
-                                                        {snippet.name}
-                                                    </Text>
-                                                </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, width: '100%' }}>
+                                                <PlayCircleOutlined style={{ color: '#52c41a', flexShrink: 0 }} />
+                                                <Text strong style={{ fontSize: 13, flex: 1, minWidth: 0 }} ellipsis={{ tooltip: snippet.name }}>
+                                                    {snippet.name}
+                                                </Text>
                                                 {isSecret && (
                                                     <Tag 
                                                         color="warning" 
@@ -250,6 +248,18 @@ export const SnippetSidebar: React.FC = () => {
             <style>{`
                 .snippet-item:hover {
                     background-color: ${token.colorFillAlter} !important;
+                }
+                .snippet-item .ant-list-item-action {
+                    margin-inline-start: 8px !important;
+                }
+                .snippet-item .ant-list-item-action > li {
+                    padding: 0 2px !important;
+                }
+                .snippet-item .ant-list-item-action .ant-list-item-action-split {
+                    display: none !important;
+                }
+                .snippet-item .ant-list-item-meta-content {
+                    min-width: 0 !important;
                 }
             `}</style>
         </div>
