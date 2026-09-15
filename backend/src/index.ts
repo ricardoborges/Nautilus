@@ -20,6 +20,7 @@ import {
 } from './features/connections/hostkey.service';
 import { SFTPClient, SSHClient, TerminalSession, SSHPoolManager } from './features/terminal';
 import { ServicesService, ServiceAction } from './features/services';
+import { LogsService, ReadLogsOptions, StreamLogsOptions } from './features/logs';
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
 import logger from './shared/utils/logger';
@@ -44,6 +45,7 @@ const ENV_SEARCH_MAX_RESULTS = 500;
 let activeSystemMonitor: SystemMonitor | null = null;
 const activeTerminals = new Map<string, TerminalSession>();
 const servicesService = new ServicesService();
+const logsService = new LogsService();
 
 // Event subscribers (for metrics and terminal data)
 const eventSubscribers = new Map<string, ServerResponse[]>();
@@ -340,6 +342,41 @@ const handlers: HandlerRegistry = {
         const authConfig = await getAuthConfig(conn as AuthArgs);
         const status = await servicesService.getServiceStatus(connectionId, authConfig, serviceName);
         return { status };
+    },
+
+    // Logs handlers
+    'ssm:logs:read': async (args) => {
+        const { connectionId, ...options } = args as unknown as { connectionId: string } & ReadLogsOptions;
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        return logsService.readLogs(connectionId, authConfig, options);
+    },
+
+    'ssm:logs:listFiles': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const files = await logsService.listFiles(connectionId, authConfig);
+        return { files };
+    },
+
+    'ssm:logs:stream:start': async (args) => {
+        const { connectionId, streamId, ...options } = args as unknown as { connectionId: string; streamId: string } & StreamLogsOptions;
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        await logsService.startStream(connectionId, authConfig, streamId, options, (chunk) => {
+            broadcastEvent('ssm:logs:stream:data', { streamId, chunk });
+        });
+        return { success: true };
+    },
+
+    'ssm:logs:stream:stop': async (args) => {
+        const { streamId } = args as { streamId: string };
+        logsService.stopStream(streamId);
+        return { success: true };
     },
 
     // Cron handlers
@@ -1688,6 +1725,7 @@ function cleanup(): void {
         activeSystemMonitor.stopPolling();
     }
     activeTerminals.forEach((service) => service.stop());
+    logsService.stopAll();
     SSHPoolManager.getInstance().closeAll();
     closeDatabase();
     server.close(() => {
