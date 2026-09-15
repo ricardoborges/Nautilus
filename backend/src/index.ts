@@ -22,6 +22,7 @@ import { SFTPClient, SSHClient, TerminalSession, SSHPoolManager } from './featur
 import { ServicesService, ServiceAction } from './features/services';
 import { LogsService, ReadLogsOptions, StreamLogsOptions } from './features/logs';
 import { TunnelService, TunnelConfig } from './features/tunnels';
+import { UfwService, Fail2banService, PackagesService, AddUfwRuleOptions } from './features/security';
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
 import logger from './shared/utils/logger';
@@ -48,6 +49,9 @@ const activeTerminals = new Map<string, TerminalSession>();
 const servicesService = new ServicesService();
 const logsService = new LogsService();
 const tunnelService = new TunnelService();
+const ufwService = new UfwService();
+const fail2banService = new Fail2banService();
+const packagesService = new PackagesService();
 
 // Event subscribers (for metrics and terminal data)
 const eventSubscribers = new Map<string, ServerResponse[]>();
@@ -419,6 +423,101 @@ const handlers: HandlerRegistry = {
         const { id } = args as { id: string };
         await tunnelService.stopTunnel(id);
         return { success: true };
+    },
+
+    // Security & Firewall handlers
+    'ssm:security:ufw:status': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        return await ufwService.getStatus(connectionId, authConfig);
+    },
+
+    'ssm:security:ufw:toggle': async (args) => {
+        const { connectionId, action } = args as { connectionId: string; action: 'enable' | 'disable' | 'reload' };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        await ufwService.toggleUfw(connectionId, authConfig, action);
+        return { success: true };
+    },
+
+    'ssm:security:ufw:addRule': async (args) => {
+        const { connectionId, options } = args as unknown as { connectionId: string; options: AddUfwRuleOptions };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        await ufwService.addRule(connectionId, authConfig, options);
+        return { success: true };
+    },
+
+    'ssm:security:ufw:deleteRule': async (args) => {
+        const { connectionId, ruleNumber } = args as { connectionId: string; ruleNumber: number };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        await ufwService.deleteRule(connectionId, authConfig, ruleNumber);
+        return { success: true };
+    },
+
+    'ssm:security:fail2ban:status': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        return await fail2banService.getStatus(connectionId, authConfig);
+    },
+
+    'ssm:security:fail2ban:unban': async (args) => {
+        const { connectionId, jail, ip } = args as { connectionId: string; jail: string; ip: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        await fail2banService.unbanIp(connectionId, authConfig, jail, ip);
+        return { success: true };
+    },
+
+    'ssm:security:fail2ban:ban': async (args) => {
+        const { connectionId, jail, ip } = args as { connectionId: string; jail: string; ip: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        await fail2banService.banIp(connectionId, authConfig, jail, ip);
+        return { success: true };
+    },
+
+    // Package & OS Updates handlers
+    'ssm:packages:list': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        return await packagesService.listUpdates(connectionId, authConfig);
+    },
+
+    'ssm:packages:refresh': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        return await packagesService.refreshCache(connectionId, authConfig);
+    },
+
+    'ssm:packages:upgrade': async (args) => {
+        const { connectionId, packageNames } = args as { connectionId: string; packageNames?: string[] };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        return await packagesService.upgradePackages(connectionId, authConfig, packageNames);
+    },
+
+    'ssm:packages:checkReboot': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        return await packagesService.checkReboot(connectionId, authConfig);
     },
 
     // Cron handlers
