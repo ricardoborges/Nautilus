@@ -16,8 +16,8 @@ export class ConnectionModel implements Connection {
     // RDP specific fields
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
-
     description?: string;
+    bastionConnectionId?: string | null;
 
     constructor(data: ConnectionData) {
         this.id = data.id || crypto.randomUUID();
@@ -32,6 +32,7 @@ export class ConnectionModel implements Connection {
         this.lastSeen = data.lastSeen ?? null;
         this.monitoredServices = data.monitoredServices ?? [];
         this.autoConnect = data.autoConnect ?? false;
+        this.bastionConnectionId = data.bastionConnectionId ?? null;
         // RDP specific
         this.rdpAuthMethod = data.rdpAuthMethod;
         this.domain = data.domain;

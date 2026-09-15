@@ -24,6 +24,7 @@ interface ConnectionRow {
     domain: string | null;
     tags?: string | null;
     environment?: string | null;
+    bastion_connection_id?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -44,6 +45,7 @@ function rowToConnection(row: ConnectionRow): Connection {
         autoConnect: Boolean(row.auto_connect),
         tags: JSON.parse(row.tags || '[]'),
         environment: (row.environment as any) || 'other',
+        bastionConnectionId: row.bastion_connection_id ?? undefined,
         rdpAuthMethod: row.rdp_auth_method as 'credentials' | 'windows_auth' | undefined,
         domain: row.domain ?? undefined,
     };
@@ -89,6 +91,7 @@ export class ConnectionRepository {
             data.domain ?? null,
             JSON.stringify(data.tags ?? []),
             data.environment ?? 'other',
+            data.bastionConnectionId ?? null,
         ];
 
         db.run(`
@@ -96,8 +99,8 @@ export class ConnectionRepository {
                 id, name, description, host, port, user,
                 connection_type, auth_method, key_path, last_seen,
                 monitored_services, auto_connect, rdp_auth_method, domain,
-                tags, environment
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tags, environment, bastion_connection_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, params);
 
         saveDatabase();
@@ -129,6 +132,7 @@ export class ConnectionRepository {
             data.domain ?? existing.domain ?? null,
             JSON.stringify(data.tags ?? existing.tags ?? []),
             data.environment ?? existing.environment ?? 'other',
+            data.bastionConnectionId !== undefined ? data.bastionConnectionId : (existing.bastionConnectionId ?? null),
             id,
         ];
 
@@ -149,6 +153,7 @@ export class ConnectionRepository {
                 domain = ?,
                 tags = ?,
                 environment = ?,
+                bastion_connection_id = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `, params);

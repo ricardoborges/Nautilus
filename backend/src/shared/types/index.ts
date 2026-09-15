@@ -35,12 +35,13 @@ export interface ConnectionData {
     autoConnect?: boolean;
     tags?: string[];
     environment?: 'production' | 'staging' | 'development' | 'other';
+    bastionConnectionId?: string | null;
     // RDP specific fields
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
 }
 
-export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen' | 'rdpAuthMethod' | 'domain' | 'description' | 'tags' | 'environment'>> {
+export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen' | 'rdpAuthMethod' | 'domain' | 'description' | 'tags' | 'environment' | 'bastionConnectionId'>> {
     keyPath: string | null;
     lastSeen: string | null;
     rdpAuthMethod?: 'credentials' | 'windows_auth';
@@ -48,6 +49,7 @@ export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'l
     description?: string;
     tags?: string[];
     environment?: 'production' | 'staging' | 'development' | 'other';
+    bastionConnectionId?: string | null;
 }
 
 // ========================

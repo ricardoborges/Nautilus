@@ -106,6 +106,7 @@ function createSchema(database: SqlJsDatabase): void {
             domain TEXT,
             tags TEXT DEFAULT '[]',
             environment TEXT DEFAULT 'other',
+            bastion_connection_id TEXT DEFAULT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
@@ -114,6 +115,7 @@ function createSchema(database: SqlJsDatabase): void {
     // Migration for existing databases
     try { database.run("ALTER TABLE connections ADD COLUMN tags TEXT DEFAULT '[]'"); } catch {}
     try { database.run("ALTER TABLE connections ADD COLUMN environment TEXT DEFAULT 'other'"); } catch {}
+    try { database.run("ALTER TABLE connections ADD COLUMN bastion_connection_id TEXT DEFAULT NULL"); } catch {}
 
     // Create snippets table
     database.run(`
@@ -129,6 +131,22 @@ function createSchema(database: SqlJsDatabase): void {
 
     // Migration for existing databases
     try { database.run("ALTER TABLE snippets ADD COLUMN is_secret INTEGER DEFAULT 0"); } catch {}
+
+    // Create tunnels table
+    database.run(`
+        CREATE TABLE IF NOT EXISTS tunnels (
+            id TEXT PRIMARY KEY,
+            connection_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            tunnel_type TEXT NOT NULL DEFAULT 'local',
+            local_host TEXT NOT NULL DEFAULT '127.0.0.1',
+            local_port INTEGER NOT NULL,
+            remote_host TEXT NOT NULL DEFAULT '127.0.0.1',
+            remote_port INTEGER NOT NULL,
+            auto_start INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
 
     // Create known_hosts table (SSH host key pinning / TOFU)
     database.run(`
