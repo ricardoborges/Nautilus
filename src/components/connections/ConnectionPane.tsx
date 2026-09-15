@@ -19,6 +19,7 @@ import {
     MenuUnfoldOutlined,
     ClusterOutlined,
     FileSearchOutlined,
+    SwapOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -31,10 +32,11 @@ import { DockerDashboard } from '../docker/DockerDashboard';
 import { EnvManager } from '../env/EnvManager';
 import { ServiceManager } from '../services/ServiceManager';
 import { LogManager } from '../logs/LogManager';
+import { TunnelManager } from '../tunnels/TunnelManager';
 
 const { Sider, Content } = Layout;
 
-type TabKey = 'dashboard' | 'terminal' | 'files' | 'env' | 'services' | 'logs' | 'processes' | 'cron' | 'docker';
+type TabKey = 'dashboard' | 'terminal' | 'files' | 'env' | 'services' | 'logs' | 'tunnels' | 'processes' | 'cron' | 'docker';
 
 interface ConnectionPaneProps {
     connectionId: string;
@@ -87,6 +89,11 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
             key: 'logs',
             icon: <FileSearchOutlined />,
             label: t('common.logs'),
+        },
+        {
+            key: 'tunnels',
+            icon: <SwapOutlined />,
+            label: t('common.tunnels'),
         },
         {
             key: 'processes',
@@ -205,6 +212,9 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
                         connectionId={connectionId}
                         initialService={logsTargetService}
                     />
+                </div>
+                <div style={tabStyle('tunnels')}>
+                    <TunnelManager connectionId={connectionId} />
                 </div>
                 <div style={tabStyle('processes')}>
                     <ProcessManager connectionId={connectionId} />
