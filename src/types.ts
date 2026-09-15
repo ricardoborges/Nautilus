@@ -23,6 +23,8 @@ export interface Connection {
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
     port?: number;
+    // Bastion / Jump Host
+    bastionConnectionId?: string | null;
 }
 
 export interface ConnectionFormData extends Omit<Connection, 'id'> {
@@ -34,6 +36,8 @@ export interface ConnectionFormData extends Omit<Connection, 'id'> {
     // RDP specific
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
+    // Bastion / Jump Host
+    bastionConnectionId?: string | null;
 }
 
 // ========================
@@ -442,8 +446,39 @@ export interface SSMAPI {
     logsStreamStop: (streamId: string) => Promise<void>;
     onLogsStreamData: (callback: (payload: LogStreamDataPayload) => void) => () => void;
 
+    // Tunnels (SSH Port Forwarding)
+    tunnelsList: (connectionId: string) => Promise<TunnelRuntimeInfo[]>;
+    tunnelsCreate: (data: Omit<TunnelConfig, 'id'>) => Promise<TunnelConfig>;
+    tunnelsUpdate: (id: string, data: Partial<TunnelConfig>) => Promise<void>;
+    tunnelsDelete: (id: string) => Promise<void>;
+    tunnelsStart: (id: string) => Promise<void>;
+    tunnelsStop: (id: string) => Promise<void>;
+
     // Window Controls
     win: SSMWindowControls;
+}
+
+// ========================
+// Tunnel Types
+// ========================
+
+export interface TunnelConfig {
+    id: string;
+    connectionId: string;
+    name: string;
+    tunnelType: 'local' | 'remote';
+    localHost: string;
+    localPort: number;
+    remoteHost: string;
+    remotePort: number;
+    autoStart: boolean;
+    createdAt?: string;
+}
+
+export interface TunnelRuntimeInfo extends TunnelConfig {
+    status: 'active' | 'inactive' | 'error';
+    error?: string;
+    activeConnections: number;
 }
 
 // ========================

@@ -31,7 +31,9 @@ import type {
     SystemdService,
     ServiceAction,
     ReadLogsOptions,
-    LogStreamDataPayload
+    LogStreamDataPayload,
+    TunnelConfig,
+    TunnelRuntimeInfo
 } from './types';
 
 const BACKEND_URL = 'http://127.0.0.1:45678';
@@ -519,6 +521,25 @@ const ssm: SSMAPI = {
             }
         };
     },
+
+    // Tunnels (SSH Port Forwarding)
+    tunnelsList: (connectionId: string): Promise<TunnelRuntimeInfo[]> =>
+        backendInvoke<TunnelRuntimeInfo[]>('ssm:tunnels:list', { connectionId }),
+
+    tunnelsCreate: (data: Omit<TunnelConfig, 'id'>): Promise<TunnelConfig> =>
+        backendInvoke<TunnelConfig>('ssm:tunnels:create', { data } as unknown as Record<string, unknown>),
+
+    tunnelsUpdate: (id: string, data: Partial<TunnelConfig>): Promise<void> =>
+        backendInvoke<void>('ssm:tunnels:update', { id, data } as unknown as Record<string, unknown>),
+
+    tunnelsDelete: (id: string): Promise<void> =>
+        backendInvoke<void>('ssm:tunnels:delete', { id }),
+
+    tunnelsStart: (id: string): Promise<void> =>
+        backendInvoke<void>('ssm:tunnels:start', { id }),
+
+    tunnelsStop: (id: string): Promise<void> =>
+        backendInvoke<void>('ssm:tunnels:stop', { id }),
 
     // Window Controls
     win: {
