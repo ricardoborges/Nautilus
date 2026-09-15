@@ -21,6 +21,7 @@ import {
 import { SFTPClient, SSHClient, TerminalSession, SSHPoolManager } from './features/terminal';
 import { ServicesService, ServiceAction } from './features/services';
 import { LogsService, ReadLogsOptions, StreamLogsOptions } from './features/logs';
+import { TunnelService, TunnelConfig } from './features/tunnels';
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
 import logger from './shared/utils/logger';
@@ -46,6 +47,7 @@ let activeSystemMonitor: SystemMonitor | null = null;
 const activeTerminals = new Map<string, TerminalSession>();
 const servicesService = new ServicesService();
 const logsService = new LogsService();
+const tunnelService = new TunnelService();
 
 // Event subscribers (for metrics and terminal data)
 const eventSubscribers = new Map<string, ServerResponse[]>();
@@ -376,6 +378,46 @@ const handlers: HandlerRegistry = {
     'ssm:logs:stream:stop': async (args) => {
         const { streamId } = args as { streamId: string };
         logsService.stopStream(streamId);
+        return { success: true };
+    },
+
+    // Tunnel handlers
+    'ssm:tunnels:list': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        return tunnelService.listTunnels(connectionId);
+    },
+
+    'ssm:tunnels:create': async (args) => {
+        const tunnelData = args as unknown as Omit<TunnelConfig, 'id'>;
+        return tunnelService.createTunnel(tunnelData);
+    },
+
+    'ssm:tunnels:update': async (args) => {
+        const { id, data } = args as unknown as { id: string; data: Partial<TunnelConfig> };
+        await tunnelService.updateTunnel(id, data);
+        return { success: true };
+    },
+
+    'ssm:tunnels:delete': async (args) => {
+        const { id } = args as { id: string };
+        await tunnelService.deleteTunnel(id);
+        return { success: true };
+    },
+
+    'ssm:tunnels:start': async (args) => {
+        const { id } = args as { id: string };
+        const tunnel = await tunnelService.getTunnel(id);
+        if (!tunnel) throw new Error('Túnel não encontrado');
+        const conn = await connectionManager.get(tunnel.connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        await tunnelService.startTunnel(id, authConfig);
+        return { success: true };
+    },
+
+    'ssm:tunnels:stop': async (args) => {
+        const { id } = args as { id: string };
+        await tunnelService.stopTunnel(id);
         return { success: true };
     },
 
@@ -1726,6 +1768,7 @@ function cleanup(): void {
     }
     activeTerminals.forEach((service) => service.stop());
     logsService.stopAll();
+    tunnelService.stopAll();
     SSHPoolManager.getInstance().closeAll();
     closeDatabase();
     server.close(() => {
