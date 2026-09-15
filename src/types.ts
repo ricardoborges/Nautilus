@@ -454,6 +454,21 @@ export interface SSMAPI {
     tunnelsStart: (id: string) => Promise<void>;
     tunnelsStop: (id: string) => Promise<void>;
 
+    // Security (UFW Firewall & Fail2ban)
+    securityUfwStatus: (connectionId: string) => Promise<UfwStatus>;
+    securityUfwToggle: (connectionId: string, action: 'enable' | 'disable' | 'reload') => Promise<void>;
+    securityUfwAddRule: (connectionId: string, options: AddUfwRuleOptions) => Promise<void>;
+    securityUfwDeleteRule: (connectionId: string, ruleNumber: number) => Promise<void>;
+    securityFail2banStatus: (connectionId: string) => Promise<Fail2banStatus>;
+    securityFail2banUnban: (connectionId: string, jail: string, ip: string) => Promise<void>;
+    securityFail2banBan: (connectionId: string, jail: string, ip: string) => Promise<void>;
+
+    // OS Packages & Updates
+    packagesList: (connectionId: string) => Promise<PackageUpdatesResult>;
+    packagesRefresh: (connectionId: string) => Promise<{ output: string }>;
+    packagesUpgrade: (connectionId: string, packageNames?: string[]) => Promise<{ output: string }>;
+    packagesCheckReboot: (connectionId: string) => Promise<{ rebootRequired: boolean; packages: string[] }>;
+
     // Window Controls
     win: SSMWindowControls;
 }
@@ -479,6 +494,72 @@ export interface TunnelRuntimeInfo extends TunnelConfig {
     status: 'active' | 'inactive' | 'error';
     error?: string;
     activeConnections: number;
+}
+
+// ========================
+// Security & Firewall Types
+// ========================
+
+export interface UfwRule {
+    number: number;
+    to: string;
+    action: 'ALLOW' | 'DENY' | 'REJECT' | 'LIMIT';
+    direction: 'IN' | 'OUT';
+    from: string;
+    comment?: string;
+    isV6?: boolean;
+}
+
+export interface UfwStatus {
+    installed: boolean;
+    active: boolean;
+    defaultIncoming?: string;
+    defaultOutgoing?: string;
+    rules: UfwRule[];
+}
+
+export interface AddUfwRuleOptions {
+    port: string;
+    proto?: 'tcp' | 'udp' | 'any';
+    action: 'allow' | 'deny' | 'reject' | 'limit';
+    from?: string;
+    comment?: string;
+}
+
+export interface Fail2banJail {
+    name: string;
+    currentlyFailed: number;
+    totalFailed: number;
+    currentlyBanned: number;
+    totalBanned: number;
+    bannedIpList: string[];
+}
+
+export interface Fail2banStatus {
+    installed: boolean;
+    running: boolean;
+    jails: Fail2banJail[];
+}
+
+// ========================
+// Package Updates Types
+// ========================
+
+export interface PackageUpdate {
+    name: string;
+    currentVersion: string;
+    newVersion: string;
+    repository?: string;
+    isSecurity: boolean;
+}
+
+export interface PackageUpdatesResult {
+    packageManager: string;
+    totalUpdates: number;
+    securityUpdates: number;
+    rebootRequired: boolean;
+    rebootPackages: string[];
+    packages: PackageUpdate[];
 }
 
 // ========================

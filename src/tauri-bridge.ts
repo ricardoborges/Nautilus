@@ -33,7 +33,11 @@ import type {
     ReadLogsOptions,
     LogStreamDataPayload,
     TunnelConfig,
-    TunnelRuntimeInfo
+    TunnelRuntimeInfo,
+    UfwStatus,
+    AddUfwRuleOptions,
+    Fail2banStatus,
+    PackageUpdatesResult
 } from './types';
 
 const BACKEND_URL = 'http://127.0.0.1:45678';
@@ -540,6 +544,41 @@ const ssm: SSMAPI = {
 
     tunnelsStop: (id: string): Promise<void> =>
         backendInvoke<void>('ssm:tunnels:stop', { id }),
+
+    // Security (UFW Firewall & Fail2ban)
+    securityUfwStatus: (connectionId: string): Promise<UfwStatus> =>
+        backendInvoke<UfwStatus>('ssm:security:ufw:status', { connectionId }),
+
+    securityUfwToggle: (connectionId: string, action: 'enable' | 'disable' | 'reload'): Promise<void> =>
+        backendInvoke<void>('ssm:security:ufw:toggle', { connectionId, action }),
+
+    securityUfwAddRule: (connectionId: string, options: AddUfwRuleOptions): Promise<void> =>
+        backendInvoke<void>('ssm:security:ufw:addRule', { connectionId, options } as unknown as Record<string, unknown>),
+
+    securityUfwDeleteRule: (connectionId: string, ruleNumber: number): Promise<void> =>
+        backendInvoke<void>('ssm:security:ufw:deleteRule', { connectionId, ruleNumber }),
+
+    securityFail2banStatus: (connectionId: string): Promise<Fail2banStatus> =>
+        backendInvoke<Fail2banStatus>('ssm:security:fail2ban:status', { connectionId }),
+
+    securityFail2banUnban: (connectionId: string, jail: string, ip: string): Promise<void> =>
+        backendInvoke<void>('ssm:security:fail2ban:unban', { connectionId, jail, ip }),
+
+    securityFail2banBan: (connectionId: string, jail: string, ip: string): Promise<void> =>
+        backendInvoke<void>('ssm:security:fail2ban:ban', { connectionId, jail, ip }),
+
+    // OS Packages & Updates
+    packagesList: (connectionId: string): Promise<PackageUpdatesResult> =>
+        backendInvoke<PackageUpdatesResult>('ssm:packages:list', { connectionId }),
+
+    packagesRefresh: (connectionId: string): Promise<{ output: string }> =>
+        backendInvoke<{ output: string }>('ssm:packages:refresh', { connectionId }),
+
+    packagesUpgrade: (connectionId: string, packageNames?: string[]): Promise<{ output: string }> =>
+        backendInvoke<{ output: string }>('ssm:packages:upgrade', { connectionId, packageNames } as unknown as Record<string, unknown>),
+
+    packagesCheckReboot: (connectionId: string): Promise<{ rebootRequired: boolean; packages: string[] }> =>
+        backendInvoke<{ rebootRequired: boolean; packages: string[] }>('ssm:packages:checkReboot', { connectionId }),
 
     // Window Controls
     win: {
