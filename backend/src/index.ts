@@ -19,6 +19,7 @@ import {
     type HostKeyPromptResult
 } from './features/connections/hostkey.service';
 import { SFTPClient, SSHClient, TerminalSession, SSHPoolManager } from './features/terminal';
+import { ServicesService, ServiceAction } from './features/services';
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
 import logger from './shared/utils/logger';
@@ -42,6 +43,7 @@ const ENV_SEARCH_MAX_RESULTS = 500;
 // Active services
 let activeSystemMonitor: SystemMonitor | null = null;
 const activeTerminals = new Map<string, TerminalSession>();
+const servicesService = new ServicesService();
 
 // Event subscribers (for metrics and terminal data)
 const eventSubscribers = new Map<string, ServerResponse[]>();
@@ -311,6 +313,33 @@ const handlers: HandlerRegistry = {
         } finally {
             ssh.end();
         }
+    },
+
+    // Services handlers
+    'ssm:services:list': async (args) => {
+        const { connectionId } = args as { connectionId: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        return servicesService.listServices(connectionId, authConfig);
+    },
+
+    'ssm:services:action': async (args) => {
+        const { connectionId, serviceName, action } = args as { connectionId: string; serviceName: string; action: ServiceAction };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        await servicesService.actionService(connectionId, authConfig, serviceName, action);
+        return { success: true };
+    },
+
+    'ssm:services:status': async (args) => {
+        const { connectionId, serviceName } = args as { connectionId: string; serviceName: string };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const status = await servicesService.getServiceStatus(connectionId, authConfig, serviceName);
+        return { status };
     },
 
     // Cron handlers
