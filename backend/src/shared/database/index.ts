@@ -124,6 +124,7 @@ function createSchema(database: SqlJsDatabase): void {
             name TEXT NOT NULL,
             command TEXT NOT NULL,
             is_secret INTEGER DEFAULT 0,
+            steps TEXT DEFAULT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
@@ -131,6 +132,7 @@ function createSchema(database: SqlJsDatabase): void {
 
     // Migration for existing databases
     try { database.run("ALTER TABLE snippets ADD COLUMN is_secret INTEGER DEFAULT 0"); } catch {}
+    try { database.run("ALTER TABLE snippets ADD COLUMN steps TEXT DEFAULT NULL"); } catch {}
 
     // Create tunnels table
     database.run(`

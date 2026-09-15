@@ -157,12 +157,20 @@ export interface CronTemplate {
 // Snippet Types
 // ========================
 
+export interface SnippetStep {
+    id: string;
+    type: 'command' | 'snippet';
+    snippetId?: string;
+    command?: string;
+}
+
 export interface Snippet {
     id: string;
     name: string;
     command: string;
     isSecret?: boolean;
     isSystem?: boolean;
+    steps?: SnippetStep[];
 }
 
 export interface KnownHost {

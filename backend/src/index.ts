@@ -32,6 +32,7 @@ import type {
     SSHConfig,
     ConnectionData,
     Connection,
+    SnippetData,
     APIRequest,
     Handler,
     HandlerRegistry,
@@ -676,11 +677,11 @@ const handlers: HandlerRegistry = {
     },
 
     'ssm:snippets:add': async (args) => {
-        return await snippetManager.add(args as { name: string; command: string; isSecret?: boolean });
+        return await snippetManager.add(args as unknown as SnippetData);
     },
 
     'ssm:snippets:update': async (args) => {
-        return await snippetManager.update(args as { id: string; name: string; command: string; isSecret?: boolean });
+        return await snippetManager.update(args as unknown as SnippetData);
     },
 
     'ssm:snippets:remove': async (args) => {

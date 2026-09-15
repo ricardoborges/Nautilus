@@ -297,7 +297,21 @@
     "secret_required": "Please enter a secret value",
     "secret_tip": "This secret is stored securely and hidden from view",
     "show_secret": "Reveal secret",
-    "hide_secret": "Hide secret"
+    "hide_secret": "Hide secret",
+    "enable_steps": "Run in sequence (nest snippets)",
+    "steps_title": "Execution Sequence",
+    "steps_description": "Commands and snippets will be executed in order with a 300ms interval.",
+    "add_saved_snippet": "Add Saved Snippet",
+    "add_custom_step": "Add Custom Command",
+    "select_snippet_placeholder": "Choose a snippet...",
+    "step_command": "Command",
+    "step_snippet": "Snippet",
+    "step_custom_placeholder": "Command for this step...",
+    "move_up": "Move up",
+    "move_down": "Move down",
+    "remove_step": "Remove step",
+    "no_steps": "No steps added yet. Add a saved snippet or custom command above.",
+    "sequence_tag": "Sequence ({{count}})"
   },
   "docker": {
     "select_connection": "Select a connection",

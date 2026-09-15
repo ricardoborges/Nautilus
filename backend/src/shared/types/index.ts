@@ -56,11 +56,19 @@ export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'l
 // Snippet Types
 // ========================
 
+export interface SnippetStep {
+    id: string;
+    type: 'command' | 'snippet';
+    snippetId?: string;
+    command?: string;
+}
+
 export interface SnippetData {
     id?: string;
     name: string;
     command: string;
     isSecret?: boolean;
+    steps?: SnippetStep[];
 }
 
 export interface Snippet {
@@ -68,6 +76,7 @@ export interface Snippet {
     name: string;
     command: string;
     isSecret?: boolean;
+    steps?: SnippetStep[];
 }
 
 // ========================

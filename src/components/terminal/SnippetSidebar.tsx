@@ -16,7 +16,8 @@ import {
     CodeOutlined,
     LockOutlined,
     EyeOutlined,
-    EyeInvisibleOutlined
+    EyeInvisibleOutlined,
+    UnorderedListOutlined
 } from '@ant-design/icons';
 import { terminalService } from '../../hooks/useTerminal';
 import { SnippetModal } from '../modals/SnippetModal';
@@ -56,9 +57,11 @@ export const SnippetSidebar: React.FC = () => {
     }, [fetchSnippets]);
 
     useEffect(() => {
+        const query = searchText.toLowerCase();
         const filtered = snippets.filter(s => 
-            s.name.toLowerCase().includes(searchText.toLowerCase()) ||
-            (!s.isSecret && s.command.toLowerCase().includes(searchText.toLowerCase()))
+            s.name.toLowerCase().includes(query) ||
+            (!s.isSecret && s.command.toLowerCase().includes(query)) ||
+            (s.steps && s.steps.some(st => st.type === 'command' && st.command?.toLowerCase().includes(query)))
         );
         setFilteredSnippets(filtered);
     }, [searchText, snippets]);
@@ -71,9 +74,59 @@ export const SnippetSidebar: React.FC = () => {
         }));
     };
 
-    const handleExecute = (snippet: Snippet) => {
+    const handleExecute = async (snippet: Snippet) => {
         if (!terminalService.isReady) {
             message.warning(t('terminal.no_terminal_open'));
+            return;
+        }
+
+        // Sequential nested steps execution
+        if (snippet.steps && snippet.steps.length > 0) {
+            message.loading({ content: t('snippet.executing', { name: snippet.name }), key: 'executing-snippet', duration: 2 });
+            
+            const snippetMap = new Map<string, Snippet>();
+            snippets.forEach(s => snippetMap.set(s.id, s));
+
+            const resolveCommands = (currentSnippet: Snippet, visited = new Set<string>()): string[] => {
+                if (visited.has(currentSnippet.id)) {
+                    console.warn(`Circular snippet reference detected: ${currentSnippet.id}`);
+                    return [];
+                }
+                visited.add(currentSnippet.id);
+
+                if (!currentSnippet.steps || currentSnippet.steps.length === 0) {
+                    return currentSnippet.command ? [currentSnippet.command] : [];
+                }
+
+                const resolved: string[] = [];
+                for (const step of currentSnippet.steps) {
+                    if (step.type === 'command' && step.command) {
+                        resolved.push(step.command);
+                    } else if (step.type === 'snippet' && step.snippetId) {
+                        const target = snippetMap.get(step.snippetId);
+                        if (target) {
+                            resolved.push(...resolveCommands(target, new Set(visited)));
+                        }
+                    }
+                }
+                return resolved;
+            };
+
+            const commandsToRun = resolveCommands(snippet);
+
+            if (commandsToRun.length === 0 && snippet.command) {
+                commandsToRun.push(snippet.command);
+            }
+
+            for (let i = 0; i < commandsToRun.length; i++) {
+                const cmd = commandsToRun[i];
+                terminalService.writeToActive(cmd + '\n');
+                if (i < commandsToRun.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                }
+            }
+
+            message.success({ content: t('snippet.executing', { name: snippet.name }), key: 'executing-snippet', duration: 1.5 });
             return;
         }
         
@@ -142,6 +195,7 @@ export const SnippetSidebar: React.FC = () => {
                         renderItem={(snippet) => {
                             const isSecret = Boolean(snippet.isSecret);
                             const isRevealed = Boolean(visibleSecrets[snippet.id]);
+                            const hasSteps = Boolean(snippet.steps && snippet.steps.length > 0);
                             const displayedCommand = isSecret && !isRevealed ? '••••••••••••' : snippet.command;
 
                             return (
@@ -204,6 +258,15 @@ export const SnippetSidebar: React.FC = () => {
                                                 <Text strong style={{ fontSize: 13, flex: 1, minWidth: 0 }} ellipsis={{ tooltip: snippet.name }}>
                                                     {snippet.name}
                                                 </Text>
+                                                {hasSteps && (
+                                                    <Tag 
+                                                        color="processing" 
+                                                        icon={<UnorderedListOutlined />} 
+                                                        style={{ margin: 0, fontSize: 10, padding: '0 4px', lineHeight: '18px', flexShrink: 0 }}
+                                                    >
+                                                        {t('snippet.sequence_tag', { count: snippet.steps!.length })}
+                                                    </Tag>
+                                                )}
                                                 {isSecret && (
                                                     <Tag 
                                                         color="warning" 

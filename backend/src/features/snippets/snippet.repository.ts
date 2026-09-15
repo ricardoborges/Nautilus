@@ -6,15 +6,26 @@
 
 import crypto from 'crypto';
 import { getDatabase, saveDatabase, query, queryOne, BindParams } from '../../shared/database';
-import type { Snippet, SnippetData } from '../../shared/types';
+import type { Snippet, SnippetData, SnippetStep } from '../../shared/types';
 
 interface SnippetRow {
     id: string;
     name: string;
     command: string;
     is_secret?: number | null;
+    steps?: string | null;
     created_at: string;
     updated_at: string;
+}
+
+function parseSteps(stepsJson?: string | null): SnippetStep[] | undefined {
+    if (!stepsJson) return undefined;
+    try {
+        const parsed = JSON.parse(stepsJson);
+        return Array.isArray(parsed) ? parsed : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 function rowToSnippet(row: SnippetRow): Snippet {
@@ -23,6 +34,7 @@ function rowToSnippet(row: SnippetRow): Snippet {
         name: row.name,
         command: row.command,
         isSecret: Boolean(row.is_secret),
+        steps: parseSteps(row.steps),
     };
 }
 
@@ -52,17 +64,19 @@ export class SnippetRepository {
         const isSecret = Boolean(data.isSecret);
         // If secret, do not store sensitive content in plain text in sqlite
         const storedCommand = isSecret ? '' : data.command;
+        const storedSteps = data.steps && data.steps.length > 0 ? JSON.stringify(data.steps) : null;
 
         const params: BindParams = [
             id,
             data.name,
             storedCommand,
             isSecret ? 1 : 0,
+            storedSteps,
         ];
 
         db.run(`
-            INSERT INTO snippets (id, name, command, is_secret)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO snippets (id, name, command, is_secret, steps)
+            VALUES (?, ?, ?, ?, ?)
         `, params);
 
         saveDatabase();
@@ -71,6 +85,7 @@ export class SnippetRepository {
             name: data.name,
             command: data.command,
             isSecret,
+            steps: data.steps,
         };
     }
 
@@ -87,11 +102,14 @@ export class SnippetRepository {
         const isSecret = data.isSecret !== undefined ? Boolean(data.isSecret) : Boolean(existing.isSecret);
         const newCommand = data.command ?? existing.command;
         const storedCommand = isSecret ? '' : newCommand;
+        const newSteps = data.steps !== undefined ? data.steps : existing.steps;
+        const storedSteps = newSteps && newSteps.length > 0 ? JSON.stringify(newSteps) : null;
 
         const params: BindParams = [
             data.name ?? existing.name,
             storedCommand,
             isSecret ? 1 : 0,
+            storedSteps,
             data.id,
         ];
 
@@ -100,6 +118,7 @@ export class SnippetRepository {
                 name = ?,
                 command = ?,
                 is_secret = ?,
+                steps = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `, params);
@@ -110,6 +129,7 @@ export class SnippetRepository {
             name: data.name ?? existing.name,
             command: newCommand,
             isSecret,
+            steps: newSteps,
         };
     }
 

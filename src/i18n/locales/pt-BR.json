@@ -297,7 +297,21 @@
     "secret_required": "Informe o valor do segredo",
     "secret_tip": "Este segredo é armazenado de forma segura e protegido contra visualização",
     "show_secret": "Mostrar segredo",
-    "hide_secret": "Ocultar segredo"
+    "hide_secret": "Ocultar segredo",
+    "enable_steps": "Executar em sequência (aninhar snippets)",
+    "steps_title": "Sequência de Execução",
+    "steps_description": "Os comandos e snippets serão executados na ordem definida com intervalo de 300ms.",
+    "add_saved_snippet": "Adicionar Snippet Salvo",
+    "add_custom_step": "Adicionar Comando Personalizado",
+    "select_snippet_placeholder": "Escolha um snippet...",
+    "step_command": "Comando",
+    "step_snippet": "Snippet",
+    "step_custom_placeholder": "Comando deste passo...",
+    "move_up": "Mover para cima",
+    "move_down": "Mover para baixo",
+    "remove_step": "Remover passo",
+    "no_steps": "Nenhum passo adicionado. Adicione um snippet salvo ou comando personalizado acima.",
+    "sequence_tag": "Sequência ({{count}})"
   },
   "docker": {
     "select_connection": "Selecione uma conexão",
