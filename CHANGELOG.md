@@ -5,6 +5,17 @@ All notable changes to Nautilus are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-09-15
+
+### Added
+
+- **Nested Snippets Management & Pipeline.** Organize command snippets with hierarchy, folders, and pipeline execution.
+- **SSH Connection Pool & Session Multiplexing.** Reusable persistent SSH connections for reduced overhead across terminal, SFTP, and management operations.
+- **Bastion Host & SSH Tunnel Support.** Support for ProxyJump bastion jump hosts and SSH tunnel management with presets.
+- **Systemd Service Manager & Central Logs.** Dedicated interface and backend services to inspect, restart, and control services as well as stream system logs.
+- **Security & Package Management.** Manage firewall rules (UFW), intrusion prevention (Fail2ban), and operating system updates and security patches.
+- **Internationalization.** Comprehensive localization for all new sysadmin, security, and tunnel features across multiple languages.
+
 ## [2.0.1] - 2026-09-14
 
 ### Added
@@ -114,6 +125,7 @@ version. Version 1.5.0 was never published — everything below lands on top of
 - Connection handling issues when opening and switching between servers.
 - Several fixes in the environment files tab following its introduction.
 
+[2.2.0]: https://github.com/ricardoborges/Nautilus/releases/tag/v2.2.0
 [2.0.1]: https://github.com/ricardoborges/Nautilus/releases/tag/v2.0.1
 [2.0.0]: https://github.com/ricardoborges/Nautilus/releases/tag/v2.0.0
 [v1.4.0]: https://github.com/ricardoborges/Nautilus/releases/tag/v1.4.0
