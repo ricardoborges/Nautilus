@@ -21,7 +21,20 @@ export class SSHPoolManager {
         return SSHPoolManager.instance;
     }
 
-    public async acquire(connectionId: string, authConfig: SSHConfig): Promise<Client> {
+    public async openBastionStream(bastionClient: Client, targetHost: string, targetPort: number): Promise<any> {
+        return new Promise((resolve, reject) => {
+            bastionClient.forwardOut('127.0.0.1', 0, targetHost, targetPort, (err, stream) => {
+                if (err) return reject(err);
+                resolve(stream);
+            });
+        });
+    }
+
+    public async acquire(
+        connectionId: string,
+        authConfig: SSHConfig,
+        getBastionStream?: () => Promise<any>
+    ): Promise<Client> {
         const existing = this.pool.get(connectionId);
         if (existing) {
             existing.lastUsed = Date.now();
@@ -34,42 +47,50 @@ export class SSHPoolManager {
         const client = new Client();
         const verifier = new HostKeyVerifier(authConfig.host, authConfig.port);
 
-        const connectPromise = new Promise<Client>((resolve, reject) => {
-            const disarm = verifier.armTimeout((err) => {
-                client.end();
-                this.pool.delete(connectionId);
-                reject(err);
-            });
+        const connectPromise = (async () => {
+            let sockStream: any = undefined;
+            if (getBastionStream) {
+                sockStream = await getBastionStream();
+            }
 
-            client
-                .on('ready', () => {
-                    disarm();
-                    const entry = this.pool.get(connectionId);
-                    if (entry) {
-                        entry.isConnecting = false;
-                        entry.connectPromise = undefined;
-                    }
-                    resolve(client);
-                })
-                .on('error', (err) => {
-                    disarm();
+            return new Promise<Client>((resolve, reject) => {
+                const disarm = verifier.armTimeout((err) => {
+                    client.end();
                     this.pool.delete(connectionId);
-                    reject(verifier.wrapError(err));
-                })
-                .on('close', () => {
-                    this.pool.delete(connectionId);
-                })
-                .on('end', () => {
-                    this.pool.delete(connectionId);
-                })
-                .connect({
-                    keepaliveInterval: 15000,
-                    keepaliveCountMax: 3,
-                    ...authConfig,
-                    readyTimeout: verifier.readyTimeout,
-                    hostVerifier: verifier.verify
+                    reject(err);
                 });
-        });
+
+                client
+                    .on('ready', () => {
+                        disarm();
+                        const entry = this.pool.get(connectionId);
+                        if (entry) {
+                            entry.isConnecting = false;
+                            entry.connectPromise = undefined;
+                        }
+                        resolve(client);
+                    })
+                    .on('error', (err) => {
+                        disarm();
+                        this.pool.delete(connectionId);
+                        reject(verifier.wrapError(err));
+                    })
+                    .on('close', () => {
+                        this.pool.delete(connectionId);
+                    })
+                    .on('end', () => {
+                        this.pool.delete(connectionId);
+                    })
+                    .connect({
+                        keepaliveInterval: 15000,
+                        keepaliveCountMax: 3,
+                        ...authConfig,
+                        sock: sockStream || (authConfig as any).sock,
+                        readyTimeout: verifier.readyTimeout,
+                        hostVerifier: verifier.verify
+                    });
+            });
+        })();
 
         this.pool.set(connectionId, {
             client,
@@ -82,8 +103,13 @@ export class SSHPoolManager {
         return connectPromise;
     }
 
-    public async exec(connectionId: string, authConfig: SSHConfig, command: string): Promise<SSHExecResult> {
-        const client = await this.acquire(connectionId, authConfig);
+    public async exec(
+        connectionId: string,
+        authConfig: SSHConfig,
+        command: string,
+        getBastionStream?: () => Promise<any>
+    ): Promise<SSHExecResult> {
+        const client = await this.acquire(connectionId, authConfig, getBastionStream);
 
         const runCommand = (sshClient: Client): Promise<SSHExecResult> => {
             return new Promise((resolve, reject) => {
