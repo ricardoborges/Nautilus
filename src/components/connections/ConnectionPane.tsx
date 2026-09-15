@@ -17,6 +17,8 @@ import {
     FileTextOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
+    ClusterOutlined,
+    FileSearchOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -27,10 +29,12 @@ import { ProcessManager } from '../processes/ProcessManager';
 import { CronManager } from '../cron/CronManager';
 import { DockerDashboard } from '../docker/DockerDashboard';
 import { EnvManager } from '../env/EnvManager';
+import { ServiceManager } from '../services/ServiceManager';
+import { LogManager } from '../logs/LogManager';
 
 const { Sider, Content } = Layout;
 
-type TabKey = 'dashboard' | 'terminal' | 'files' | 'env' | 'processes' | 'cron' | 'docker';
+type TabKey = 'dashboard' | 'terminal' | 'files' | 'env' | 'services' | 'logs' | 'processes' | 'cron' | 'docker';
 
 interface ConnectionPaneProps {
     connectionId: string;
@@ -49,6 +53,7 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
     const { themeMode } = useTheme();
     const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
     const [collapsed, setCollapsed] = useState(false);
+    const [logsTargetService, setLogsTargetService] = useState<string | undefined>(undefined);
 
     const isDark = themeMode === 'dark';
 
@@ -72,6 +77,16 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
             key: 'env',
             icon: <FileTextOutlined />,
             label: t('common.env'),
+        },
+        {
+            key: 'services',
+            icon: <ClusterOutlined />,
+            label: t('common.services'),
+        },
+        {
+            key: 'logs',
+            icon: <FileSearchOutlined />,
+            label: t('common.logs'),
         },
         {
             key: 'processes',
@@ -175,6 +190,21 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
                 </div>
                 <div style={tabStyle('env')}>
                     <EnvManager connectionId={connectionId} />
+                </div>
+                <div style={tabStyle('services')}>
+                    <ServiceManager
+                        connectionId={connectionId}
+                        onNavigateToLogs={(serviceName) => {
+                            setLogsTargetService(serviceName);
+                            setActiveTab('logs');
+                        }}
+                    />
+                </div>
+                <div style={tabStyle('logs')}>
+                    <LogManager
+                        connectionId={connectionId}
+                        initialService={logsTargetService}
+                    />
                 </div>
                 <div style={tabStyle('processes')}>
                     <ProcessManager connectionId={connectionId} />
