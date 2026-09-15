@@ -18,7 +18,7 @@ import {
     type HostKeyPromptRequest,
     type HostKeyPromptResult
 } from './features/connections/hostkey.service';
-import { SFTPClient, SSHClient, TerminalSession } from './features/terminal';
+import { SFTPClient, SSHClient, TerminalSession, SSHPoolManager } from './features/terminal';
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
 import logger from './shared/utils/logger';
@@ -1659,6 +1659,7 @@ function cleanup(): void {
         activeSystemMonitor.stopPolling();
     }
     activeTerminals.forEach((service) => service.stop());
+    SSHPoolManager.getInstance().closeAll();
     closeDatabase();
     server.close(() => {
         process.exit(0);
