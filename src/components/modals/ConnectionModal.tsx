@@ -30,7 +30,9 @@ import {
     WindowsOutlined,
     LinuxOutlined,
     DesktopOutlined,
+    BranchesOutlined,
 } from '@ant-design/icons';
+import { useConnection } from '../../context/ConnectionContext';
 import type { Connection, ConnectionFormData } from '../../types';
 
 interface ConnectionModalProps {
@@ -47,8 +49,13 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
     connection
 }) => {
     const { t } = useTranslation();
+    const { connections } = useConnection();
     const [form] = Form.useForm();
     const isEditing = !!connection;
+
+    const availableBastions = connections.filter(
+        (c) => c.connectionType === 'ssh' && (!connection || c.id !== connection.id)
+    );
 
     const [password, setPassword] = useState('');
     const [isTesting, setIsTesting] = useState(false);
@@ -79,6 +86,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     port: connection.port,
                     environment: connection.environment || 'other',
                     tags: connection.tags || [],
+                    bastionConnectionId: connection.bastionConnectionId || undefined,
                 });
                 // Load password if editing
                 window.ssm.getPassword(connection.id).then(pwd => {
@@ -99,6 +107,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     port: undefined,
                     environment: 'other',
                     tags: [],
+                    bastionConnectionId: undefined,
                 });
                 setPassword('');
             }
@@ -147,6 +156,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 authMethod: values.authMethod,
                 keyPath: values.keyPath || '',
                 autoConnect: values.autoConnect || false,
+                bastionConnectionId: values.bastionConnectionId || undefined,
             };
 
             await window.ssm.testConnection({ ...formData, password });
@@ -178,6 +188,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 port: values.port,
                 environment: values.environment || 'other',
                 tags: values.tags || [],
+                bastionConnectionId: values.connectionType === 'ssh' ? (values.bastionConnectionId || null) : null,
             };
 
             // Validate password for SSH connections with password auth
@@ -414,6 +425,30 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                                 <Input placeholder={t('connection.key_path_placeholder')} />
                             </Form.Item>
                         )}
+
+                        {/* Bastion / Jump Host */}
+                        <Form.Item
+                            name="bastionConnectionId"
+                            label={
+                                <Space>
+                                    <BranchesOutlined />
+                                    <span>{t('connection.bastion_gateway')}</span>
+                                </Space>
+                            }
+                            tooltip={t('connection.bastion_tooltip')}
+                        >
+                            <Select
+                                allowClear
+                                placeholder={t('connection.direct_connection')}
+                                options={[
+                                    { label: t('connection.direct_connection'), value: '' },
+                                    ...availableBastions.map((c) => ({
+                                        label: `${c.name} (${c.user}@${c.host})`,
+                                        value: c.id,
+                                    })),
+                                ]}
+                            />
+                        </Form.Item>
                     </>
                 )}
 

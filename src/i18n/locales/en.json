@@ -269,7 +269,11 @@
     "env_production": "Production",
     "env_staging": "Staging",
     "env_development": "Development",
-    "env_other": "Other"
+    "env_other": "Other",
+    "bastion_gateway": "Jump Host / Bastion Gateway",
+    "bastion_tooltip": "Tunnel SSH connection through an intermediary Bastion / Jump Host",
+    "direct_connection": "Direct Connection (No Bastion)",
+    "select_bastion": "Select Bastion Host"
   },
   "snippet": {
     "new_snippet": "New Snippet",

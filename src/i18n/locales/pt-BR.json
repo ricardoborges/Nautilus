@@ -269,7 +269,11 @@
     "env_production": "Produção",
     "env_staging": "Homologação",
     "env_development": "Desenvolvimento",
-    "env_other": "Outros"
+    "env_other": "Outros",
+    "bastion_gateway": "Jump Host / Servidor Bastion",
+    "bastion_tooltip": "Conectar através de um servidor intermediário (Bastion / Jump Host)",
+    "direct_connection": "Conexão Direta (Sem Bastion)",
+    "select_bastion": "Selecione o Servidor Bastion"
   },
   "snippet": {
     "new_snippet": "Novo Snippet",
