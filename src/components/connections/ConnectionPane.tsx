@@ -20,6 +20,8 @@ import {
     ClusterOutlined,
     FileSearchOutlined,
     SwapOutlined,
+    SafetyCertificateOutlined,
+    SyncOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -33,10 +35,12 @@ import { EnvManager } from '../env/EnvManager';
 import { ServiceManager } from '../services/ServiceManager';
 import { LogManager } from '../logs/LogManager';
 import { TunnelManager } from '../tunnels/TunnelManager';
+import { SecurityManager } from '../security/SecurityManager';
+import { PackageManager } from '../packages/PackageManager';
 
 const { Sider, Content } = Layout;
 
-type TabKey = 'dashboard' | 'terminal' | 'files' | 'env' | 'services' | 'logs' | 'tunnels' | 'processes' | 'cron' | 'docker';
+type TabKey = 'dashboard' | 'terminal' | 'files' | 'env' | 'services' | 'logs' | 'tunnels' | 'security' | 'packages' | 'processes' | 'cron' | 'docker';
 
 interface ConnectionPaneProps {
     connectionId: string;
@@ -94,6 +98,16 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
             key: 'tunnels',
             icon: <SwapOutlined />,
             label: t('common.tunnels'),
+        },
+        {
+            key: 'security',
+            icon: <SafetyCertificateOutlined />,
+            label: t('common.security'),
+        },
+        {
+            key: 'packages',
+            icon: <SyncOutlined />,
+            label: t('common.packages'),
         },
         {
             key: 'processes',
@@ -215,6 +229,12 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
                 </div>
                 <div style={tabStyle('tunnels')}>
                     <TunnelManager connectionId={connectionId} />
+                </div>
+                <div style={tabStyle('security')}>
+                    <SecurityManager connectionId={connectionId} />
+                </div>
+                <div style={tabStyle('packages')}>
+                    <PackageManager connectionId={connectionId} />
                 </div>
                 <div style={tabStyle('processes')}>
                     <ProcessManager connectionId={connectionId} />
