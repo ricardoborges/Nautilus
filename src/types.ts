@@ -304,6 +304,30 @@ export interface RdpBitmapEvent {
     data: string; // Base64 encoded
 }
 
+export interface SystemdService {
+    name: string;
+    description: string;
+    loadState: string;
+    activeState: string;
+    subState: string;
+    enabledState?: string;
+}
+
+export type ServiceAction = 'start' | 'stop' | 'restart' | 'reload' | 'enable' | 'disable';
+
+export interface ReadLogsOptions {
+    source: 'journal' | 'file';
+    target: string;
+    lines?: number;
+    since?: string;
+    priority?: string;
+}
+
+export interface LogStreamDataPayload {
+    streamId: string;
+    chunk: string;
+}
+
 export interface SSMWindowControls {
     minimize: () => Promise<void>;
     maximize: () => Promise<void>;
@@ -405,6 +429,18 @@ export interface SSMAPI {
     onRdpConnected: (callback: (event: { sessionId: string }) => void) => () => void;
     onRdpClosed: (callback: (event: { sessionId: string }) => void) => () => void;
     onRdpError: (callback: (event: { sessionId: string; error: string }) => void) => () => void;
+
+    // Systemd Services
+    servicesList: (connectionId: string) => Promise<{ supported: boolean; services: SystemdService[] }>;
+    servicesAction: (connectionId: string, serviceName: string, action: ServiceAction) => Promise<void>;
+    servicesStatus: (connectionId: string, serviceName: string) => Promise<{ status: string }>;
+
+    // System Logs
+    logsRead: (connectionId: string, options: ReadLogsOptions) => Promise<{ lines: string[] }>;
+    logsListFiles: (connectionId: string) => Promise<{ files: string[] }>;
+    logsStreamStart: (connectionId: string, streamId: string, options: { source: 'journal' | 'file'; target: string }) => Promise<void>;
+    logsStreamStop: (streamId: string) => Promise<void>;
+    onLogsStreamData: (callback: (payload: LogStreamDataPayload) => void) => () => void;
 
     // Window Controls
     win: SSMWindowControls;

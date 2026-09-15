@@ -27,7 +27,11 @@ import type {
     DockerInfo,
     RdpConnectOptions,
     RdpConnectResponse,
-    RdpBitmapEvent
+    RdpBitmapEvent,
+    SystemdService,
+    ServiceAction,
+    ReadLogsOptions,
+    LogStreamDataPayload
 } from './types';
 
 const BACKEND_URL = 'http://127.0.0.1:45678';
@@ -463,6 +467,45 @@ const ssm: SSMAPI = {
 
     onRdpError: (callback: (event: { sessionId: string; error: string }) => void): (() => void) => {
         const channel = 'ssm:rdp:error';
+        const listeners = eventListeners.get(channel) || [];
+        listeners.push(callback as (data: unknown) => void);
+        eventListeners.set(channel, listeners);
+
+        return () => {
+            const currentListeners = eventListeners.get(channel) || [];
+            const index = currentListeners.indexOf(callback as (data: unknown) => void);
+            if (index > -1) {
+                currentListeners.splice(index, 1);
+                eventListeners.set(channel, currentListeners);
+            }
+        };
+    },
+
+    // Systemd Services
+    servicesList: (connectionId: string): Promise<{ supported: boolean; services: SystemdService[] }> =>
+        backendInvoke<{ supported: boolean; services: SystemdService[] }>('ssm:services:list', { connectionId }),
+
+    servicesAction: (connectionId: string, serviceName: string, action: ServiceAction): Promise<void> =>
+        backendInvoke<void>('ssm:services:action', { connectionId, serviceName, action }),
+
+    servicesStatus: (connectionId: string, serviceName: string): Promise<{ status: string }> =>
+        backendInvoke<{ status: string }>('ssm:services:status', { connectionId, serviceName }),
+
+    // System Logs
+    logsRead: (connectionId: string, options: ReadLogsOptions): Promise<{ lines: string[] }> =>
+        backendInvoke<{ lines: string[] }>('ssm:logs:read', { connectionId, ...options } as unknown as Record<string, unknown>),
+
+    logsListFiles: (connectionId: string): Promise<{ files: string[] }> =>
+        backendInvoke<{ files: string[] }>('ssm:logs:listFiles', { connectionId }),
+
+    logsStreamStart: (connectionId: string, streamId: string, options: { source: 'journal' | 'file'; target: string }): Promise<void> =>
+        backendInvoke<void>('ssm:logs:stream:start', { connectionId, streamId, ...options }),
+
+    logsStreamStop: (streamId: string): Promise<void> =>
+        backendInvoke<void>('ssm:logs:stream:stop', { streamId }),
+
+    onLogsStreamData: (callback: (payload: LogStreamDataPayload) => void): (() => void) => {
+        const channel = 'ssm:logs:stream:data';
         const listeners = eventListeners.get(channel) || [];
         listeners.push(callback as (data: unknown) => void);
         eventListeners.set(channel, listeners);
