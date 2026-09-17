@@ -21,6 +21,15 @@ export class SSHClient {
             });
 
             this.client
+                .on('connect', () => {
+                    const sock = (this.client as any)._sock;
+                    if (sock && typeof sock.setKeepAlive === 'function') {
+                        sock.setKeepAlive(true, 10000);
+                    }
+                    if (typeof this.client.setNoDelay === 'function') {
+                        this.client.setNoDelay(true);
+                    }
+                })
                 .on('ready', () => {
                     disarm();
                     resolve();
@@ -30,9 +39,9 @@ export class SSHClient {
                     reject(verifier.wrapError(err));
                 })
                 .connect({
-                    keepaliveInterval: 15000,
-                    keepaliveCountMax: 3,
                     ...this.config,
+                    keepaliveInterval: 10000,
+                    keepaliveCountMax: 6,
                     readyTimeout: verifier.readyTimeout,
                     hostVerifier: verifier.verify
                 });

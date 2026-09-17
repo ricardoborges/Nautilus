@@ -1747,17 +1747,32 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
 
     // Server-Sent Events for streaming updates
     if (req.url?.startsWith('/events') && req.method === 'GET') {
+        req.socket.setTimeout(0);
+        req.socket.setNoDelay(true);
+        req.socket.setKeepAlive(true, 10000);
+
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive'
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no'
         });
 
         const subscribers = eventSubscribers.get('events') || [];
         subscribers.push(res);
         eventSubscribers.set('events', subscribers);
 
+        // Keep alive comments every 15s to keep the SSE stream active through firewalls/proxies
+        const keepAlive = setInterval(() => {
+            try {
+                res.write(':keepalive\n\n');
+            } catch {
+                clearInterval(keepAlive);
+            }
+        }, 15000);
+
         req.on('close', () => {
+            clearInterval(keepAlive);
             const current = eventSubscribers.get('events') || [];
             const index = current.indexOf(res);
             if (index > -1) {
@@ -1765,15 +1780,6 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
                 eventSubscribers.set('events', current);
             }
         });
-
-        // Keep alive
-        const keepAlive = setInterval(() => {
-            try {
-                res.write(':keepalive\n\n');
-            } catch {
-                clearInterval(keepAlive);
-            }
-        }, 30000);
 
         return;
     }

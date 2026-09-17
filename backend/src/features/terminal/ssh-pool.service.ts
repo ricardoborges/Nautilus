@@ -61,6 +61,15 @@ export class SSHPoolManager {
                 });
 
                 client
+                    .on('connect', () => {
+                        const sock = (client as any)._sock;
+                        if (sock && typeof sock.setKeepAlive === 'function') {
+                            sock.setKeepAlive(true, 10000);
+                        }
+                        if (typeof client.setNoDelay === 'function') {
+                            client.setNoDelay(true);
+                        }
+                    })
                     .on('ready', () => {
                         disarm();
                         const entry = this.pool.get(connectionId);
@@ -82,9 +91,9 @@ export class SSHPoolManager {
                         this.pool.delete(connectionId);
                     })
                     .connect({
-                        keepaliveInterval: 15000,
-                        keepaliveCountMax: 3,
                         ...authConfig,
+                        keepaliveInterval: 10000,
+                        keepaliveCountMax: 6,
                         sock: sockStream || (authConfig as any).sock,
                         readyTimeout: verifier.readyTimeout,
                         hostVerifier: verifier.verify
