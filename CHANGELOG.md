@@ -5,6 +5,14 @@ All notable changes to Nautilus are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-09-17
+
+### Fixed
+
+- **SSH Terminal Connection Stability & Keepalive.** Fixed idle terminal freezing and silent disconnections by activating OS-level TCP keepalive (`sock.setKeepAlive`) on underlying sockets and standardizing SSH keepalive ping intervals.
+- **SSH Connection Lifecycle & Disconnect Notifications.** Added comprehensive lifecycle handling (`close`, `end`, `timeout`) on the SSH client to provide clear visual feedback in the terminal when a session is closed or lost, preventing terminal hangs during inactivity.
+- **SSE Stream Keepalive.** Improved SSE event stream stability with socket keepalive and keepalive timer cleanup.
+
 ## [2.2.0] - 2026-09-15
 
 ### Added
