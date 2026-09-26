@@ -56,7 +56,7 @@ export class SSHPoolManager {
             return new Promise<Client>((resolve, reject) => {
                 const disarm = verifier.armTimeout((err) => {
                     client.end();
-                    this.pool.delete(connectionId);
+                    this.forget(connectionId, client);
                     reject(err);
                 });
 
@@ -81,14 +81,14 @@ export class SSHPoolManager {
                     })
                     .on('error', (err) => {
                         disarm();
-                        this.pool.delete(connectionId);
+                        this.forget(connectionId, client);
                         reject(verifier.wrapError(err));
                     })
                     .on('close', () => {
-                        this.pool.delete(connectionId);
+                        this.forget(connectionId, client);
                     })
                     .on('end', () => {
-                        this.pool.delete(connectionId);
+                        this.forget(connectionId, client);
                     })
                     .connect({
                         ...authConfig,
@@ -155,10 +155,20 @@ export class SSHPoolManager {
                                      err?.level === 'client-timeout';
             if (isConnectionDrop) {
                 this.close(connectionId);
-                const reconnectedClient = await this.acquire(connectionId, authConfig);
+                const reconnectedClient = await this.acquire(connectionId, authConfig, getBastionStream);
                 return await runCommand(reconnectedClient);
             }
             throw err;
+        }
+    }
+
+    /**
+     * Drops the pool entry only if it still belongs to this client. A dead
+     * client's late 'close'/'end' must not evict the connection that replaced it.
+     */
+    private forget(connectionId: string, client: Client): void {
+        if (this.pool.get(connectionId)?.client === client) {
+            this.pool.delete(connectionId);
         }
     }
 

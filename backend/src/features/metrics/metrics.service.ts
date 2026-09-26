@@ -14,25 +14,77 @@ export class SystemMonitor {
     private interval: NodeJS.Timeout | null = null;
     private lastNetStats: NetStats | null = null;
     private lastNetStatsTimestamp: number | null = null;
+    private sshConfig: SSHConfig;
+    private connected = false;
+    private inFlight = false;
+    private stopped = false;
+
+    private static readonly EXEC_TIMEOUT_MS = 30000;
 
     constructor(connection: Connection, sshConfig: SSHConfig, onUpdate: (data: MetricsUpdate) => void) {
         this.connection = connection;
+        this.sshConfig = sshConfig;
         this.sshClient = new SSHClient(sshConfig);
         this.onUpdate = onUpdate;
     }
 
     async connectAndStartPolling(intervalMs: number = 5000): Promise<void> {
+        // Poll even if the first connect fails: each tick reconnects when needed,
+        // so the dashboard recovers on its own after a network drop.
+        this.interval = setInterval(() => this.tick(), intervalMs);
+        await this.tick();
+    }
+
+    private async tick(): Promise<void> {
+        // Never stack commands: a slow or half-dead connection would otherwise
+        // pile up one pending exec every interval.
+        if (this.inFlight || this.stopped) return;
+        this.inFlight = true;
+        try {
+            if (!this.connected) {
+                await this.reconnect();
+            }
+            if (this.connected && !this.stopped) {
+                await this.fetchAndEmitMetrics();
+            }
+        } finally {
+            this.inFlight = false;
+        }
+    }
+
+    private async reconnect(): Promise<void> {
+        try {
+            this.sshClient.end();
+        } catch {
+            // ignore
+        }
+        this.sshClient = new SSHClient(this.sshConfig);
         try {
             await this.sshClient.connect();
+            if (this.stopped) {
+                this.sshClient.end();
+                return;
+            }
+            this.connected = true;
             logger.info(`[Metrics] Conectado a ${this.sshClient.config.host} para polling de métricas.`);
-
-            this.fetchAndEmitMetrics(); // Fetch immediately on start
-            this.interval = setInterval(() => this.fetchAndEmitMetrics(), intervalMs);
         } catch (error) {
             const err = error as Error;
             logger.error(`[Metrics] Falha ao conectar para polling: ${err.message}`);
             this.emitError(err);
         }
+    }
+
+    private execWithTimeout(command: string): Promise<SSHExecResult> {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(
+                () => reject(new Error('Tempo limite ao coletar métricas')),
+                SystemMonitor.EXEC_TIMEOUT_MS
+            );
+            this.sshClient.exec(command).then(
+                (result) => { clearTimeout(timer); resolve(result); },
+                (err) => { clearTimeout(timer); reject(err); }
+            );
+        });
     }
 
     async fetchAndEmitMetrics(): Promise<void> {
@@ -47,7 +99,7 @@ export class SystemMonitor {
 
             const compoundCmd = `{ uptime; echo '${DELIMITER}'; free -m; echo '${DELIMITER}'; df -h /; echo '${DELIMITER}'; top -b -n 1 | grep '^%Cpu' | awk '{print $2+$4}'; echo '${DELIMITER}'; uname -srmo && cat /etc/os-release | grep PRETTY_NAME | cut -d '"' -f 2 && lscpu | grep 'Model name:' | sed 's/Model name:[[:space:]]*//'; echo '${DELIMITER}'; cat /proc/net/dev; ${serviceCmds ? serviceCmds + '; ' : ''}}`;
 
-            const execResult = await this.sshClient.exec(compoundCmd);
+            const execResult = await this.execWithTimeout(compoundCmd);
             const parts = execResult.stdout.split(DELIMITER).map(p => p.trim());
 
             const uptimeStr = parts[0] || '';
@@ -76,7 +128,13 @@ export class SystemMonitor {
             const err = error as Error;
             logger.error(`[Metrics] Erro ao buscar métricas: ${err.message}`);
             this.emitError(err);
-            this.stopPolling();
+            // Drop the connection; the next tick opens a fresh one.
+            this.connected = false;
+            try {
+                this.sshClient.end();
+            } catch {
+                // ignore
+            }
         }
     }
 
@@ -150,11 +208,17 @@ export class SystemMonitor {
     }
 
     stopPolling(): void {
+        this.stopped = true;
+        this.connected = false;
         if (this.interval) {
             clearInterval(this.interval);
             this.interval = null;
-            this.sshClient.end();
-            logger.info(`[Metrics] Polling interrompido para ${this.sshClient.config.host}.`);
         }
+        try {
+            this.sshClient.end();
+        } catch {
+            // ignore
+        }
+        logger.info(`[Metrics] Polling interrompido para ${this.sshClient.config.host}.`);
     }
 }

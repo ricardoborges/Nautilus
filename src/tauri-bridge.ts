@@ -67,12 +67,14 @@ async function getAuthToken(): Promise<string> {
 let eventSource: EventSource | null = null;
 
 async function setupEventSource(): Promise<void> {
+    const token = await getAuthToken();
+    const url = token ? `${BACKEND_URL}/events?token=${encodeURIComponent(token)}` : `${BACKEND_URL}/events`;
+
+    // Close the previous stream right before replacing it, after the await,
+    // so concurrent calls cannot leave an orphaned EventSource open.
     if (eventSource) {
         eventSource.close();
     }
-
-    const token = await getAuthToken();
-    const url = token ? `${BACKEND_URL}/events?token=${encodeURIComponent(token)}` : `${BACKEND_URL}/events`;
     eventSource = new EventSource(url);
 
     eventSource.onmessage = (event: MessageEvent) => {
@@ -91,10 +93,25 @@ async function setupEventSource(): Promise<void> {
         }
     };
 
-    eventSource.onerror = (error: Event) => {
-        console.warn('SSE connection error, reconnecting...', error);
-        setTimeout(setupEventSource, 2000);
+    const source = eventSource;
+    source.onerror = (error: Event) => {
+        // EventSource retries on its own while CONNECTING. Only rebuild it when
+        // the browser gave up (CLOSED), and only once per dead instance, so we
+        // never end up with several streams holding the host's connection slots.
+        if (source !== eventSource || source.readyState !== EventSource.CLOSED) return;
+        console.warn('SSE connection closed, reconnecting...', error);
+        scheduleEventSourceReconnect();
     };
+}
+
+let eventSourceReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleEventSourceReconnect(): void {
+    if (eventSourceReconnectTimer) return;
+    eventSourceReconnectTimer = setTimeout(() => {
+        eventSourceReconnectTimer = null;
+        setupEventSource().catch(() => scheduleEventSourceReconnect());
+    }, 2000);
 }
 
 // Wait for backend to be ready

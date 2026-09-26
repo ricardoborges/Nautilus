@@ -1,3 +1,4 @@
+use std::io::{BufRead, BufReader, Read};
 use std::process::{Command, Stdio};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -164,12 +165,42 @@ fn start_backend_process(app: &AppHandle, auth_token: &str) -> Result<std::proce
     #[cfg(windows)]
     command.creation_flags(0x08000000); // CREATE_NO_WINDOW
     
-    command
+    let mut child = command
         .env("NAUTILUS_AUTH_TOKEN", auth_token)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to start backend: {}", e))
+        .map_err(|e| format!("Failed to start backend: {}", e))?;
+
+    // The pipes must be drained continuously. If nobody reads them, the OS
+    // pipe buffer fills up after a few minutes of logging and every write the
+    // backend makes to stdout/stderr blocks, freezing the whole Node process.
+    if let Some(stdout) = child.stdout.take() {
+        drain_pipe(stdout, "backend");
+    }
+    if let Some(stderr) = child.stderr.take() {
+        drain_pipe(stderr, "backend:stderr");
+    }
+
+    Ok(child)
+}
+
+/// Reads a child pipe until EOF on a dedicated thread, forwarding each line to the log.
+fn drain_pipe<R: Read + Send + 'static>(pipe: R, label: &'static str) {
+    std::thread::spawn(move || {
+        let mut reader = BufReader::new(pipe);
+        let mut line = Vec::new();
+        loop {
+            line.clear();
+            match reader.read_until(b'\n', &mut line) {
+                Ok(0) | Err(_) => break,
+                Ok(_) => {
+                    let text = String::from_utf8_lossy(&line);
+                    log::debug!("[{}] {}", label, text.trim_end());
+                }
+            }
+        }
+    });
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
