@@ -5,6 +5,15 @@ All notable changes to Nautilus are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2026-09-25
+
+### Fixed
+
+- **Backend freeze after long sessions.** The desktop app now continuously drains the backend sidecar's stdout/stderr pipes, preventing the OS pipe buffer from filling up and blocking the Node process.
+- **Metrics dashboard recovery.** Metrics polling now reconnects automatically after a network drop, never stacks pending commands, and applies a timeout to each remote command.
+- **SSH connection pool eviction.** A dead client's late `close`/`end` events no longer evict the connection that replaced it, and reconnects after a drop now preserve the bastion (jump host) route.
+- **SSE reconnection.** The event stream is only rebuilt when the browser gives up, with a single pending reconnect, avoiding orphaned streams that exhausted the host's connection slots.
+
 ## [2.2.1] - 2026-09-17
 
 ### Fixed
