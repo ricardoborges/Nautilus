@@ -4,16 +4,23 @@ import type { CommandRunner, CommandResult, CommandRunnerOptions } from './comma
 
 export class SSHCommandRunner implements CommandRunner {
     private sshConfig: SSHConfig;
-    private sshClient: SSHClient | null = null;
+    private client: SSHClient | null = null;
 
     constructor(sshConfig: SSHConfig) {
         this.sshConfig = sshConfig;
     }
 
+    private async ensureConnected(): Promise<SSHClient> {
+        if (!this.client) {
+            this.client = new SSHClient(this.sshConfig);
+            await this.client.connect();
+        }
+        return this.client;
+    }
+
     async exec(command: string, options?: CommandRunnerOptions): Promise<CommandResult> {
-        const client = new SSHClient(this.sshConfig);
         try {
-            await client.connect();
+            const client = await this.ensureConnected();
             const result = await client.exec(command);
             return {
                 stdout: result.stdout,
@@ -26,8 +33,17 @@ export class SSHCommandRunner implements CommandRunner {
                 stderr: err.message || String(err),
                 code: err.code || 1,
             };
-        } finally {
-            client.end();
+        }
+    }
+
+    dispose(): void {
+        if (this.client) {
+            try {
+                this.client.end();
+            } catch {
+                // ignore
+            }
+            this.client = null;
         }
     }
 }

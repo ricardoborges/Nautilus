@@ -26,7 +26,7 @@ import { UfwService, Fail2banService, PackagesService, AddUfwRuleOptions } from 
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
 import logger from './shared/utils/logger';
-import { isWslAvailable, listWslDistros } from './features/execution';
+import { isWslAvailable, listWslDistros, createCommandRunner, CommandRunner } from './features/execution';
 import { initializeDatabase, closeDatabase, exportDatabase, importDatabase } from './shared/database';
 import { validateId, escapeShellArg } from './shared/utils/security.utils';
 import type {
@@ -92,6 +92,10 @@ async function getAuthConfig(connData: AuthArgs, useRawPassword: boolean = false
     }
 
     return authConfig;
+}
+
+async function getCommandRunner(conn: Connection): Promise<CommandRunner> {
+    return await createCommandRunner(conn, async (c) => getAuthConfig(c as AuthArgs));
 }
 
 // Handler registry
@@ -818,20 +822,17 @@ const handlers: HandlerRegistry = {
         const { connectionId } = args as { connectionId: string };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-
             // Check if docker command exists
-            const versionResult = await ssh.exec('docker --version 2>/dev/null');
+            const versionResult = await runner.exec('docker --version 2>/dev/null');
             if (versionResult.stdout && versionResult.stdout.includes('Docker version')) {
                 const versionMatch = versionResult.stdout.match(/Docker version ([^,]+)/);
 
                 // Try to get containers count
                 let containersCount = 0;
                 try {
-                    const infoResult = await ssh.exec('docker info --format "{{.Containers}}" 2>/dev/null');
+                    const infoResult = await runner.exec('docker info --format "{{.Containers}}" 2>/dev/null');
                     containersCount = parseInt(infoResult.stdout.trim()) || 0;
                 } catch {
                     // Ignore - user may not have permission to run docker info
@@ -847,7 +848,7 @@ const handlers: HandlerRegistry = {
         } catch {
             return { available: false };
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -855,16 +856,14 @@ const handlers: HandlerRegistry = {
         const { connectionId } = args as { connectionId: string };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
             // List all containers with extended format including labels for stack detection
-            const result = await ssh.exec('docker ps -a --format "{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.State}}|{{.Ports}}|{{.CreatedAt}}|{{.Label \\"com.docker.compose.project\\"}}"');
+            const result = await runner.exec('docker ps -a --format "{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.State}}|{{.Ports}}|{{.CreatedAt}}|{{.Label \\"com.docker.compose.project\\"}}"');
             const containerLines = result.stdout.trim().split('\n').filter(line => line.trim());
 
             // Get IP addresses for all containers using docker inspect
-            const ipResult = await ssh.exec('docker inspect --format "{{.Name}}|{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" $(docker ps -aq 2>/dev/null) 2>/dev/null || echo ""');
+            const ipResult = await runner.exec('docker inspect --format "{{.Name}}|{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" $(docker ps -aq 2>/dev/null) 2>/dev/null || echo ""');
             const ipMap = new Map<string, string>();
             if (ipResult.stdout.trim()) {
                 ipResult.stdout.trim().split('\n').filter(line => line.trim()).forEach(line => {
@@ -892,7 +891,7 @@ const handlers: HandlerRegistry = {
             });
             return containers;
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -916,18 +915,16 @@ const handlers: HandlerRegistry = {
 
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
             const dockerAction = action === 'remove' ? 'rm -f' : action;
-            const result = await ssh.exec(`docker ${dockerAction} ${containerId}`);
+            const result = await runner.exec(`docker ${dockerAction} ${containerId}`);
             if (result.stderr && !result.stdout) {
                 throw new Error(result.stderr);
             }
             return { success: true };
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -943,6 +940,10 @@ const handlers: HandlerRegistry = {
         const safeContainerId = validateId(containerId, 'Container ID');
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
+
+        if (conn.connectionType === 'wsl') {
+            throw new Error('O terminal interativo para containers WSL2 será suportado em uma próxima versão.');
+        }
 
         const authConfig = await getAuthConfig(conn as AuthArgs);
 
@@ -975,11 +976,9 @@ const handlers: HandlerRegistry = {
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
 
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-            const result = await ssh.exec('docker stats --no-stream --format "{{.ID}}|{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}" 2>/dev/null || echo ""');
+            const result = await runner.exec('docker stats --no-stream --format "{{.ID}}|{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}" 2>/dev/null || echo ""');
             const lines = result.stdout.trim().split('\n').filter(l => l.trim());
             const stats = lines.map(l => {
                 const [id, name, cpu, memUsage, memPerc, netIO, blockIO] = l.split('|');
@@ -995,7 +994,7 @@ const handlers: HandlerRegistry = {
             });
             return stats;
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -1003,12 +1002,10 @@ const handlers: HandlerRegistry = {
         const { connectionId } = args as { connectionId: string };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
             // List all images with formatted output
-            const result = await ssh.exec('docker images --format "{{.ID}}|{{.Repository}}|{{.Tag}}|{{.Size}}|{{.CreatedAt}}"');
+            const result = await runner.exec('docker images --format "{{.ID}}|{{.Repository}}|{{.Tag}}|{{.Size}}|{{.CreatedAt}}"');
             const images = result.stdout.trim().split('\n')
                 .filter(line => line.trim())
                 .map(line => {
@@ -1023,7 +1020,7 @@ const handlers: HandlerRegistry = {
                 });
             return images;
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -1046,17 +1043,15 @@ const handlers: HandlerRegistry = {
 
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-            const result = await ssh.exec(`docker rmi ${imageId}`);
+            const result = await runner.exec(`docker rmi ${imageId}`);
             if (result.stderr && !result.stdout) {
                 throw new Error(result.stderr);
             }
             return { success: true };
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -1080,14 +1075,12 @@ const handlers: HandlerRegistry = {
 
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-            const result = await ssh.exec(`docker logs --tail ${safeTail} --timestamps ${containerId} 2>&1`);
+            const result = await runner.exec(`docker logs --tail ${safeTail} --timestamps ${containerId} 2>&1`);
             return result.stdout || result.stderr || '';
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -1095,12 +1088,10 @@ const handlers: HandlerRegistry = {
         const { connectionId } = args as { connectionId: string };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
             // Get volume list with details including creation time
-            const result = await ssh.exec('docker volume ls -q');
+            const result = await runner.exec('docker volume ls -q');
             const volumeNames = result.stdout.trim().split('\n').filter(name => name.trim());
 
             if (volumeNames.length === 0) {
@@ -1108,47 +1099,38 @@ const handlers: HandlerRegistry = {
             }
 
             // Get detailed info for each volume using docker volume inspect.
-            // Volume names come from the remote host, so they are escaped before
-            // being placed back into a command.
             const quotedVolumes = volumeNames.map(name => escapeShellArg(name.trim())).join(' ');
-            const inspectResult = await ssh.exec(`docker volume inspect ${quotedVolumes} --format "{{.Name}}|{{.Driver}}|{{.Mountpoint}}|{{.CreatedAt}}" 2>/dev/null || echo ""`);
+            const inspectResult = await runner.exec(`docker volume inspect ${quotedVolumes} --format "{{.Name}}|{{.Driver}}|{{.Mountpoint}}|{{.CreatedAt}}" 2>/dev/null || echo ""`);
 
             // Get volume sizes using docker system df -v
             let volumeSizes: Record<string, string> = {};
             try {
-                const dfResult = await ssh.exec('docker system df -v --format "{{json .}}" 2>/dev/null | grep -A1000 "Volumes" || echo ""');
-                // Parse volume sizes from docker system df output
-                // Try alternative command that gives us volume sizes directly
-                const sizeResult = await ssh.exec('docker system df -v 2>/dev/null | grep -E "^[a-f0-9]{12,}" || echo ""');
+                const sizeResult = await runner.exec('docker system df -v 2>/dev/null | grep -E "^[a-f0-9]{12,}" || echo ""');
                 const sizeLines = sizeResult.stdout.trim().split('\n').filter(line => line.trim());
                 for (const line of sizeLines) {
                     const parts = line.trim().split(/\s+/);
                     if (parts.length >= 3) {
-                        // Format: VOLUME NAME   LINKS   SIZE
                         const volName = parts[0];
                         const size = parts[parts.length - 1];
                         volumeSizes[volName] = size;
                     }
                 }
             } catch {
-                // Ignore size errors - we'll just not show sizes
+                // Ignore size errors
             }
 
             const volumes = inspectResult.stdout.trim().split('\n')
                 .filter(line => line.trim())
                 .map(line => {
                     const [name, driver, mountpoint, created] = line.split('|');
-                    // Format created date (2025-12-15T17:08:25-03:00 -> 2025-12-15 17:08:25)
                     let formattedCreated = created || '';
                     const dateMatch = formattedCreated.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
                     if (dateMatch) {
                         formattedCreated = `${dateMatch[1]} ${dateMatch[2]}`;
                     }
 
-                    // Get size - try exact match first, then partial match
                     let size = volumeSizes[name] || '';
                     if (!size) {
-                        // Try partial match for truncated volume names
                         const shortName = name?.substring(0, 12);
                         for (const [volName, volSize] of Object.entries(volumeSizes)) {
                             if (volName.startsWith(shortName) || name?.startsWith(volName)) {
@@ -1168,7 +1150,7 @@ const handlers: HandlerRegistry = {
                 });
             return volumes;
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -1179,29 +1161,25 @@ const handlers: HandlerRegistry = {
             action: 'remove';
         };
 
-        // Validate action
         if (action !== 'remove') {
             throw new Error('Ação inválida');
         }
 
-        // Validate volume name (alphanumeric, hyphens, underscores, dots)
         if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(volumeName)) {
             throw new Error('Nome de volume inválido');
         }
 
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-            const result = await ssh.exec(`docker volume rm ${volumeName}`);
+            const result = await runner.exec(`docker volume rm ${volumeName}`);
             if (result.stderr && !result.stdout) {
                 throw new Error(result.stderr);
             }
             return { success: true };
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -1209,21 +1187,18 @@ const handlers: HandlerRegistry = {
         const { connectionId } = args as { connectionId: string };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
             // Get network IDs
-            const listResult = await ssh.exec('docker network ls -q');
+            const listResult = await runner.exec('docker network ls -q');
             const networkIds = listResult.stdout.trim().split('\n').filter(id => id.trim());
 
             if (networkIds.length === 0) {
                 return [];
             }
 
-            // Get detailed info using docker network inspect with JSON format
             const quotedNetworkIds = networkIds.map(id => escapeShellArg(id.trim())).join(' ');
-            const inspectResult = await ssh.exec(`docker network inspect ${quotedNetworkIds} 2>/dev/null || echo "[]"`);
+            const inspectResult = await runner.exec(`docker network inspect ${quotedNetworkIds} 2>/dev/null || echo "[]"`);
 
             try {
                 const networksData = JSON.parse(inspectResult.stdout.trim()) as Array<{
@@ -1240,13 +1215,8 @@ const handlers: HandlerRegistry = {
                 }>;
 
                 const networks = networksData.map(net => {
-                    // Check if it's a system network (bridge, host, none)
                     const isSystem = ['bridge', 'host', 'none'].includes(net.Name);
-
-                    // Get stack name from labels
                     const stack = net.Labels?.['com.docker.compose.project'] || '';
-
-                    // Get IPAM config
                     const ipamConfig = net.IPAM?.Config?.[0] || {};
 
                     return {
@@ -1266,8 +1236,7 @@ const handlers: HandlerRegistry = {
 
                 return networks;
             } catch {
-                // Fallback to simple format if JSON parsing fails
-                const simpleResult = await ssh.exec('docker network ls --format "{{.ID}}|{{.Name}}|{{.Driver}}|{{.Scope}}"');
+                const simpleResult = await runner.exec('docker network ls --format "{{.ID}}|{{.Name}}|{{.Driver}}|{{.Scope}}"');
                 return simpleResult.stdout.trim().split('\n')
                     .filter(line => line.trim())
                     .map(line => {
@@ -1289,7 +1258,7 @@ const handlers: HandlerRegistry = {
                     });
             }
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -1300,29 +1269,25 @@ const handlers: HandlerRegistry = {
             action: 'remove';
         };
 
-        // Validate action
         if (action !== 'remove') {
             throw new Error('Ação inválida');
         }
 
-        // Validate network ID/name (alphanumeric, hyphens, underscores, dots)
         if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(networkId)) {
             throw new Error('ID de rede inválido');
         }
 
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-            const result = await ssh.exec(`docker network rm ${networkId}`);
+            const result = await runner.exec(`docker network rm ${networkId}`);
             if (result.stderr && !result.stdout) {
                 throw new Error(result.stderr);
             }
             return { success: true };
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -1330,27 +1295,19 @@ const handlers: HandlerRegistry = {
         const { connectionId } = args as { connectionId: string };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-
-            // Get all unique compose project names from containers
-            const containersResult = await ssh.exec('docker ps -a --format "{{.Labels}}" 2>/dev/null || echo ""');
+            const containersResult = await runner.exec('docker ps -a --format "{{.Labels}}" 2>/dev/null || echo ""');
             const projectsMap = new Map<string, { name: string; created: string }>();
 
             const lines = containersResult.stdout.trim().split('\n').filter(line => line.trim());
 
             for (const line of lines) {
-                // Parse labels to find com.docker.compose.project
                 const projectMatch = line.match(/com\.docker\.compose\.project=([^,]+)/);
                 if (projectMatch) {
                     const projectName = projectMatch[1];
                     if (!projectsMap.has(projectName)) {
-                        // Get the creation time of the oldest container in the stack
-                        // projectName comes from a container label on the remote
-                        // host, so it is escaped before going back into a command
-                        const createdResult = await ssh.exec(
+                        const createdResult = await runner.exec(
                             `docker ps -a --filter ${escapeShellArg(`label=com.docker.compose.project=${projectName}`)} --format "{{.CreatedAt}}" | head -1 2>/dev/null || echo ""`
                         );
                         const createdAt = createdResult.stdout.trim() || '';
@@ -1362,7 +1319,6 @@ const handlers: HandlerRegistry = {
                 }
             }
 
-            // Convert map to array
             const stacks = Array.from(projectsMap.values()).map(stack => ({
                 name: stack.name,
                 type: 'Compose',
@@ -1372,7 +1328,7 @@ const handlers: HandlerRegistry = {
 
             return stacks;
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -1384,13 +1340,10 @@ const handlers: HandlerRegistry = {
             stacksDirectory: string;
         };
 
-        // Validate stack name (alphanumeric, hyphens, underscores)
         if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(stackName)) {
             throw new Error('Invalid stack name. Use alphanumeric characters, hyphens, and underscores only.');
         }
 
-        // Use provided directory or default. It comes from a settings field,
-        // so it must be a plain absolute path - no shell metacharacters.
         const baseDir = stacksDirectory || '/tmp/nautilus-stacks';
         if (!/^\/[a-zA-Z0-9_./-]*$/.test(baseDir) || baseDir.includes('..')) {
             throw new Error('Invalid stacks directory. Use a plain absolute path.');
@@ -1402,30 +1355,21 @@ const handlers: HandlerRegistry = {
 
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Connection not found');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-
-            // Create the stack directory
             const stackDir = `${baseDir.replace(/\/+$/, '')}/${stackName}`;
             const quotedStackDir = escapeShellArg(stackDir);
-            await ssh.exec(`mkdir -p ${quotedStackDir}`);
+            await runner.exec(`mkdir -p ${quotedStackDir}`);
 
-            // Write the docker-compose.yml file using a heredoc whose delimiter
-            // cannot appear in the payload, so the content can never break out.
             const eof = `NAUTILUS_EOF_${crypto.randomBytes(12).toString('hex')}`;
-            await ssh.exec(`cat > ${escapeShellArg(`${stackDir}/docker-compose.yml`)} << '${eof}'
+            await runner.exec(`cat > ${escapeShellArg(`${stackDir}/docker-compose.yml`)} << '${eof}'
 ${composeContent}
 ${eof}`);
 
-            // Try docker compose (plugin) first, fall back to docker-compose (standalone)
-            // This ensures compatibility with both old and new Docker installations
             const quotedStackName = escapeShellArg(stackName);
             const composeCmd = `cd ${quotedStackDir} && (docker compose -p ${quotedStackName} up -d 2>&1 || docker-compose -p ${quotedStackName} up -d 2>&1)`;
-            const result = await ssh.exec(composeCmd);
+            const result = await runner.exec(composeCmd);
 
-            // Check for errors in output
             const output = result.stdout || result.stderr || '';
             if (output.toLowerCase().includes('error') && !output.toLowerCase().includes('pulling') && !output.toLowerCase().includes('created') && !output.toLowerCase().includes('started')) {
                 throw new Error(output);
@@ -1433,7 +1377,7 @@ ${eof}`);
 
             return { success: true, output: result.stdout };
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
