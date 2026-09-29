@@ -618,10 +618,10 @@ const handlers: HandlerRegistry = {
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
 
-        const authConfig = await getAuthConfig(conn as AuthArgs);
+        const runner = await getCommandRunner(conn);
         activeSystemMonitor = new SystemMonitor(
             conn as Connection,
-            authConfig,
+            runner,
             (data: MetricsUpdate) => {
                 broadcastEvent('ssm:metrics:update', data);
             }
