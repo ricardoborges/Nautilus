@@ -318,14 +318,12 @@ const handlers: HandlerRegistry = {
         const { connectionId } = args as { connectionId: string };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-            const result = await ssh.exec("ps -eo pid,user,%cpu,%mem,comm --sort=-%cpu");
+            const result = await runner.exec("ps -eo pid,user,%cpu,%mem,comm --sort=-%cpu");
             return result.stdout;
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -336,14 +334,12 @@ const handlers: HandlerRegistry = {
 
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-            const result = await ssh.exec(`kill -9 ${safePid}`);
+            const result = await runner.exec(`kill -9 ${safePid}`);
             return result.stdout;
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -549,14 +545,12 @@ const handlers: HandlerRegistry = {
         const { connectionId } = args as { connectionId: string };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-            const result = await ssh.exec("crontab -l 2>/dev/null || echo ''");
+            const result = await runner.exec("crontab -l 2>/dev/null || echo ''");
             return result.stdout;
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -564,11 +558,8 @@ const handlers: HandlerRegistry = {
         const { connectionId, content } = args as { connectionId: string; content: string };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-
             const lines = content.split('\n').filter(l => l.trim() && !l.startsWith('#'));
             for (const line of lines) {
                 const parts = line.trim().split(/\s+/);
@@ -581,7 +572,7 @@ const handlers: HandlerRegistry = {
                         const scriptPath = scriptMatch[1];
                         if (!scriptPath.startsWith('/bin/') && !scriptPath.startsWith('/usr/bin/') && !scriptPath.startsWith('/sbin/')) {
                             try {
-                                await ssh.exec(`chmod +x ${escapeShellArg(scriptPath)} 2>/dev/null || true`);
+                                await runner.exec(`chmod +x ${escapeShellArg(scriptPath)} 2>/dev/null || true`);
                             } catch {
                                 // Ignore chmod errors
                             }
@@ -590,10 +581,10 @@ const handlers: HandlerRegistry = {
                 }
             }
 
-            await ssh.exec(`echo ${escapeShellArg(content)} | crontab -`);
+            await runner.exec(`echo ${escapeShellArg(content)} | crontab -`);
             return { success: true };
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -604,15 +595,13 @@ const handlers: HandlerRegistry = {
         }
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
             const safeLogPath = escapeShellArg(logPath);
-            const result = await ssh.exec(`tail -n 200 ${safeLogPath} 2>/dev/null || echo "(Arquivo de log não encontrado)"`);
+            const result = await runner.exec(`tail -n 200 ${safeLogPath} 2>/dev/null || echo "(Arquivo de log não encontrado)"`);
             return result.stdout;
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -732,11 +721,8 @@ const handlers: HandlerRegistry = {
         const { connectionId } = args as { connectionId: string };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
-        const authConfig = await getAuthConfig(conn as AuthArgs);
-        const ssh = new SSHClient(authConfig);
+        const runner = await getCommandRunner(conn);
         try {
-            await ssh.connect();
-
             // Search the logged-in user's home for dotenv files. Heavy directories
             // are pruned so this stays fast on real project trees, and every part
             // is tolerant of permission errors.
@@ -751,7 +737,7 @@ const handlers: HandlerRegistry = {
                 `done; ` +
                 `true`;
 
-            const result = await ssh.exec(findCmd);
+            const result = await runner.exec(findCmd);
             const lines = result.stdout.split('\n').map(l => l.trim()).filter(Boolean);
 
             let home = '';
@@ -785,7 +771,7 @@ const handlers: HandlerRegistry = {
             files.sort((a, b) => a.path.localeCompare(b.path));
             return { home, files };
         } finally {
-            ssh.end();
+            runner.dispose?.();
         }
     },
 
@@ -881,8 +867,8 @@ const handlers: HandlerRegistry = {
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
-            // List all containers with extended format including labels for stack detection
-            const result = await runner.exec('docker ps -a --format "{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.State}}|{{.Ports}}|{{.CreatedAt}}|{{.Label \\"com.docker.compose.project\\"}}"');
+            // List all containers with extended format including labels for stack and service detection
+            const result = await runner.exec('docker ps -a --format "{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.State}}|{{.Ports}}|{{.CreatedAt}}|{{.Label \\"com.docker.compose.project\\"}}|{{.Label \\"com.docker.compose.service\\"}}"');
             const containerLines = result.stdout.trim().split('\n').filter(line => line.trim());
 
             // Get IP addresses for all containers using docker inspect
@@ -899,7 +885,7 @@ const handlers: HandlerRegistry = {
             }
 
             const containers = containerLines.map(line => {
-                const [id, name, image, status, state, ports, created, stack] = line.split('|');
+                const [id, name, image, status, state, ports, created, stack, service] = line.split('|');
                 return {
                     id: id || '',
                     name: name || '',
@@ -909,6 +895,7 @@ const handlers: HandlerRegistry = {
                     ports: ports || '',
                     created: created || '',
                     stack: stack || '',
+                    service: service || '',
                     ipAddress: ipMap.get(name) || '',
                 };
             });

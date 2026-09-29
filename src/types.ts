@@ -222,6 +222,7 @@ export interface DockerContainer {
     ports: string;
     created: string;
     stack?: string;
+    service?: string;
     ipAddress?: string;
 }
 

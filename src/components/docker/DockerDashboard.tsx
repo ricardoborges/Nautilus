@@ -62,6 +62,49 @@ import type { DockerContainer, DockerImage, DockerVolume, DockerNetwork, DockerS
 
 const { Text, Title } = Typography;
 
+export interface DockerContainerRow extends Partial<DockerContainer> {
+    id: string;
+    name: string;
+    isStack?: boolean;
+    stackName?: string;
+    runningCount?: number;
+    totalCount?: number;
+    children?: DockerContainerRow[];
+    image?: string;
+    status?: string;
+    state?: DockerContainer['state'];
+    ports?: string;
+    created?: string;
+    stack?: string;
+    service?: string;
+    ipAddress?: string;
+}
+
+const getStatusDot = (state?: string) => {
+    const colorMap: Record<string, string> = {
+        running: '#52c41a',
+        unhealthy: '#faad14',
+        exited: '#8c8c8c',
+        paused: '#1677ff',
+        restarting: '#1677ff',
+        dead: '#ff4d4f',
+        created: '#8c8c8c',
+    };
+    const color = colorMap[state || 'exited'] || '#8c8c8c';
+    return (
+        <span
+            style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: color,
+                flexShrink: 0,
+            }}
+        />
+    );
+};
+
 // Status badge component similar to Portainer
 const StatusBadge: React.FC<{ state: string; status: string }> = ({ state, status }) => {
     const { t } = useTranslation();
@@ -334,6 +377,12 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
     // Container selection and search state
     const [selectedContainers, setSelectedContainers] = useState<string[]>([]);
     const [containerSearchText, setContainerSearchText] = useState('');
+    const [groupByStack, setGroupByStack] = useState<boolean>(() => {
+        const saved = localStorage.getItem('nautilus_docker_group_by_stack');
+        return saved !== null ? saved === 'true' : true;
+    });
+    const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
+    const [hasInitializedExpanded, setHasInitializedExpanded] = useState(false);
 
     // Image selection and search state
     const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -517,29 +566,49 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
 
     // Bulk action on selected containers
     const handleBulkAction = async (action: 'start' | 'stop' | 'restart' | 'pause' | 'unpause' | 'kill') => {
-        if (selectedContainers.length === 0) return;
+        const targetIds = selectedContainers.filter(id => !id.startsWith('stack-'));
+        if (targetIds.length === 0) return;
 
-        for (const containerId of selectedContainers) {
+        for (const containerId of targetIds) {
             await handleAction(containerId, action);
         }
         setSelectedContainers([]);
     };
 
     const handleBulkRemove = () => {
-        if (selectedContainers.length === 0) return;
+        const targetIds = selectedContainers.filter(id => !id.startsWith('stack-'));
+        if (targetIds.length === 0) return;
         modal.confirm({
             title: t('docker.remove_confirm_title'),
-            content: t('docker.remove_selected_count', { count: selectedContainers.length }),
+            content: t('docker.remove_selected_count', { count: targetIds.length }),
             okText: t('common.delete'),
             okType: 'danger',
             cancelText: t('common.cancel'),
             onOk: async () => {
-                for (const containerId of selectedContainers) {
+                for (const containerId of targetIds) {
                     await handleAction(containerId, 'remove');
                 }
                 setSelectedContainers([]);
             },
         });
+    };
+
+    const handleStackAction = async (stackRecord: DockerContainerRow, action: 'start' | 'stop' | 'restart') => {
+        if (!activeConnectionId || !stackRecord.children || stackRecord.children.length === 0) return;
+        setActionLoading(stackRecord.id);
+        try {
+            const promises = stackRecord.children.map(child =>
+                window.ssm.dockerContainerAction(activeConnectionId, child.id, action)
+            );
+            await Promise.allSettled(promises);
+            messageApi.success(t('docker.stack_action_success', { name: stackRecord.stackName, defaultValue: `Ação executada na stack ${stackRecord.stackName}` }));
+            await loadContainers();
+        } catch (error) {
+            const err = error as Error;
+            messageApi.error(err.message);
+        } finally {
+            setActionLoading(null);
+        }
     };
 
     const handleImageAction = async (imageId: string, action: 'remove') => {
@@ -577,9 +646,101 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
             c.name.toLowerCase().includes(search) ||
             c.image.toLowerCase().includes(search) ||
             c.state.toLowerCase().includes(search) ||
-            (c.stack && c.stack.toLowerCase().includes(search))
+            (c.stack && c.stack.toLowerCase().includes(search)) ||
+            (c.service && c.service.toLowerCase().includes(search))
         );
     }, [containers, containerSearchText]);
+
+    // Tree data grouped by stack
+    const containerTreeData = useMemo<DockerContainerRow[]>(() => {
+        if (!groupByStack) {
+            return filteredContainers.map(c => ({
+                ...c,
+                isStack: false,
+            }));
+        }
+
+        const stackMap = new Map<string, DockerContainer[]>();
+        const standalone: DockerContainer[] = [];
+
+        filteredContainers.forEach(container => {
+            const stackName = container.stack?.trim();
+            if (stackName) {
+                if (!stackMap.has(stackName)) {
+                    stackMap.set(stackName, []);
+                }
+                stackMap.get(stackName)!.push(container);
+            } else {
+                standalone.push(container);
+            }
+        });
+
+        const rows: DockerContainerRow[] = [];
+
+        // Add stacks as parent rows
+        stackMap.forEach((stackContainers, stackName) => {
+            const runningCount = stackContainers.filter(c => c.state === 'running').length;
+            const totalCount = stackContainers.length;
+
+            rows.push({
+                id: `stack-${stackName}`,
+                name: stackName,
+                isStack: true,
+                stackName,
+                runningCount,
+                totalCount,
+                stack: stackName,
+                children: stackContainers.map(c => ({
+                    ...c,
+                    isStack: false,
+                })),
+            });
+        });
+
+        // Sort stacks alphabetically
+        rows.sort((a, b) => a.name.localeCompare(b.name));
+
+        // Sort standalone containers alphabetically
+        standalone.sort((a, b) => a.name.localeCompare(b.name));
+        standalone.forEach(c => {
+            rows.push({
+                ...c,
+                isStack: false,
+            });
+        });
+
+        return rows;
+    }, [filteredContainers, groupByStack]);
+
+    const allStackKeys = useMemo(() => {
+        return containerTreeData.filter(r => r.isStack).map(r => r.id);
+    }, [containerTreeData]);
+
+    const selectedRealContainers = useMemo(() => {
+        return selectedContainers.filter(id => !id.startsWith('stack-'));
+    }, [selectedContainers]);
+
+    useEffect(() => {
+        if (allStackKeys.length > 0 && !hasInitializedExpanded) {
+            setExpandedRowKeys(allStackKeys);
+            setHasInitializedExpanded(true);
+        }
+    }, [allStackKeys, hasInitializedExpanded]);
+
+    useEffect(() => {
+        if (containerSearchText && allStackKeys.length > 0) {
+            setExpandedRowKeys(allStackKeys);
+        }
+    }, [containerSearchText, allStackKeys]);
+
+    const handleToggleGroupByStack = () => {
+        const next = !groupByStack;
+        setGroupByStack(next);
+        localStorage.setItem('nautilus_docker_group_by_stack', String(next));
+        if (next) {
+            setExpandedRowKeys(allStackKeys);
+        }
+    };
 
     // Filtered images based on search
     const filteredImages = useMemo(() => {
@@ -899,83 +1060,246 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
         return created;
     };
 
-    const containerColumns = [
+    const containerColumns: any[] = [
         {
             title: t('docker.container_name'),
             dataIndex: 'name',
             key: 'name',
-            sorter: (a: DockerContainer, b: DockerContainer) => a.name.localeCompare(b.name),
-            render: (name: string) => <Text strong style={{ color: token.colorPrimary }}>{name}</Text>,
+            sorter: (a: DockerContainerRow, b: DockerContainerRow) => a.name.localeCompare(b.name),
+            render: (_: string, record: DockerContainerRow) => {
+                if (record.isStack) {
+                    return (
+                        <Space size={8}>
+                            <AppstoreOutlined style={{ color: token.colorPrimary, fontSize: 14 }} />
+                            <Text strong style={{ fontSize: 13, color: token.colorTextHeading }}>
+                                {record.name}
+                            </Text>
+                            <Tag
+                                bordered={false}
+                                style={{
+                                    fontSize: 11,
+                                    borderRadius: 10,
+                                    padding: '0 8px',
+                                    backgroundColor: token.colorFillAlter,
+                                    margin: 0,
+                                }}
+                            >
+                                {record.totalCount} {record.totalCount === 1 ? 'container' : 'containers'}
+                            </Tag>
+                        </Space>
+                    );
+                }
+
+                let displayName = record.name;
+                if (record.service) {
+                    displayName = record.service;
+                } else if (record.stack) {
+                    const prefixRegex = new RegExp(`^${record.stack}[-_]`, 'i');
+                    if (prefixRegex.test(record.name)) {
+                        displayName = record.name.replace(prefixRegex, '');
+                    }
+                }
+
+                return (
+                    <Space size={8}>
+                        {getStatusDot(record.state)}
+                        <Tooltip title={displayName !== record.name ? `Container: ${record.name}` : undefined}>
+                            <Text strong style={{ color: token.colorPrimary, cursor: 'pointer' }}>
+                                {displayName}
+                            </Text>
+                        </Tooltip>
+                    </Space>
+                );
+            },
         },
         {
             title: t('docker.state'),
             dataIndex: 'state',
             key: 'state',
-            width: 120,
+            width: 150,
             filters: [
                 { text: t('docker.running'), value: 'running' },
                 { text: t('docker.exited'), value: 'exited' },
                 { text: t('docker.paused'), value: 'paused' },
             ],
-            onFilter: (value: unknown, record: DockerContainer) => record.state === value,
-            render: (_: string, record: DockerContainer) => <StatusBadge state={record.state} status={record.status} />,
+            onFilter: (value: unknown, record: DockerContainerRow) => {
+                if (record.isStack) {
+                    return record.children?.some(c => c.state === value) ?? false;
+                }
+                return record.state === value;
+            },
+            render: (_: string, record: DockerContainerRow) => {
+                if (record.isStack) {
+                    const running = record.runningCount || 0;
+                    const total = record.totalCount || 0;
+                    if (running === total && total > 0) {
+                        return (
+                            <Tag
+                                style={{
+                                    color: '#52c41a',
+                                    backgroundColor: 'rgba(82, 196, 26, 0.15)',
+                                    border: 'none',
+                                    borderRadius: 4,
+                                    padding: '2px 8px',
+                                    fontWeight: 500,
+                                    fontSize: 12,
+                                }}
+                                icon={<CheckCircleOutlined />}
+                            >
+                                {t('docker.running')} ({running}/{total})
+                            </Tag>
+                        );
+                    }
+                    if (running === 0) {
+                        return (
+                            <Tag
+                                style={{
+                                    color: '#8c8c8c',
+                                    backgroundColor: 'rgba(140, 140, 140, 0.15)',
+                                    border: 'none',
+                                    borderRadius: 4,
+                                    padding: '2px 8px',
+                                    fontWeight: 500,
+                                    fontSize: 12,
+                                }}
+                                icon={<StopOutlined />}
+                            >
+                                {t('docker.exited')} (0/{total})
+                            </Tag>
+                        );
+                    }
+                    return (
+                        <Tag
+                            style={{
+                                color: '#1677ff',
+                                backgroundColor: 'rgba(22, 119, 255, 0.15)',
+                                border: 'none',
+                                borderRadius: 4,
+                                padding: '2px 8px',
+                                fontWeight: 500,
+                                fontSize: 12,
+                            }}
+                            icon={<ClockCircleOutlined />}
+                        >
+                            {t('docker.running')} ({running}/{total})
+                        </Tag>
+                    );
+                }
+                return <StatusBadge state={record.state || 'exited'} status={record.status || ''} />;
+            },
         },
         {
             title: t('docker.quick_actions'),
             key: 'quickActions',
             width: 140,
-            render: (_: unknown, record: DockerContainer) => (
-                <QuickActions
-                    container={record}
-                    onAction={handleAction}
-                    onLogs={openLogs}
-                    onExec={(id, name) => setExecContainer({ id, name })}
-                    loading={actionLoading}
-                />
-            ),
+            render: (_: unknown, record: DockerContainerRow) => {
+                if (record.isStack) {
+                    const isStackLoading = actionLoading === record.id;
+                    return (
+                        <Space size={4}>
+                            <Tooltip title={t('docker.start_all_stack')}>
+                                <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<PlayCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />}
+                                    loading={isStackLoading}
+                                    onClick={() => handleStackAction(record, 'start')}
+                                    style={{ padding: '2px 6px' }}
+                                />
+                            </Tooltip>
+                            <Tooltip title={t('docker.stop_all_stack')}>
+                                <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<StopOutlined style={{ fontSize: 14, color: '#ff4d4f' }} />}
+                                    loading={isStackLoading}
+                                    onClick={() => handleStackAction(record, 'stop')}
+                                    style={{ padding: '2px 6px' }}
+                                />
+                            </Tooltip>
+                            <Tooltip title={t('docker.restart_all_stack')}>
+                                <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<ReloadOutlined style={{ fontSize: 14, color: '#1677ff' }} />}
+                                    loading={isStackLoading}
+                                    onClick={() => handleStackAction(record, 'restart')}
+                                    style={{ padding: '2px 6px' }}
+                                />
+                            </Tooltip>
+                        </Space>
+                    );
+                }
+                return (
+                    <QuickActions
+                        container={record as DockerContainer}
+                        onAction={handleAction}
+                        onLogs={openLogs}
+                        onExec={(id, name) => setExecContainer({ id, name })}
+                        loading={actionLoading}
+                    />
+                );
+            },
         },
         {
             title: t('docker.stack'),
             dataIndex: 'stack',
             key: 'stack',
             width: 120,
-            sorter: (a: DockerContainer, b: DockerContainer) => (a.stack || '').localeCompare(b.stack || ''),
-            render: (stack: string) => stack ? <Text>{stack}</Text> : <Text type="secondary">-</Text>,
+            sorter: (a: DockerContainerRow, b: DockerContainerRow) => (a.stack || '').localeCompare(b.stack || ''),
+            render: (stack: string, record: DockerContainerRow) => {
+                if (record.isStack) {
+                    return <Text strong>{record.name}</Text>;
+                }
+                return stack ? <Text>{stack}</Text> : <Text type="secondary">-</Text>;
+            },
         },
         {
             title: t('docker.image'),
             dataIndex: 'image',
             key: 'image',
             ellipsis: true,
-            sorter: (a: DockerContainer, b: DockerContainer) => a.image.localeCompare(b.image),
-            render: (image: string) => (
-                <Tooltip title={image}>
-                    <Text style={{ color: token.colorPrimary, cursor: 'pointer' }} ellipsis>
-                        {image}
-                    </Text>
-                </Tooltip>
-            ),
+            sorter: (a: DockerContainerRow, b: DockerContainerRow) => (a.image || '').localeCompare(b.image || ''),
+            render: (image: string, record: DockerContainerRow) => {
+                if (record.isStack || !image) return <Text type="secondary">-</Text>;
+                return (
+                    <Tooltip title={image}>
+                        <Text style={{ color: token.colorPrimary, cursor: 'pointer' }} ellipsis>
+                            {image}
+                        </Text>
+                    </Tooltip>
+                );
+            },
         },
         {
             title: t('docker.created'),
             dataIndex: 'created',
             key: 'created',
             width: 160,
-            sorter: (a: DockerContainer, b: DockerContainer) => a.created.localeCompare(b.created),
-            render: (created: string) => <Text type="secondary">{formatCreatedDate(created)}</Text>,
+            sorter: (a: DockerContainerRow, b: DockerContainerRow) => (a.created || '').localeCompare(b.created || ''),
+            render: (created: string, record: DockerContainerRow) => {
+                if (record.isStack || !created) return <Text type="secondary">-</Text>;
+                return <Text type="secondary">{formatCreatedDate(created)}</Text>;
+            },
         },
         {
             title: t('docker.ip_address'),
             dataIndex: 'ipAddress',
             key: 'ipAddress',
             width: 120,
-            render: (ip: string) => ip ? <Text code style={{ fontSize: 12 }}>{ip}</Text> : <Text type="secondary">-</Text>,
+            render: (ip: string, record: DockerContainerRow) => {
+                if (record.isStack || !ip) return <Text type="secondary">-</Text>;
+                return <Text code style={{ fontSize: 12 }}>{ip}</Text>;
+            },
         },
         {
             title: t('docker.published_ports'),
             dataIndex: 'ports',
             key: 'ports',
-            render: (ports: string) => <PortsDisplay ports={ports} hostIp={hostIp} />,
+            render: (ports: string, record: DockerContainerRow) => {
+                if (record.isStack || !ports) return <Text type="secondary">-</Text>;
+                return <PortsDisplay ports={ports} hostIp={hostIp} />;
+            },
         },
     ];
 
@@ -1247,49 +1571,71 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
                     value={containerSearchText}
                     onChange={(e) => setContainerSearchText(e.target.value)}
                     allowClear
-                    style={{ width: 250 }}
+                    style={{ width: 220 }}
                 />
+                <Tooltip title={groupByStack ? t('docker.view_flat') : t('docker.view_grouped')}>
+                    <Button
+                        type={groupByStack ? 'primary' : 'default'}
+                        icon={<AppstoreOutlined />}
+                        onClick={handleToggleGroupByStack}
+                    >
+                        {t('docker.group_by_stack')}
+                    </Button>
+                </Tooltip>
+                {groupByStack && allStackKeys.length > 0 && (
+                    <Button
+                        onClick={() => {
+                            if (expandedRowKeys.length > 0) {
+                                setExpandedRowKeys([]);
+                            } else {
+                                setExpandedRowKeys(allStackKeys);
+                            }
+                        }}
+                    >
+                        {expandedRowKeys.length > 0 ? t('docker.collapse_all') : t('docker.expand_all')}
+                    </Button>
+                )}
             </Space>
             <Space wrap>
                 <Button
                     icon={<PlayCircleOutlined />}
                     onClick={() => handleBulkAction('start')}
-                    disabled={selectedContainers.length === 0}
+                    disabled={selectedRealContainers.length === 0}
                 >
                     {t('docker.start')}
                 </Button>
                 <Button
                     icon={<StopOutlined />}
                     onClick={() => handleBulkAction('stop')}
-                    disabled={selectedContainers.length === 0}
+                    disabled={selectedRealContainers.length === 0}
                 >
                     {t('docker.stop')}
                 </Button>
                 <Button
                     icon={<PoweroffOutlined />}
                     onClick={() => handleBulkAction('kill')}
-                    disabled={selectedContainers.length === 0}
+                    disabled={selectedRealContainers.length === 0}
                 >
                     {t('docker.kill')}
                 </Button>
                 <Button
                     icon={<ReloadOutlined />}
                     onClick={() => handleBulkAction('restart')}
-                    disabled={selectedContainers.length === 0}
+                    disabled={selectedRealContainers.length === 0}
                 >
                     {t('docker.restart')}
                 </Button>
                 <Button
                     icon={<PauseCircleOutlined />}
                     onClick={() => handleBulkAction('pause')}
-                    disabled={selectedContainers.length === 0}
+                    disabled={selectedRealContainers.length === 0}
                 >
                     {t('docker.pause')}
                 </Button>
                 <Button
                     icon={<CaretRightOutlined />}
                     onClick={() => handleBulkAction('unpause')}
-                    disabled={selectedContainers.length === 0}
+                    disabled={selectedRealContainers.length === 0}
                 >
                     {t('docker.resume')}
                 </Button>
@@ -1297,9 +1643,9 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
                     danger
                     icon={<DeleteOutlined />}
                     onClick={handleBulkRemove}
-                    disabled={selectedContainers.length === 0}
+                    disabled={selectedRealContainers.length === 0}
                 >
-                    {t('docker.remove')}
+                    {t('docker.remove')} {selectedRealContainers.length > 0 && `(${selectedRealContainers.length})`}
                 </Button>
                 <Button
                     type="primary"
@@ -1403,14 +1749,14 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
                                                 {t('docker.loading_containers')}
                                             </Text>
                                         </div>
-                                    ) : filteredContainers.length === 0 ? (
+                                    ) : containerTreeData.length === 0 ? (
                                         <Empty
                                             image={Empty.PRESENTED_IMAGE_SIMPLE}
                                             description={containerSearchText ? t('docker.no_containers_match') : t('docker.no_containers')}
                                         />
                                     ) : (
                                         <Table
-                                            dataSource={filteredContainers}
+                                            dataSource={containerTreeData}
                                             columns={containerColumns}
                                             rowKey="id"
                                             size="middle"
@@ -1418,7 +1764,12 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
                                             rowSelection={{
                                                 selectedRowKeys: selectedContainers,
                                                 onChange: (keys) => setSelectedContainers(keys as string[]),
+                                                checkStrictly: false,
                                             }}
+                                            expandable={groupByStack ? {
+                                                expandedRowKeys,
+                                                onExpandedRowsChange: (keys) => setExpandedRowKeys(keys as string[]),
+                                            } : undefined}
                                             pagination={{
                                                 pageSize: 10,
                                                 showSizeChanger: true,
