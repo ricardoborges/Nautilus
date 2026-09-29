@@ -12,7 +12,7 @@ export interface Connection {
     host: string;
     user: string;
     description?: string;
-    connectionType: 'ssh' | 'rdp';
+    connectionType: 'ssh' | 'rdp' | 'wsl';
     authMethod: 'password' | 'key';
     keyPath?: string;
     monitoredServices?: string[];
@@ -25,6 +25,9 @@ export interface Connection {
     port?: number;
     // Bastion / Jump Host
     bastionConnectionId?: string | null;
+    // WSL specific fields
+    wslDistro?: string;
+    wslUser?: string;
 }
 
 export interface ConnectionFormData extends Omit<Connection, 'id'> {
@@ -38,6 +41,9 @@ export interface ConnectionFormData extends Omit<Connection, 'id'> {
     domain?: string;
     // Bastion / Jump Host
     bastionConnectionId?: string | null;
+    // WSL specific
+    wslDistro?: string;
+    wslUser?: string;
 }
 
 // ========================
