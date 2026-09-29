@@ -142,7 +142,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         // a few sockets per origin - asking before the tab exists keeps those
         // sockets free so the answer can get through.
         const connection = connections.find(c => c.id === id);
-        if (connection && connection.connectionType !== 'rdp') {
+        if (connection && connection.connectionType === 'ssh') {
             try {
                 const gate = await window.ssm.hostKeyEnsure(id);
                 if (!gate.trusted) {

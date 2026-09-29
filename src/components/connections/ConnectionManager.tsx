@@ -26,6 +26,7 @@ import {
     PlusOutlined,
     WindowsOutlined,
     LinuxOutlined,
+    CodeOutlined,
     EditOutlined,
     DeleteOutlined,
     LoginOutlined,
@@ -250,11 +251,15 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             {item.connectionType === 'rdp'
                                                 ? <WindowsOutlined style={{ fontSize: 18, color: '#0078d4' }} />
-                                                : <LinuxOutlined style={{ fontSize: 18, color: '#f57c00' }} />
+                                                : item.connectionType === 'wsl'
+                                                    ? <CodeOutlined style={{ fontSize: 18, color: '#13c2c2' }} />
+                                                    : <LinuxOutlined style={{ fontSize: 18, color: '#f57c00' }} />
                                             }
                                             <Space direction="vertical" size={0} style={{ rowGap: 0 }}>
                                                 <Text strong style={{ fontSize: 14, lineHeight: '1.2' }}>{item.name}</Text>
-                                                <Text type="secondary" style={{ fontSize: 11 }}>{item.user}@{item.host}</Text>
+                                                <Text type="secondary" style={{ fontSize: 11 }}>
+                                                    {item.connectionType === 'wsl' ? `WSL: ${item.wslDistro || 'default'}` : `${item.user}@${item.host}`}
+                                                </Text>
                                             </Space>
                                         </div>
                                         {isActive && (
