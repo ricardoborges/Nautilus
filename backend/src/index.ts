@@ -26,6 +26,7 @@ import { UfwService, Fail2banService, PackagesService, AddUfwRuleOptions } from 
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
 import logger from './shared/utils/logger';
+import { isWslAvailable, listWslDistros } from './features/execution';
 import { initializeDatabase, closeDatabase, exportDatabase, importDatabase } from './shared/database';
 import { validateId, escapeShellArg } from './shared/utils/security.utils';
 import type {
@@ -122,6 +123,16 @@ const handlers: HandlerRegistry = {
     'ssm:connections:getPassword': async (args): Promise<string | null> => {
         const { id } = args as { id: string };
         return await connectionManager.getPassword(id);
+    },
+
+    // WSL handlers
+    'ssm:wsl:isAvailable': async (): Promise<{ available: boolean }> => {
+        const available = await isWslAvailable();
+        return { available };
+    },
+
+    'ssm:wsl:listDistros': async (): Promise<{ distros: string[]; defaultDistro?: string }> => {
+        return await listWslDistros();
     },
 
     // SSH handlers
