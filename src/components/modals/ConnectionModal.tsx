@@ -29,6 +29,7 @@ import {
     LoadingOutlined,
     WindowsOutlined,
     LinuxOutlined,
+    CodeOutlined,
     DesktopOutlined,
     BranchesOutlined,
 } from '@ant-design/icons';
@@ -62,6 +63,21 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
     const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isWslAvailable, setIsWslAvailable] = useState(false);
+    const [wslDistros, setWslDistros] = useState<string[]>([]);
+
+    useEffect(() => {
+        window.ssm.wslIsAvailable().then(res => {
+            setIsWslAvailable(res.available);
+            if (res.available) {
+                window.ssm.wslListDistros().then(distroRes => {
+                    setWslDistros(distroRes.distros || []);
+                });
+            }
+        }).catch(() => {
+            setIsWslAvailable(false);
+        });
+    }, []);
 
     // Watch form values
     const connectionType = Form.useWatch('connectionType', form);
@@ -78,6 +94,8 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     host: connection.host,
                     user: connection.user,
                     connectionType: connection.connectionType || 'ssh',
+                    wslDistro: connection.wslDistro,
+                    wslUser: connection.wslUser,
                     authMethod: connection.authMethod,
                     keyPath: connection.keyPath || '',
                     autoConnect: connection.autoConnect || false,
@@ -99,6 +117,8 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     host: '',
                     user: 'root',
                     connectionType: 'ssh',
+                    wslDistro: undefined,
+                    wslUser: '',
                     authMethod: 'password',
                     keyPath: '',
                     autoConnect: false,
@@ -141,6 +161,10 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
             return;
         }
 
+        if (connectionType !== 'ssh') {
+            return;
+        }
+
         setIsTesting(true);
         setTestResult(null);
         setError(null);
@@ -173,22 +197,25 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
     const handleSave = async () => {
         try {
             const values = await form.validateFields();
+            const isWsl = values.connectionType === 'wsl';
 
             const formData: ConnectionFormData = {
                 name: values.name,
                 description: values.description,
-                host: values.host,
-                user: values.user,
+                host: isWsl ? 'localhost' : values.host,
+                user: isWsl ? (values.wslUser || 'default') : values.user,
                 connectionType: values.connectionType || 'ssh',
-                authMethod: values.connectionType === 'rdp' ? 'password' : values.authMethod,
-                keyPath: values.keyPath || '',
+                authMethod: values.connectionType === 'rdp' ? 'password' : (isWsl ? 'password' : values.authMethod),
+                keyPath: values.connectionType === 'ssh' && values.authMethod === 'key' ? values.keyPath : '',
                 autoConnect: values.autoConnect || false,
                 rdpAuthMethod: values.connectionType === 'rdp' ? values.rdpAuthMethod : undefined,
                 domain: values.connectionType === 'rdp' ? values.domain : undefined,
-                port: values.port,
+                port: isWsl ? undefined : values.port,
                 environment: values.environment || 'other',
                 tags: values.tags || [],
                 bastionConnectionId: values.connectionType === 'ssh' ? (values.bastionConnectionId || null) : null,
+                wslDistro: isWsl ? values.wslDistro : undefined,
+                wslUser: isWsl ? values.wslUser : undefined,
             };
 
             // Validate password for SSH connections with password auth
@@ -241,7 +268,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
     };
 
     // Determine if we should show SSH-specific test button
-    const showTestButton = connectionType !== 'rdp';
+    const showTestButton = connectionType === 'ssh';
 
     return (
         <Modal
@@ -302,6 +329,14 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                                 RDP (Windows)
                             </Space>
                         </Radio.Button>
+                        {isWslAvailable && (
+                            <Radio.Button value="wsl">
+                                <Space>
+                                    <CodeOutlined />
+                                    WSL2 (Linux)
+                                </Space>
+                            </Radio.Button>
+                        )}
                     </Radio.Group>
                 </Form.Item>
 
@@ -324,29 +359,60 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     <Input.TextArea placeholder={t('connection.description_placeholder')} rows={2} />
                 </Form.Item>
 
+                {/* WSL specific fields */}
+                {connectionType === 'wsl' && (
+                    <>
+                        <Form.Item
+                            name="wslDistro"
+                            label={t('connection.wsl_distro')}
+                            rules={[{ required: true, message: t('connection.wsl_distro_required') }]}
+                        >
+                            <Select
+                                placeholder={t('connection.wsl_distro_placeholder')}
+                                options={wslDistros.map(d => ({ label: d, value: d }))}
+                                onChange={(distro) => {
+                                    const currentName = form.getFieldValue('name');
+                                    if (!currentName || currentName.startsWith('WSL - ')) {
+                                        form.setFieldsValue({ name: `WSL - ${distro}` });
+                                    }
+                                }}
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            name="wslUser"
+                            label={t('connection.wsl_user')}
+                            extra={t('connection.wsl_user_extra')}
+                        >
+                            <Input placeholder="root / ubuntu / default" />
+                        </Form.Item>
+                    </>
+                )}
+
                 {/* Host & Port */}
-                <Space style={{ display: 'flex' }} align="start">
-                    <Form.Item
-                        name="host"
-                        label={t('connection.host')}
-                        rules={[{ required: true, message: t('connection.host_required') }]}
-                        style={{ flex: 1 }}
-                    >
-                        <Input placeholder={t('connection.host_placeholder')} />
-                    </Form.Item>
-                    <Form.Item
-                        name="port"
-                        label={t('connection.port')}
-                        style={{ width: 100 }}
-                    >
-                        <InputNumber
-                            placeholder={connectionType === 'rdp' ? '3389' : '22'}
-                            min={1}
-                            max={65535}
-                            style={{ width: '100%' }}
-                        />
-                    </Form.Item>
-                </Space>
+                {connectionType !== 'wsl' && (
+                    <Space style={{ display: 'flex' }} align="start">
+                        <Form.Item
+                            name="host"
+                            label={t('connection.host')}
+                            rules={[{ required: true, message: t('connection.host_required') }]}
+                            style={{ flex: 1 }}
+                        >
+                            <Input placeholder={t('connection.host_placeholder')} />
+                        </Form.Item>
+                        <Form.Item
+                            name="port"
+                            label={t('connection.port')}
+                            style={{ width: 100 }}
+                        >
+                            <InputNumber
+                                placeholder={connectionType === 'rdp' ? '3389' : '22'}
+                                min={1}
+                                max={65535}
+                                style={{ width: '100%' }}
+                            />
+                        </Form.Item>
+                    </Space>
+                )}
 
                 {/* Environment & Tags */}
                 <Space style={{ display: 'flex' }} align="start">
