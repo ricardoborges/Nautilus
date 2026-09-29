@@ -194,6 +194,11 @@ const ssm: SSMAPI = {
 
     getPassword: (id: string): Promise<string | null> => backendInvoke<string | null>('ssm:connections:getPassword', { id }),
 
+    // WSL methods
+    wslIsAvailable: (): Promise<{ available: boolean }> => backendInvoke<{ available: boolean }>('ssm:wsl:isAvailable'),
+
+    wslListDistros: (): Promise<{ distros: string[]; defaultDistro?: string }> => backendInvoke<{ distros: string[]; defaultDistro?: string }>('ssm:wsl:listDistros'),
+
     // SSHService methods
     testConnection: (connectionData: ConnectionFormData): Promise<void> => backendInvoke<void>('ssm:ssh:test', connectionData as unknown as Record<string, unknown>),
 

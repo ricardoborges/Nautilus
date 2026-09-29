@@ -365,6 +365,10 @@ export interface SSMAPI {
     setPassword: (id: string, password: string) => Promise<void>;
     getPassword: (id: string) => Promise<string | null>;
 
+    // WSL
+    wslIsAvailable: () => Promise<{ available: boolean }>;
+    wslListDistros: () => Promise<{ distros: string[]; defaultDistro?: string }>;
+
     // SSH
     testConnection: (data: ConnectionFormData) => Promise<void>;
 
