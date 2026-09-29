@@ -18,7 +18,7 @@ import {
     type HostKeyPromptRequest,
     type HostKeyPromptResult
 } from './features/connections/hostkey.service';
-import { SFTPClient, SSHClient, TerminalSession, SSHPoolManager } from './features/terminal';
+import { SFTPClient, SSHClient, TerminalSession, SSHPoolManager, WSLTerminalSession } from './features/terminal';
 import { ServicesService, ServiceAction } from './features/services';
 import { LogsService, ReadLogsOptions, StreamLogsOptions } from './features/logs';
 import { TunnelService, TunnelConfig } from './features/tunnels';
@@ -47,7 +47,7 @@ const ENV_SEARCH_MAX_RESULTS = 500;
 
 // Active services
 let activeSystemMonitor: SystemMonitor | null = null;
-const activeTerminals = new Map<string, TerminalSession>();
+const activeTerminals = new Map<string, TerminalSession | WSLTerminalSession>();
 const servicesService = new ServicesService();
 const logsService = new LogsService();
 const tunnelService = new TunnelService();
@@ -141,7 +141,15 @@ const handlers: HandlerRegistry = {
 
     // SSH handlers
     'ssm:ssh:test': async (args): Promise<{ success: boolean }> => {
-        const connArgs = args as unknown as AuthArgs;
+        const connArgs = args as unknown as (AuthArgs & { connectionType?: string; wslDistro?: string; wslUser?: string });
+        if (connArgs.connectionType === 'wsl') {
+            const runner = await createCommandRunner(connArgs as unknown as Connection);
+            const res = await runner.exec('echo "WSL_OK"');
+            if (res.code !== 0) {
+                throw new Error(res.stderr || 'Falha ao conectar à distribuição WSL');
+            }
+            return { success: true };
+        }
         const authConfig = await getAuthConfig(connArgs, true);
         if (connArgs.id && connArgs.authMethod === 'password' && !connArgs.password) {
             authConfig.password = await connectionManager.getPassword(connArgs.id) || undefined;
@@ -643,6 +651,21 @@ const handlers: HandlerRegistry = {
         const { connectionId, terminalId } = args as { connectionId: string; terminalId: string };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
+
+        if (conn.connectionType === 'wsl') {
+            const session = new WSLTerminalSession(
+                (data: string) => {
+                    broadcastEvent('ssm:terminal:data', { id: terminalId, data });
+                },
+                terminalId,
+                conn.wslDistro,
+                conn.wslUser
+            );
+
+            activeTerminals.set(terminalId, session);
+            session.start();
+            return { success: true };
+        }
 
         const authConfig = await getAuthConfig(conn as AuthArgs);
         const session = new TerminalSession(

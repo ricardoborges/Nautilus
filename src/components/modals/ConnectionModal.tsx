@@ -149,20 +149,23 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
     }, [connectionType, isEditing, form]);
 
     const handleTest = async () => {
-        try {
-            await form.validateFields(['host', 'user']);
-        } catch {
-            return;
-        }
-
-        // Only test SSH connections
         if (connectionType === 'rdp') {
             message.info(t('connection.rdp_test_not_available'));
             return;
         }
 
-        if (connectionType !== 'ssh') {
-            return;
+        if (connectionType === 'wsl') {
+            try {
+                await form.validateFields(['wslDistro']);
+            } catch {
+                return;
+            }
+        } else {
+            try {
+                await form.validateFields(['host', 'user']);
+            } catch {
+                return;
+            }
         }
 
         setIsTesting(true);
@@ -171,16 +174,19 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
 
         try {
             const values = form.getFieldsValue();
+            const isWsl = values.connectionType === 'wsl';
             const formData: ConnectionFormData = {
                 name: values.name,
                 description: values.description,
-                host: values.host,
-                user: values.user,
+                host: isWsl ? 'localhost' : values.host,
+                user: isWsl ? (values.wslUser || 'default') : values.user,
                 connectionType: values.connectionType || 'ssh',
-                authMethod: values.authMethod,
-                keyPath: values.keyPath || '',
+                authMethod: values.connectionType === 'rdp' ? 'password' : (isWsl ? 'password' : values.authMethod),
+                keyPath: values.connectionType === 'ssh' && values.authMethod === 'key' ? values.keyPath : '',
                 autoConnect: values.autoConnect || false,
-                bastionConnectionId: values.bastionConnectionId || undefined,
+                bastionConnectionId: values.connectionType === 'ssh' ? (values.bastionConnectionId || undefined) : undefined,
+                wslDistro: isWsl ? values.wslDistro : undefined,
+                wslUser: isWsl ? values.wslUser : undefined,
             };
 
             await window.ssm.testConnection({ ...formData, password });
@@ -267,8 +273,8 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
         }
     };
 
-    // Determine if we should show SSH-specific test button
-    const showTestButton = connectionType === 'ssh';
+    // Determine if we should show test button
+    const showTestButton = connectionType === 'ssh' || connectionType === 'wsl';
 
     return (
         <Modal
