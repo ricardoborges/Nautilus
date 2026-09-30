@@ -4,8 +4,6 @@ A desktop app for managing Linux servers over SSH. Connect to a server and you g
 
 Built with Tauri, React and a Node.js sidecar that handles the SSH/SFTP heavy lifting.
 
-<img src="./01.png" width="49%" alt="Dashboard" /> <img src="./02.png" width="49%" alt="Terminal and SFTP" />
-
 ## Features
 
 - **Dashboard** — live CPU, memory, disk and network metrics, uptime, and systemd service status
