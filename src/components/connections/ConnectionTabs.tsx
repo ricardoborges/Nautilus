@@ -17,6 +17,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useConnection } from '../../context/ConnectionContext';
 import { useTheme } from '../../context/ThemeContext';
+import { WslIcon } from './WslIcon';
 import type { MenuProps } from 'antd';
 
 const { Text } = Typography;
@@ -26,7 +27,7 @@ const getConnectionIcon = (type?: string) => {
         case 'rdp':
             return <WindowsOutlined style={{ color: '#0078d4' }} />;
         case 'wsl':
-            return <CodeOutlined style={{ color: '#13c2c2' }} />;
+            return <WslIcon size={14} />;
         default:
             return <LinuxOutlined style={{ color: '#f57c00' }} />;
     }

@@ -25,6 +25,9 @@ interface ConnectionRow {
     tags?: string | null;
     environment?: string | null;
     bastion_connection_id?: string | null;
+    wsl_distro?: string | null;
+    wsl_user?: string | null;
+    container_engine?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -37,7 +40,7 @@ function rowToConnection(row: ConnectionRow): Connection {
         host: row.host,
         port: row.port,
         user: row.user,
-        connectionType: row.connection_type as 'ssh' | 'rdp',
+        connectionType: row.connection_type as 'ssh' | 'rdp' | 'wsl',
         authMethod: row.auth_method as 'password' | 'key',
         keyPath: row.key_path,
         lastSeen: row.last_seen,
@@ -48,6 +51,9 @@ function rowToConnection(row: ConnectionRow): Connection {
         bastionConnectionId: row.bastion_connection_id ?? undefined,
         rdpAuthMethod: row.rdp_auth_method as 'credentials' | 'windows_auth' | undefined,
         domain: row.domain ?? undefined,
+        wslDistro: row.wsl_distro ?? undefined,
+        wslUser: row.wsl_user ?? undefined,
+        containerEngine: (row.container_engine as any) || 'auto',
     };
 }
 
@@ -92,6 +98,9 @@ export class ConnectionRepository {
             JSON.stringify(data.tags ?? []),
             data.environment ?? 'other',
             data.bastionConnectionId ?? null,
+            data.wslDistro ?? null,
+            data.wslUser ?? null,
+            data.containerEngine ?? 'auto',
         ];
 
         db.run(`
@@ -99,8 +108,8 @@ export class ConnectionRepository {
                 id, name, description, host, port, user,
                 connection_type, auth_method, key_path, last_seen,
                 monitored_services, auto_connect, rdp_auth_method, domain,
-                tags, environment, bastion_connection_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tags, environment, bastion_connection_id, wsl_distro, wsl_user, container_engine
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, params);
 
         saveDatabase();
@@ -133,6 +142,9 @@ export class ConnectionRepository {
             JSON.stringify(data.tags ?? existing.tags ?? []),
             data.environment ?? existing.environment ?? 'other',
             data.bastionConnectionId !== undefined ? data.bastionConnectionId : (existing.bastionConnectionId ?? null),
+            data.wslDistro !== undefined ? data.wslDistro : (existing.wslDistro ?? null),
+            data.wslUser !== undefined ? data.wslUser : (existing.wslUser ?? null),
+            data.containerEngine !== undefined ? data.containerEngine : (existing.containerEngine ?? 'auto'),
             id,
         ];
 
@@ -154,6 +166,9 @@ export class ConnectionRepository {
                 tags = ?,
                 environment = ?,
                 bastion_connection_id = ?,
+                wsl_distro = ?,
+                wsl_user = ?,
+                container_engine = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `, params);

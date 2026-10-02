@@ -28,6 +28,7 @@ import {
     Checkbox,
     theme,
     App,
+    Segmented,
 } from 'antd';
 import { ProCard } from '@ant-design/pro-components';
 import {
@@ -359,11 +360,23 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
 }) => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
-    const { modal, message: messageApi } = App.useApp();
-    const { activeConnectionId: contextConnectionId, activeConnection, dockerAvailable } = useConnection();
+    const { message: messageApi, modal } = App.useApp();
+    const {
+        activeConnectionId: contextConnectionId,
+        activeConnection,
+        dockerAvailable,
+        dockerEngine,
+        availableEngines,
+        dockerCount,
+        wslcCount,
+        checkDockerAvailability,
+    } = useConnection();
 
     // Use prop connectionId if provided, otherwise fall back to context
     const activeConnectionId = propConnectionId ?? contextConnectionId;
+    const [selectedEngine, setSelectedEngine] = useState<'docker' | 'wslc' | null>(null);
+    const currentEngine = selectedEngine || dockerEngine || undefined;
+
     const [containers, setContainers] = useState<DockerContainer[]>([]);
     const [images, setImages] = useState<DockerImage[]>([]);
     const [volumes, setVolumes] = useState<DockerVolume[]>([]);
@@ -428,12 +441,13 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
     // Get host IP for port links
     const hostIp = activeConnection?.host || 'localhost';
 
-    const loadContainers = useCallback(async () => {
+    const loadContainers = useCallback(async (engineOverride?: 'docker' | 'wslc') => {
         if (!activeConnectionId) return;
+        const targetEngine = engineOverride || currentEngine;
 
         setLoading(true);
         try {
-            const result = await window.ssm.dockerListContainers(activeConnectionId);
+            const result = await window.ssm.dockerListContainers(activeConnectionId, targetEngine);
             setContainers(result);
             setDockerPermissionError(false);
         } catch (error) {
@@ -446,14 +460,15 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
         } finally {
             setLoading(false);
         }
-    }, [activeConnectionId, t]);
+    }, [activeConnectionId, currentEngine, t]);
 
-    const loadImages = useCallback(async () => {
+    const loadImages = useCallback(async (engineOverride?: 'docker' | 'wslc') => {
         if (!activeConnectionId) return;
+        const targetEngine = engineOverride || currentEngine;
 
         setImagesLoading(true);
         try {
-            const result = await window.ssm.dockerListImages(activeConnectionId);
+            const result = await window.ssm.dockerListImages(activeConnectionId, targetEngine);
             setImages(result);
         } catch (error) {
             console.error('Failed to load images:', error);
@@ -465,14 +480,15 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
         } finally {
             setImagesLoading(false);
         }
-    }, [activeConnectionId, t]);
+    }, [activeConnectionId, currentEngine, t]);
 
-    const loadVolumes = useCallback(async () => {
+    const loadVolumes = useCallback(async (engineOverride?: 'docker' | 'wslc') => {
         if (!activeConnectionId) return;
+        const targetEngine = engineOverride || currentEngine;
 
         setVolumesLoading(true);
         try {
-            const result = await window.ssm.dockerListVolumes(activeConnectionId);
+            const result = await window.ssm.dockerListVolumes(activeConnectionId, targetEngine);
             setVolumes(result);
         } catch (error) {
             console.error('Failed to load volumes:', error);
@@ -484,14 +500,15 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
         } finally {
             setVolumesLoading(false);
         }
-    }, [activeConnectionId, t]);
+    }, [activeConnectionId, currentEngine, t]);
 
-    const loadNetworks = useCallback(async () => {
+    const loadNetworks = useCallback(async (engineOverride?: 'docker' | 'wslc') => {
         if (!activeConnectionId) return;
+        const targetEngine = engineOverride || currentEngine;
 
         setNetworksLoading(true);
         try {
-            const result = await window.ssm.dockerListNetworks(activeConnectionId);
+            const result = await window.ssm.dockerListNetworks(activeConnectionId, targetEngine);
             setNetworks(result);
         } catch (error) {
             console.error('Failed to load networks:', error);
@@ -503,14 +520,15 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
         } finally {
             setNetworksLoading(false);
         }
-    }, [activeConnectionId, t]);
+    }, [activeConnectionId, currentEngine, t]);
 
-    const loadStacks = useCallback(async () => {
+    const loadStacks = useCallback(async (engineOverride?: 'docker' | 'wslc') => {
         if (!activeConnectionId) return;
+        const targetEngine = engineOverride || currentEngine;
 
         setStacksLoading(true);
         try {
-            const data = await window.ssm.dockerListStacks(activeConnectionId);
+            const data = await window.ssm.dockerListStacks(activeConnectionId, targetEngine);
             setStacks(data);
         } catch (error) {
             console.error('Failed to load stacks:', error);
@@ -522,7 +540,19 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
         } finally {
             setStacksLoading(false);
         }
-    }, [activeConnectionId, t]);
+    }, [activeConnectionId, currentEngine, t]);
+
+    const handleEngineChange = async (nextEngine: 'docker' | 'wslc') => {
+        setSelectedEngine(nextEngine);
+        if (activeConnectionId) {
+            await checkDockerAvailability(activeConnectionId, nextEngine);
+            loadContainers(nextEngine);
+            loadImages(nextEngine);
+            loadVolumes(nextEngine);
+            loadNetworks(nextEngine);
+            loadStacks(nextEngine);
+        }
+    };
 
     useEffect(() => {
         if (activeConnectionId && dockerAvailable) {
@@ -532,7 +562,7 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
             loadNetworks();
             loadStacks();
         }
-    }, [activeConnectionId, dockerAvailable, loadContainers, loadImages, loadVolumes, loadNetworks, loadStacks]);
+    }, [activeConnectionId, dockerAvailable, currentEngine, loadContainers, loadImages, loadVolumes, loadNetworks, loadStacks]);
 
     const handleAction = async (containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill') => {
         if (!activeConnectionId) return;
@@ -753,6 +783,56 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
         );
     }, [images, imageSearchText]);
 
+    // Helper to determine if an image is in use by any container
+    const isImageInUse = useCallback((image: DockerImage): boolean => {
+        if (typeof image.inUse === 'boolean') {
+            return image.inUse;
+        }
+        if (typeof image.containersCount === 'number') {
+            return image.containersCount > 0;
+        }
+
+        const rawId = (image.id || '').replace(/^sha256:/i, '').toLowerCase();
+        const shortId = rawId.substring(0, 12);
+        const repo = (image.repository || '').trim();
+        const tag = (image.tag || '').trim();
+        const isUntagged = repo === '<none>' || tag === '<none>';
+        const fullTag = !isUntagged ? `${repo}:${tag}` : '';
+        const isLatest = tag === 'latest';
+
+        return containers.some(c => {
+            const cImg = (c.image || '').trim();
+            if (!cImg) return false;
+
+            const cImgLower = cImg.toLowerCase();
+            const cImgRaw = cImgLower.replace(/^sha256:/i, '');
+
+            // ID matching (full or prefix)
+            if (rawId && (cImgRaw === rawId || (cImgRaw.length >= 6 && rawId.startsWith(cImgRaw)) || (rawId.length >= 6 && cImgRaw.startsWith(rawId)))) {
+                return true;
+            }
+            if (shortId && (cImgRaw.startsWith(shortId) || shortId.startsWith(cImgRaw))) {
+                return true;
+            }
+
+            // Tag/Repository matching
+            if (fullTag) {
+                if (cImg === fullTag) return true;
+                if (isLatest && cImg === repo) return true;
+                if (cImg === `${repo}:latest`) return true;
+                if (cImg.endsWith(`/${fullTag}`) || fullTag.endsWith(`/${cImg}`)) return true;
+                if (isLatest && (cImg.endsWith(`/${repo}`) || repo.endsWith(`/${cImg}`))) return true;
+            }
+
+            return false;
+        });
+    }, [containers]);
+
+    // Unused images list
+    const unusedImages = useMemo(() => {
+        return images.filter(img => !isImageInUse(img));
+    }, [images, isImageInUse]);
+
     // Handle bulk remove selected images
     const removeSelectedImages = async () => {
         if (!activeConnectionId || selectedImages.length === 0) return;
@@ -763,7 +843,7 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
 
         for (const imageId of selectedImages) {
             try {
-                await window.ssm.dockerImageAction(activeConnectionId, imageId, 'remove');
+                await window.ssm.dockerImageAction(activeConnectionId, imageId, 'remove', currentEngine);
                 successCount++;
             } catch (error) {
                 const err = error as Error;
@@ -773,7 +853,7 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
 
         setSelectedImages([]);
         setActionLoading(null);
-        await loadImages();
+        await Promise.all([loadImages(), loadContainers()]);
 
         if (successCount > 0) {
             messageApi.success(t('docker.images_removed_count', { count: successCount }));
@@ -783,6 +863,44 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
                 content: errors.join('\n'),
                 duration: 5,
             });
+        }
+    };
+
+    // Handle prune/remove all unused images
+    const handlePruneUnusedImages = async () => {
+        if (!activeConnectionId) return;
+
+        setActionLoading('prune');
+        try {
+            await window.ssm.dockerImagePrune(activeConnectionId, currentEngine);
+            messageApi.success(t('docker.remove_unused_images_success'));
+        } catch (error) {
+            console.warn('Native prune failed, attempting individual removal of unused images:', error);
+            if (unusedImages.length > 0) {
+                let successCount = 0;
+                for (const img of unusedImages) {
+                    try {
+                        const targetId = img.repository !== '<none>' && img.tag !== '<none>'
+                            ? `${img.repository}:${img.tag}`
+                            : img.id;
+                        await window.ssm.dockerImageAction(activeConnectionId, targetId, 'remove', currentEngine);
+                        successCount++;
+                    } catch {
+                        // ignore or continue
+                    }
+                }
+                if (successCount > 0) {
+                    messageApi.success(t('docker.remove_unused_images_success'));
+                } else {
+                    messageApi.error((error as Error).message || t('docker.remove_unused_images_error'));
+                }
+            } else {
+                messageApi.error((error as Error).message || t('docker.remove_unused_images_error'));
+            }
+        } finally {
+            setActionLoading(null);
+            setSelectedImages([]);
+            await Promise.all([loadImages(), loadContainers()]);
         }
     };
 
@@ -1305,30 +1423,6 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
 
     const imageColumns = [
         {
-            title: t('docker.image_id'),
-            dataIndex: 'id',
-            key: 'id',
-            width: 280,
-            sorter: (a: DockerImage, b: DockerImage) => a.id.localeCompare(b.id),
-            render: (id: string, record: DockerImage) => {
-                const isUnused = record.repository === '<none>' || record.tag === '<none>';
-                return (
-                    <Space>
-                        <Tooltip title={id}>
-                            <Text code style={{ fontSize: 12, color: '#8b8b8b' }}>
-                                {id.startsWith('sha256:') ? id.substring(0, 19) + '...' : id.substring(0, 12)}
-                            </Text>
-                        </Tooltip>
-                        {isUnused && (
-                            <Tag color="orange" style={{ marginLeft: 8 }}>
-                                {t('docker.unused')}
-                            </Tag>
-                        )}
-                    </Space>
-                );
-            },
-        },
-        {
             title: t('docker.tags'),
             key: 'tags',
             ellipsis: true,
@@ -1339,7 +1433,7 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
             },
             render: (_: unknown, record: DockerImage) => {
                 if (record.repository === '<none>' || record.tag === '<none>') {
-                    return <Text type="secondary">-</Text>;
+                    return <Text type="secondary">&lt;none&gt;</Text>;
                 }
                 const fullTag = `${record.repository}:${record.tag}`;
                 return (
@@ -1347,6 +1441,45 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
                         <Tag color="geekblue" style={{ fontSize: 12, maxWidth: 350, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {fullTag}
                         </Tag>
+                    </Tooltip>
+                );
+            },
+        },
+        {
+            title: t('docker.status') || 'Status',
+            key: 'status',
+            width: 140,
+            sorter: (a: DockerImage, b: DockerImage) => {
+                const aUsed = isImageInUse(a);
+                const bUsed = isImageInUse(b);
+                return aUsed === bUsed ? 0 : aUsed ? -1 : 1;
+            },
+            render: (_: unknown, record: DockerImage) => {
+                const inUse = isImageInUse(record);
+                return inUse ? (
+                    <Tag color="success" icon={<CheckCircleOutlined />} style={{ borderRadius: 10, padding: '1px 8px', margin: 0 }}>
+                        {t('docker.in_use')}
+                    </Tag>
+                ) : (
+                    <Tag color="orange" icon={<ClockCircleOutlined />} style={{ borderRadius: 10, padding: '1px 8px', margin: 0 }}>
+                        {t('docker.unused')}
+                    </Tag>
+                );
+            },
+        },
+        {
+            title: t('docker.image_id'),
+            dataIndex: 'id',
+            key: 'id',
+            width: 200,
+            sorter: (a: DockerImage, b: DockerImage) => a.id.localeCompare(b.id),
+            render: (id: string) => {
+                const cleanId = id.replace(/^sha256:/i, '');
+                return (
+                    <Tooltip title={id}>
+                        <Text code style={{ fontSize: 12, color: '#8b8b8b' }}>
+                            {cleanId.substring(0, 12)}
+                        </Text>
                     </Tooltip>
                 );
             },
@@ -1650,7 +1783,7 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
                 <Button
                     type="primary"
                     icon={<ReloadOutlined />}
-                    onClick={loadContainers}
+                    onClick={() => { loadContainers(); }}
                     loading={loading}
                 >
                     {t('common.refresh')}
@@ -1661,12 +1794,48 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
 
     return (
         <div style={{ padding: 16, height: '100%', overflow: 'auto' }}>
-            {/* New Deploy Button - Always visible */}
+            {/* Top Toolbar: Engine Selector & Deploy Button */}
             <div style={{
                 display: 'flex',
-                justifyContent: 'flex-end',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 marginBottom: 16,
+                flexWrap: 'wrap',
+                gap: 12,
             }}>
+                <Space size={8} align="center">
+                    {availableEngines && availableEngines.length > 1 ? (
+                        <Segmented
+                            value={currentEngine || 'docker'}
+                            onChange={(val) => handleEngineChange(val as 'docker' | 'wslc')}
+                            options={[
+                                {
+                                    label: (
+                                        <Space size={6}>
+                                            <span>🐳 Docker</span>
+                                            <Tag style={{ margin: 0, fontSize: 10 }}>{dockerCount}</Tag>
+                                        </Space>
+                                    ),
+                                    value: 'docker'
+                                },
+                                {
+                                    label: (
+                                        <Space size={6}>
+                                            <span>🪟 WSL Containers</span>
+                                            <Tag color="cyan" style={{ margin: 0, fontSize: 10 }}>{wslcCount}</Tag>
+                                        </Space>
+                                    ),
+                                    value: 'wslc'
+                                }
+                            ]}
+                        />
+                    ) : currentEngine === 'wslc' ? (
+                        <Tag color="cyan" icon={<CodeOutlined />} style={{ padding: '4px 10px', fontSize: 13 }}>
+                            WSL Containers (wslc)
+                        </Tag>
+                    ) : null}
+                </Space>
+
                 <Button
                     type="primary"
                     icon={<RocketOutlined />}
@@ -1828,12 +1997,42 @@ export const DockerDashboard: React.FC<DockerDashboardProps> = ({
                                                     {t('docker.remove')} {selectedImages.length > 0 && `(${selectedImages.length})`}
                                                 </Button>
                                             </Popconfirm>
+                                            <Popconfirm
+                                                title={t('docker.remove_unused_images_title')}
+                                                description={
+                                                    <div style={{ maxWidth: 300 }}>
+                                                        <div>{t('docker.remove_unused_images_desc', { count: unusedImages.length })}</div>
+                                                        <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4 }}>
+                                                            {t('docker.remove_unused_images_warning')}
+                                                        </div>
+                                                    </div>
+                                                }
+                                                onConfirm={handlePruneUnusedImages}
+                                                disabled={unusedImages.length === 0 || actionLoading !== null}
+                                                okText={t('common.delete')}
+                                                cancelText={t('common.cancel')}
+                                                okButtonProps={{ danger: true, loading: actionLoading === 'prune' }}
+                                            >
+                                                <Button
+                                                    danger
+                                                    icon={<DeleteOutlined />}
+                                                    disabled={unusedImages.length === 0}
+                                                    loading={actionLoading === 'prune'}
+                                                    style={{
+                                                        borderColor: unusedImages.length > 0 ? '#ff7875' : undefined,
+                                                        color: unusedImages.length > 0 ? '#ff4d4f' : undefined,
+                                                    }}
+                                                >
+                                                    {t('docker.remove_unused_images')} {unusedImages.length > 0 && `(${unusedImages.length})`}
+                                                </Button>
+                                            </Popconfirm>
                                             <Button
                                                 type="primary"
                                                 icon={<ReloadOutlined />}
                                                 onClick={() => {
                                                     setSelectedImages([]);
                                                     loadImages();
+                                                    loadContainers();
                                                 }}
                                                 loading={imagesLoading}
                                             >

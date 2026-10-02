@@ -107,6 +107,9 @@ function createSchema(database: SqlJsDatabase): void {
             tags TEXT DEFAULT '[]',
             environment TEXT DEFAULT 'other',
             bastion_connection_id TEXT DEFAULT NULL,
+            wsl_distro TEXT DEFAULT NULL,
+            wsl_user TEXT DEFAULT NULL,
+            container_engine TEXT DEFAULT 'auto',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
@@ -116,6 +119,9 @@ function createSchema(database: SqlJsDatabase): void {
     try { database.run("ALTER TABLE connections ADD COLUMN tags TEXT DEFAULT '[]'"); } catch {}
     try { database.run("ALTER TABLE connections ADD COLUMN environment TEXT DEFAULT 'other'"); } catch {}
     try { database.run("ALTER TABLE connections ADD COLUMN bastion_connection_id TEXT DEFAULT NULL"); } catch {}
+    try { database.run("ALTER TABLE connections ADD COLUMN wsl_distro TEXT DEFAULT NULL"); } catch {}
+    try { database.run("ALTER TABLE connections ADD COLUMN wsl_user TEXT DEFAULT NULL"); } catch {}
+    try { database.run("ALTER TABLE connections ADD COLUMN container_engine TEXT DEFAULT 'auto'"); } catch {}
 
     // Create snippets table
     database.run(`

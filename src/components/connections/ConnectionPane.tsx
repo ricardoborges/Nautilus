@@ -122,7 +122,7 @@ export const ConnectionPane: React.FC<ConnectionPaneProps> = ({
         {
             key: 'docker',
             icon: <ContainerOutlined />,
-            label: t('common.docker'),
+            label: t('common.container', 'Container'),
         },
     ];
 

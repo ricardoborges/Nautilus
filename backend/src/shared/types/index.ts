@@ -42,9 +42,10 @@ export interface ConnectionData {
     // WSL specific fields
     wslDistro?: string;
     wslUser?: string;
+    containerEngine?: 'auto' | 'docker' | 'wslc';
 }
 
-export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen' | 'rdpAuthMethod' | 'domain' | 'description' | 'tags' | 'environment' | 'bastionConnectionId' | 'wslDistro' | 'wslUser'>> {
+export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen' | 'rdpAuthMethod' | 'domain' | 'description' | 'tags' | 'environment' | 'bastionConnectionId' | 'wslDistro' | 'wslUser' | 'containerEngine'>> {
     keyPath: string | null;
     lastSeen: string | null;
     rdpAuthMethod?: 'credentials' | 'windows_auth';
@@ -55,6 +56,7 @@ export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'l
     bastionConnectionId?: string | null;
     wslDistro?: string;
     wslUser?: string;
+    containerEngine?: 'auto' | 'docker' | 'wslc';
 }
 
 // ========================

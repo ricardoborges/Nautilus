@@ -387,23 +387,23 @@ const ssm: SSMAPI = {
     },
 
     // Docker methods
-    dockerCheckAvailable: (connectionId: string): Promise<DockerInfo> =>
-        backendInvoke<DockerInfo>('ssm:docker:check', { connectionId }),
+    dockerCheckAvailable: (connectionId: string, engine?: 'docker' | 'wslc'): Promise<DockerInfo> =>
+        backendInvoke<DockerInfo>('ssm:docker:check', { connectionId, engine }),
 
-    dockerListContainers: (connectionId: string): Promise<DockerContainer[]> =>
-        backendInvoke<DockerContainer[]>('ssm:docker:list', { connectionId }),
+    dockerListContainers: (connectionId: string, engine?: 'docker' | 'wslc'): Promise<DockerContainer[]> =>
+        backendInvoke<DockerContainer[]>('ssm:docker:list', { connectionId, engine }),
 
-    dockerListImages: (connectionId: string): Promise<DockerImage[]> =>
-        backendInvoke<DockerImage[]>('ssm:docker:images', { connectionId }),
+    dockerListImages: (connectionId: string, engine?: 'docker' | 'wslc'): Promise<DockerImage[]> =>
+        backendInvoke<DockerImage[]>('ssm:docker:images', { connectionId, engine }),
 
-    dockerListVolumes: (connectionId: string): Promise<DockerVolume[]> =>
-        backendInvoke<DockerVolume[]>('ssm:docker:volumes', { connectionId }),
+    dockerListVolumes: (connectionId: string, engine?: 'docker' | 'wslc'): Promise<DockerVolume[]> =>
+        backendInvoke<DockerVolume[]>('ssm:docker:volumes', { connectionId, engine }),
 
-    dockerListNetworks: (connectionId: string): Promise<DockerNetwork[]> =>
-        backendInvoke<DockerNetwork[]>('ssm:docker:networks', { connectionId }),
+    dockerListNetworks: (connectionId: string, engine?: 'docker' | 'wslc'): Promise<DockerNetwork[]> =>
+        backendInvoke<DockerNetwork[]>('ssm:docker:networks', { connectionId, engine }),
 
-    dockerListStacks: (connectionId: string): Promise<DockerStack[]> =>
-        backendInvoke<DockerStack[]>('ssm:docker:stacks', { connectionId }),
+    dockerListStacks: (connectionId: string, engine?: 'docker' | 'wslc'): Promise<DockerStack[]> =>
+        backendInvoke<DockerStack[]>('ssm:docker:stacks', { connectionId, engine }),
 
     dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill'): Promise<void> =>
         backendInvoke<void>('ssm:docker:action', { connectionId, containerId, action }),
@@ -411,8 +411,11 @@ const ssm: SSMAPI = {
     dockerContainerLogs: (connectionId: string, containerId: string, tail?: number): Promise<string> =>
         backendInvoke<string>('ssm:docker:logs', { connectionId, containerId, tail }),
 
-    dockerImageAction: (connectionId: string, imageId: string, action: 'remove'): Promise<void> =>
-        backendInvoke<void>('ssm:docker:imageAction', { connectionId, imageId, action }),
+    dockerImageAction: (connectionId: string, imageId: string, action: 'remove', engine?: 'docker' | 'wslc'): Promise<void> =>
+        backendInvoke<void>('ssm:docker:imageAction', { connectionId, imageId, action, engine }),
+
+    dockerImagePrune: (connectionId: string, engine?: 'docker' | 'wslc'): Promise<{ success: boolean; output?: string }> =>
+        backendInvoke<{ success: boolean; output?: string }>('ssm:docker:imagePrune', { connectionId, engine }),
 
     dockerVolumeAction: (connectionId: string, volumeName: string, action: 'remove'): Promise<void> =>
         backendInvoke<void>('ssm:docker:volumeAction', { connectionId, volumeName, action }),
@@ -429,8 +432,8 @@ const ssm: SSMAPI = {
     dockerExecTerminal: (connectionId: string, terminalId: string, containerId: string, cols?: number, rows?: number): Promise<void> =>
         backendInvoke<void>('ssm:docker:execTerminal', { connectionId, terminalId, containerId, cols, rows }),
 
-    dockerStats: (connectionId: string): Promise<DockerStatItem[]> =>
-        backendInvoke<DockerStatItem[]>('ssm:docker:stats', { connectionId }),
+    dockerStats: (connectionId: string, engine?: 'docker' | 'wslc'): Promise<DockerStatItem[]> =>
+        backendInvoke<DockerStatItem[]>('ssm:docker:stats', { connectionId, engine }),
 
     // RDP methods
     rdpConnect: (options: RdpConnectOptions): Promise<RdpConnectResponse> =>

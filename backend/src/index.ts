@@ -25,8 +25,21 @@ import { TunnelService, TunnelConfig } from './features/tunnels';
 import { UfwService, Fail2banService, PackagesService, AddUfwRuleOptions } from './features/security';
 import { SystemMonitor } from './features/metrics';
 import { snippetManager } from './features/snippets';
+import {
+    isWslAvailable,
+    listWslDistros,
+    createCommandRunner,
+    CommandRunner,
+    isWslcAvailable,
+    getWslcVersion,
+    wslcExec,
+    wslcListContainersWithIps,
+    parseWslcImages,
+    parseWslcVolumes,
+    parseWslcNetworks,
+    parseWslcStats,
+} from './features/execution';
 import logger from './shared/utils/logger';
-import { isWslAvailable, listWslDistros, createCommandRunner, CommandRunner } from './features/execution';
 import { initializeDatabase, closeDatabase, exportDatabase, importDatabase } from './shared/database';
 import { validateId, escapeShellArg } from './shared/utils/security.utils';
 import type {
@@ -54,6 +67,74 @@ const tunnelService = new TunnelService();
 const ufwService = new UfwService();
 const fail2banService = new Fail2banService();
 const packagesService = new PackagesService();
+type ContainerEngine = 'docker' | 'wslc';
+const connectionContainerEngine = new Map<string, ContainerEngine>();
+
+async function resolveContainerEngine(
+    conn: Connection,
+    runner: CommandRunner,
+    requestedEngine?: ContainerEngine
+): Promise<ContainerEngine | null> {
+    if (requestedEngine) {
+        connectionContainerEngine.set(conn.id, requestedEngine);
+        return requestedEngine;
+    }
+
+    if (conn.containerEngine && (conn.containerEngine === 'wslc' || conn.containerEngine === 'docker')) {
+        connectionContainerEngine.set(conn.id, conn.containerEngine);
+        return conn.containerEngine;
+    }
+
+    const cached = connectionContainerEngine.get(conn.id);
+    if (cached) return cached;
+
+    // Check availability of Docker
+    let dockerAvailable = false;
+    let dockerCount = 0;
+    try {
+        const versionResult = await runner.exec('docker --version 2>/dev/null');
+        if (versionResult.stdout && versionResult.stdout.includes('Docker version')) {
+            const psTest = await runner.exec('docker ps -q 2>/dev/null');
+            if (psTest.code === 0) {
+                dockerAvailable = true;
+                const lines = psTest.stdout.trim().split('\n').filter(l => l.trim().length > 0);
+                dockerCount = lines.length;
+            }
+        }
+    } catch {}
+
+    // Check availability of WSLC
+    let wslcAvailable = false;
+    let wslcCount = 0;
+    if (conn.connectionType === 'wsl' || process.platform === 'win32') {
+        try {
+            if (await isWslcAvailable()) {
+                wslcAvailable = true;
+                const containers = await wslcListContainersWithIps();
+                wslcCount = containers.length;
+            }
+        } catch {}
+    }
+
+    // Smart default selection:
+    // If WSLC has containers and Docker has 0 containers, prefer WSLC!
+    if (wslcAvailable && wslcCount > 0 && dockerCount === 0) {
+        connectionContainerEngine.set(conn.id, 'wslc');
+        return 'wslc';
+    }
+
+    if (dockerAvailable) {
+        connectionContainerEngine.set(conn.id, 'docker');
+        return 'docker';
+    }
+
+    if (wslcAvailable) {
+        connectionContainerEngine.set(conn.id, 'wslc');
+        return 'wslc';
+    }
+
+    return null;
+}
 
 // Event subscribers (for metrics and terminal data)
 const eventSubscribers = new Map<string, ServerResponse[]>();
@@ -826,47 +907,105 @@ const handlers: HandlerRegistry = {
         return { success: true };
     },
 
-    // Docker handlers
+    // Container Engine state & resolution (Docker vs WSL Containers wslc)
     'ssm:docker:check': async (args) => {
-        const { connectionId } = args as { connectionId: string };
+        const { connectionId, engine: requestedEngine } = args as { connectionId: string; engine?: ContainerEngine };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
-            // Check if docker command exists
-            const versionResult = await runner.exec('docker --version 2>/dev/null');
-            if (versionResult.stdout && versionResult.stdout.includes('Docker version')) {
-                const versionMatch = versionResult.stdout.match(/Docker version ([^,]+)/);
+            let dockerAvailable = false;
+            let dockerVersion = 'unknown';
+            let dockerContainersCount = 0;
 
-                // Try to get containers count
-                let containersCount = 0;
-                try {
-                    const infoResult = await runner.exec('docker info --format "{{.Containers}}" 2>/dev/null');
-                    containersCount = parseInt(infoResult.stdout.trim()) || 0;
-                } catch {
-                    // Ignore - user may not have permission to run docker info
+            try {
+                const versionResult = await runner.exec('docker --version 2>/dev/null');
+                if (versionResult.stdout && versionResult.stdout.includes('Docker version')) {
+                    const versionMatch = versionResult.stdout.match(/Docker version ([^,]+)/);
+                    if (versionMatch) dockerVersion = versionMatch[1];
+                    let daemonRunning = false;
+                    try {
+                        const infoResult = await runner.exec('docker info --format "{{.Containers}}" 2>/dev/null');
+                        if (!infoResult.stderr && infoResult.stdout.trim()) {
+                            dockerContainersCount = parseInt(infoResult.stdout.trim()) || 0;
+                            daemonRunning = true;
+                        }
+                    } catch {}
+
+                    if (daemonRunning) {
+                        dockerAvailable = true;
+                    }
                 }
+            } catch {}
 
-                return {
-                    available: true,
-                    version: versionMatch ? versionMatch[1] : 'unknown',
-                    containers: containersCount,
-                };
+            let wslcAvailable = false;
+            let wslcVersion = 'unknown';
+            let wslcContainersCount = 0;
+
+            if (conn.connectionType === 'wsl' || process.platform === 'win32') {
+                try {
+                    wslcAvailable = await isWslcAvailable();
+                    if (wslcAvailable) {
+                        wslcVersion = await getWslcVersion();
+                        const containers = await wslcListContainersWithIps();
+                        wslcContainersCount = containers.length;
+                    }
+                } catch {}
             }
-            return { available: false };
+
+            const availableEngines: ContainerEngine[] = [];
+            if (dockerAvailable) availableEngines.push('docker');
+            if (wslcAvailable) availableEngines.push('wslc');
+
+            if (availableEngines.length === 0) {
+                return { available: false, availableEngines: [] };
+            }
+
+            // Determine active engine
+            let activeEngine: ContainerEngine;
+            if (requestedEngine && availableEngines.includes(requestedEngine)) {
+                activeEngine = requestedEngine;
+            } else if (conn.containerEngine && availableEngines.includes(conn.containerEngine as ContainerEngine)) {
+                activeEngine = conn.containerEngine as ContainerEngine;
+            } else if (connectionContainerEngine.has(connectionId) && availableEngines.includes(connectionContainerEngine.get(connectionId)!)) {
+                activeEngine = connectionContainerEngine.get(connectionId)!;
+            } else if (wslcAvailable && wslcContainersCount > 0 && dockerContainersCount === 0) {
+                activeEngine = 'wslc';
+            } else if (dockerAvailable) {
+                activeEngine = 'docker';
+            } else {
+                activeEngine = 'wslc';
+            }
+
+            connectionContainerEngine.set(connectionId, activeEngine);
+
+            return {
+                available: true,
+                engine: activeEngine,
+                availableEngines,
+                dockerCount: dockerContainersCount,
+                wslcCount: wslcContainersCount,
+                version: activeEngine === 'wslc' ? `wslc ${wslcVersion}` : dockerVersion,
+                containers: activeEngine === 'wslc' ? wslcContainersCount : dockerContainersCount,
+            };
         } catch {
-            return { available: false };
+            return { available: false, availableEngines: [] };
         } finally {
             runner.dispose?.();
         }
     },
 
     'ssm:docker:list': async (args) => {
-        const { connectionId } = args as { connectionId: string };
+        const { connectionId, engine: requestedEngine } = args as { connectionId: string; engine?: ContainerEngine };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
+            const engine = await resolveContainerEngine(conn, runner, requestedEngine);
+            if (engine === 'wslc') {
+                return await wslcListContainersWithIps();
+            }
+
             // List all containers with extended format including labels for stack and service detection
             const result = await runner.exec('docker ps -a --format "{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.State}}|{{.Ports}}|{{.CreatedAt}}|{{.Label \\"com.docker.compose.project\\"}}|{{.Label \\"com.docker.compose.service\\"}}"');
             const containerLines = result.stdout.trim().split('\n').filter(line => line.trim());
@@ -927,6 +1066,27 @@ const handlers: HandlerRegistry = {
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
+            const engine = await resolveContainerEngine(conn, runner);
+            if (engine === 'wslc') {
+                if (action === 'pause' || action === 'unpause') {
+                    throw new Error('Pausar e despausar containers não é suportado pelo WSL Containers (wslc).');
+                }
+                const wslcActionMap: Record<string, string[]> = {
+                    start: ['start', containerId],
+                    stop: ['stop', containerId],
+                    restart: ['restart', containerId],
+                    remove: ['remove', '-f', containerId],
+                    kill: ['kill', containerId],
+                };
+                const cmdArgs = wslcActionMap[action];
+                if (!cmdArgs) throw new Error('Ação inválida para WSL Containers');
+                const res = await wslcExec(cmdArgs);
+                if (res.code !== 0 && res.stderr && !res.stdout) {
+                    throw new Error(res.stderr);
+                }
+                return { success: true };
+            }
+
             const dockerAction = action === 'remove' ? 'rm -f' : action;
             const result = await runner.exec(`docker ${dockerAction} ${containerId}`);
             if (result.stderr && !result.stdout) {
@@ -951,8 +1111,27 @@ const handlers: HandlerRegistry = {
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
 
+        const runner = await getCommandRunner(conn);
+        const engine = await resolveContainerEngine(conn, runner);
+        runner.dispose?.();
+
         if (conn.connectionType === 'wsl') {
-            throw new Error('O terminal interativo para containers WSL2 será suportado em uma próxima versão.');
+            const innerShell = `if command -v bash >/dev/null 2>&1; then exec bash; else exec sh; fi`;
+            const cmd = engine === 'wslc'
+                ? `wslc.exe exec -it ${safeContainerId} ${innerShell}`
+                : `docker exec -it ${safeContainerId} ${innerShell}`;
+
+            const session = new WSLTerminalSession(
+                (data: string) => broadcastEvent('ssm:terminal:data', { id: terminalId, data }),
+                terminalId,
+                conn.wslDistro,
+                conn.wslUser,
+                cmd
+            );
+
+            activeTerminals.set(terminalId, session);
+            session.start();
+            return { success: true };
         }
 
         const authConfig = await getAuthConfig(conn as AuthArgs);
@@ -982,12 +1161,18 @@ const handlers: HandlerRegistry = {
     },
 
     'ssm:docker:stats': async (args) => {
-        const { connectionId } = args as { connectionId: string };
+        const { connectionId, engine: requestedEngine } = args as { connectionId: string; engine?: ContainerEngine };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
 
         const runner = await getCommandRunner(conn);
         try {
+            const engine = await resolveContainerEngine(conn, runner, requestedEngine);
+            if (engine === 'wslc') {
+                const statsRes = await wslcExec(['stats', '--format', 'json']);
+                return parseWslcStats(statsRes.stdout);
+            }
+
             const result = await runner.exec('docker stats --no-stream --format "{{.ID}}|{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}" 2>/dev/null || echo ""');
             const lines = result.stdout.trim().split('\n').filter(l => l.trim());
             const stats = lines.map(l => {
@@ -1009,11 +1194,17 @@ const handlers: HandlerRegistry = {
     },
 
     'ssm:docker:images': async (args) => {
-        const { connectionId } = args as { connectionId: string };
+        const { connectionId, engine: requestedEngine } = args as { connectionId: string; engine?: ContainerEngine };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
+            const engine = await resolveContainerEngine(conn, runner, requestedEngine);
+            if (engine === 'wslc') {
+                const res = await wslcExec(['images', '--format', 'json']);
+                return parseWslcImages(res.stdout);
+            }
+
             // List all images with formatted output
             const result = await runner.exec('docker images --format "{{.ID}}|{{.Repository}}|{{.Tag}}|{{.Size}}|{{.CreatedAt}}"');
             const images = result.stdout.trim().split('\n')
@@ -1035,10 +1226,11 @@ const handlers: HandlerRegistry = {
     },
 
     'ssm:docker:imageAction': async (args) => {
-        const { connectionId, imageId, action } = args as {
+        const { connectionId, imageId, action, engine: requestedEngine } = args as {
             connectionId: string;
             imageId: string;
             action: 'remove';
+            engine?: ContainerEngine;
         };
 
         // Validate action
@@ -1055,11 +1247,48 @@ const handlers: HandlerRegistry = {
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
+            const engine = await resolveContainerEngine(conn, runner, requestedEngine);
+            if (engine === 'wslc') {
+                const res = await wslcExec(['rmi', imageId]);
+                if (res.code !== 0 && res.stderr && !res.stdout) {
+                    throw new Error(res.stderr);
+                }
+                return { success: true };
+            }
+
             const result = await runner.exec(`docker rmi ${imageId}`);
             if (result.stderr && !result.stdout) {
                 throw new Error(result.stderr);
             }
             return { success: true };
+        } finally {
+            runner.dispose?.();
+        }
+    },
+
+    'ssm:docker:imagePrune': async (args) => {
+        const { connectionId, engine: requestedEngine } = args as {
+            connectionId: string;
+            engine?: ContainerEngine;
+        };
+        const conn = await connectionManager.get(connectionId);
+        if (!conn) throw new Error('Conexão não encontrada');
+        const runner = await getCommandRunner(conn);
+        try {
+            const engine = await resolveContainerEngine(conn, runner, requestedEngine);
+            if (engine === 'wslc') {
+                const res = await wslcExec(['image', 'prune', '-a', '-f']);
+                if (res.code !== 0 && res.stderr && !res.stdout) {
+                    throw new Error(res.stderr);
+                }
+                return { success: true, output: res.stdout };
+            }
+
+            const result = await runner.exec('docker image prune -a -f');
+            if (result.stderr && !result.stdout) {
+                throw new Error(result.stderr);
+            }
+            return { success: true, output: result.stdout };
         } finally {
             runner.dispose?.();
         }
@@ -1087,6 +1316,12 @@ const handlers: HandlerRegistry = {
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
+            const engine = await resolveContainerEngine(conn, runner);
+            if (engine === 'wslc') {
+                const res = await wslcExec(['logs', '--tail', String(safeTail), '--timestamps', containerId]);
+                return res.stdout || res.stderr || '';
+            }
+
             const result = await runner.exec(`docker logs --tail ${safeTail} --timestamps ${containerId} 2>&1`);
             return result.stdout || result.stderr || '';
         } finally {
@@ -1095,11 +1330,17 @@ const handlers: HandlerRegistry = {
     },
 
     'ssm:docker:volumes': async (args) => {
-        const { connectionId } = args as { connectionId: string };
+        const { connectionId, engine: requestedEngine } = args as { connectionId: string; engine?: ContainerEngine };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
+            const engine = await resolveContainerEngine(conn, runner, requestedEngine);
+            if (engine === 'wslc') {
+                const res = await wslcExec(['volume', 'list', '--format', 'json']);
+                return parseWslcVolumes(res.stdout);
+            }
+
             // Get volume list with details including creation time
             const result = await runner.exec('docker volume ls -q');
             const volumeNames = result.stdout.trim().split('\n').filter(name => name.trim());
@@ -1183,6 +1424,15 @@ const handlers: HandlerRegistry = {
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
+            const engine = await resolveContainerEngine(conn, runner);
+            if (engine === 'wslc') {
+                const res = await wslcExec(['volume', 'remove', volumeName]);
+                if (res.code !== 0 && res.stderr && !res.stdout) {
+                    throw new Error(res.stderr);
+                }
+                return { success: true };
+            }
+
             const result = await runner.exec(`docker volume rm ${volumeName}`);
             if (result.stderr && !result.stdout) {
                 throw new Error(result.stderr);
@@ -1194,11 +1444,17 @@ const handlers: HandlerRegistry = {
     },
 
     'ssm:docker:networks': async (args) => {
-        const { connectionId } = args as { connectionId: string };
+        const { connectionId, engine: requestedEngine } = args as { connectionId: string; engine?: ContainerEngine };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
+            const engine = await resolveContainerEngine(conn, runner, requestedEngine);
+            if (engine === 'wslc') {
+                const res = await wslcExec(['network', 'list', '--format', 'json']);
+                return parseWslcNetworks(res.stdout);
+            }
+
             // Get network IDs
             const listResult = await runner.exec('docker network ls -q');
             const networkIds = listResult.stdout.trim().split('\n').filter(id => id.trim());
@@ -1291,6 +1547,15 @@ const handlers: HandlerRegistry = {
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
+            const engine = await resolveContainerEngine(conn, runner);
+            if (engine === 'wslc') {
+                const res = await wslcExec(['network', 'remove', networkId]);
+                if (res.code !== 0 && res.stderr && !res.stdout) {
+                    throw new Error(res.stderr);
+                }
+                return { success: true };
+            }
+
             const result = await runner.exec(`docker network rm ${networkId}`);
             if (result.stderr && !result.stdout) {
                 throw new Error(result.stderr);
@@ -1302,11 +1567,32 @@ const handlers: HandlerRegistry = {
     },
 
     'ssm:docker:stacks': async (args) => {
-        const { connectionId } = args as { connectionId: string };
+        const { connectionId, engine: requestedEngine } = args as { connectionId: string; engine?: ContainerEngine };
         const conn = await connectionManager.get(connectionId);
         if (!conn) throw new Error('Conexão não encontrada');
         const runner = await getCommandRunner(conn);
         try {
+            const engine = await resolveContainerEngine(conn, runner, requestedEngine);
+            if (engine === 'wslc') {
+                const containers = await wslcListContainersWithIps();
+                const projectsMap = new Map<string, { name: string; created: string }>();
+                for (const c of containers) {
+                    if (c.stack && !projectsMap.has(c.stack)) {
+                        projectsMap.set(c.stack, {
+                            name: c.stack,
+                            created: c.created,
+                        });
+                    }
+                }
+                const stacks = Array.from(projectsMap.values()).map(stack => ({
+                    name: stack.name,
+                    type: 'Compose',
+                    control: 'Limited',
+                    created: stack.created,
+                }));
+                return stacks;
+            }
+
             const containersResult = await runner.exec('docker ps -a --format "{{.Labels}}" 2>/dev/null || echo ""');
             const projectsMap = new Map<string, { name: string; created: string }>();
 

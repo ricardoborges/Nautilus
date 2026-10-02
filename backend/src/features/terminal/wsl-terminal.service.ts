@@ -14,18 +14,21 @@ export class WSLTerminalSession implements ITerminalSession {
     private terminalId: string;
     private distro?: string;
     private user?: string;
+    private initialCommand?: string;
     private isClosed = false;
 
     constructor(
         onData: (data: string) => void,
         terminalId: string,
         distro?: string,
-        user?: string
+        user?: string,
+        initialCommand?: string
     ) {
         this.onData = onData;
         this.terminalId = terminalId;
         this.distro = distro;
         this.user = user;
+        this.initialCommand = initialCommand;
     }
 
     start(): void {
@@ -36,8 +39,9 @@ export class WSLTerminalSession implements ITerminalSession {
         if (this.user) {
             args.push('-u', this.user);
         }
-        // Launch interactive bash or fallback to interactive sh
-        args.push('--', 'sh', '-c', 'if command -v bash >/dev/null 2>&1; then exec bash -i; else exec sh -i; fi');
+        // Launch custom command or interactive bash / fallback to interactive sh
+        const cmd = this.initialCommand || 'if command -v bash >/dev/null 2>&1; then exec bash -i; else exec sh -i; fi';
+        args.push('--', 'sh', '-c', cmd);
 
         try {
             logger.info(`[WSL-Terminal-${this.terminalId}] Iniciando processo WSL interativo: wsl.exe ${args.join(' ')}`);

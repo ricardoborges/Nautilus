@@ -32,8 +32,10 @@ import {
     CodeOutlined,
     DesktopOutlined,
     BranchesOutlined,
+    ContainerOutlined,
 } from '@ant-design/icons';
 import { useConnection } from '../../context/ConnectionContext';
+import { WslIcon } from '../connections/WslIcon';
 import type { Connection, ConnectionFormData } from '../../types';
 
 interface ConnectionModalProps {
@@ -105,6 +107,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     environment: connection.environment || 'other',
                     tags: connection.tags || [],
                     bastionConnectionId: connection.bastionConnectionId || undefined,
+                    containerEngine: connection.containerEngine || 'auto',
                 });
                 // Load password if editing
                 window.ssm.getPassword(connection.id).then(pwd => {
@@ -128,6 +131,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     environment: 'other',
                     tags: [],
                     bastionConnectionId: undefined,
+                    containerEngine: 'auto',
                 });
                 setPassword('');
             }
@@ -222,6 +226,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 bastionConnectionId: values.connectionType === 'ssh' ? (values.bastionConnectionId || null) : null,
                 wslDistro: isWsl ? values.wslDistro : undefined,
                 wslUser: isWsl ? values.wslUser : undefined,
+                containerEngine: values.containerEngine || 'auto',
             };
 
             // Validate password for SSH connections with password auth
@@ -338,7 +343,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                         {isWslAvailable && (
                             <Radio.Button value="wsl">
                                 <Space>
-                                    <CodeOutlined />
+                                    <WslIcon size={14} />
                                     WSL2 (Linux)
                                 </Space>
                             </Radio.Button>
@@ -588,6 +593,28 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                             />
                         )}
                     </>
+                )}
+
+                {/* Container Engine preference for WSL and SSH */}
+                {connectionType !== 'rdp' && (
+                    <Form.Item
+                        name="containerEngine"
+                        label={
+                            <Space>
+                                <ContainerOutlined />
+                                <span>{t('connection.container_engine', 'Container Engine')}</span>
+                            </Space>
+                        }
+                        extra={t('connection.container_engine_extra', 'Escolha entre detecção automática, Docker ou WSL Containers (wslc)')}
+                    >
+                        <Select
+                            options={[
+                                { label: t('connection.engine_auto', 'Automático (Detectar)'), value: 'auto' },
+                                { label: 'Docker', value: 'docker' },
+                                { label: 'WSL Containers (wslc)', value: 'wslc' },
+                            ]}
+                        />
+                    </Form.Item>
                 )}
 
                 {/* Auto Connect */}

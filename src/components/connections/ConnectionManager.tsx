@@ -37,6 +37,7 @@ import { useTranslation } from 'react-i18next';
 import { useConnection } from '../../context/ConnectionContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Connection } from '../../types';
+import { WslIcon } from './WslIcon';
 
 const { Text } = Typography;
 
@@ -252,13 +253,18 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                                             {item.connectionType === 'rdp'
                                                 ? <WindowsOutlined style={{ fontSize: 18, color: '#0078d4' }} />
                                                 : item.connectionType === 'wsl'
-                                                    ? <CodeOutlined style={{ fontSize: 18, color: '#13c2c2' }} />
+                                                    ? <WslIcon size={18} />
                                                     : <LinuxOutlined style={{ fontSize: 18, color: '#f57c00' }} />
                                             }
                                             <Space direction="vertical" size={0} style={{ rowGap: 0 }}>
                                                 <Text strong style={{ fontSize: 14, lineHeight: '1.2' }}>{item.name}</Text>
                                                 <Text type="secondary" style={{ fontSize: 11 }}>
-                                                    {item.connectionType === 'wsl' ? `WSL: ${item.wslDistro || 'default'}` : `${item.user}@${item.host}`}
+                                                    {item.connectionType === 'wsl'
+                                                        ? (item.wslUser && item.wslUser !== 'default' && item.wslUser !== 'root'
+                                                            ? `${item.wslUser}@${item.wslDistro || 'default'}`
+                                                            : `${item.wslDistro || 'WSL2'} • localhost`)
+                                                        : `${item.user}@${item.host}`
+                                                    }
                                                 </Text>
                                             </Space>
                                         </div>
@@ -278,7 +284,22 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                                     )}
 
                                     {/* Environment and Tags */}
-                                    <div style={{ marginBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                    <div style={{ marginBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 4, minHeight: 18 }}>
+                                        {item.connectionType === 'wsl' && (
+                                            <Tag color="cyan" style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 6px', fontWeight: 600 }}>
+                                                WSL2
+                                            </Tag>
+                                        )}
+                                        {item.connectionType === 'wsl' && item.wslDistro && (
+                                            <Tag color="blue" style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 6px' }}>
+                                                {item.wslDistro}
+                                            </Tag>
+                                        )}
+                                        {item.connectionType === 'wsl' && item.containerEngine && item.containerEngine !== 'auto' && (
+                                            <Tag color="purple" style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 6px' }}>
+                                                {item.containerEngine.toUpperCase()}
+                                            </Tag>
+                                        )}
                                         {item.environment && item.environment !== 'other' && (
                                             <Tag color={envColorMap[item.environment] || 'default'} style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px', fontWeight: 600 }}>
                                                 {envLabelMap[item.environment] || item.environment}
