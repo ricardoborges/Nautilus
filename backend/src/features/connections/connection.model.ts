@@ -7,7 +7,7 @@ export class ConnectionModel implements Connection {
     host: string;
     port: number;
     user: string;
-    connectionType: 'ssh' | 'rdp';
+    connectionType: 'ssh' | 'rdp' | 'wsl';
     authMethod: 'password' | 'key';
     keyPath: string | null;
     lastSeen: string | null;
@@ -18,6 +18,9 @@ export class ConnectionModel implements Connection {
     domain?: string;
     description?: string;
     bastionConnectionId?: string | null;
+    // WSL specific fields
+    wslDistro?: string;
+    wslUser?: string;
 
     constructor(data: ConnectionData) {
         this.id = data.id || crypto.randomUUID();
@@ -36,5 +39,8 @@ export class ConnectionModel implements Connection {
         // RDP specific
         this.rdpAuthMethod = data.rdpAuthMethod;
         this.domain = data.domain;
+        // WSL specific
+        this.wslDistro = data.wslDistro;
+        this.wslUser = data.wslUser;
     }
 }

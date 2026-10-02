@@ -12,7 +12,7 @@ export interface Connection {
     host: string;
     user: string;
     description?: string;
-    connectionType: 'ssh' | 'rdp';
+    connectionType: 'ssh' | 'rdp' | 'wsl';
     authMethod: 'password' | 'key';
     keyPath?: string;
     monitoredServices?: string[];
@@ -25,6 +25,11 @@ export interface Connection {
     port?: number;
     // Bastion / Jump Host
     bastionConnectionId?: string | null;
+    // WSL specific fields
+    wslDistro?: string;
+    wslUser?: string;
+    // Container Engine preference
+    containerEngine?: 'auto' | 'docker' | 'wslc';
 }
 
 export interface ConnectionFormData extends Omit<Connection, 'id'> {
@@ -38,6 +43,11 @@ export interface ConnectionFormData extends Omit<Connection, 'id'> {
     domain?: string;
     // Bastion / Jump Host
     bastionConnectionId?: string | null;
+    // WSL specific
+    wslDistro?: string;
+    wslUser?: string;
+    // Container Engine preference
+    containerEngine?: 'auto' | 'docker' | 'wslc';
 }
 
 // ========================
@@ -216,6 +226,7 @@ export interface DockerContainer {
     ports: string;
     created: string;
     stack?: string;
+    service?: string;
     ipAddress?: string;
 }
 
@@ -225,6 +236,8 @@ export interface DockerImage {
     tag: string;
     size: string;
     created: string;
+    containersCount?: number;
+    inUse?: boolean;
 }
 
 export interface DockerVolume {
@@ -268,6 +281,10 @@ export interface DockerStatItem {
 
 export interface DockerInfo {
     available: boolean;
+    engine?: 'docker' | 'wslc';
+    availableEngines?: Array<'docker' | 'wslc'>;
+    dockerCount?: number;
+    wslcCount?: number;
     version?: string;
     containers?: number;
     imagesCount?: number;
@@ -359,6 +376,10 @@ export interface SSMAPI {
     setPassword: (id: string, password: string) => Promise<void>;
     getPassword: (id: string) => Promise<string | null>;
 
+    // WSL
+    wslIsAvailable: () => Promise<{ available: boolean }>;
+    wslListDistros: () => Promise<{ distros: string[]; defaultDistro?: string }>;
+
     // SSH
     testConnection: (data: ConnectionFormData) => Promise<void>;
 
@@ -416,21 +437,22 @@ export interface SSMAPI {
     onHostKeyPrompt: (callback: (event: HostKeyPromptEvent) => void) => () => void;
 
     // Docker
-    dockerCheckAvailable: (connectionId: string) => Promise<DockerInfo>;
-    dockerListContainers: (connectionId: string) => Promise<DockerContainer[]>;
-    dockerListImages: (connectionId: string) => Promise<DockerImage[]>;
-    dockerListVolumes: (connectionId: string) => Promise<DockerVolume[]>;
-    dockerListNetworks: (connectionId: string) => Promise<DockerNetwork[]>;
-    dockerListStacks: (connectionId: string) => Promise<DockerStack[]>;
+    dockerCheckAvailable: (connectionId: string, engine?: 'docker' | 'wslc') => Promise<DockerInfo>;
+    dockerListContainers: (connectionId: string, engine?: 'docker' | 'wslc') => Promise<DockerContainer[]>;
+    dockerListImages: (connectionId: string, engine?: 'docker' | 'wslc') => Promise<DockerImage[]>;
+    dockerListVolumes: (connectionId: string, engine?: 'docker' | 'wslc') => Promise<DockerVolume[]>;
+    dockerListNetworks: (connectionId: string, engine?: 'docker' | 'wslc') => Promise<DockerNetwork[]>;
+    dockerListStacks: (connectionId: string, engine?: 'docker' | 'wslc') => Promise<DockerStack[]>;
     dockerContainerAction: (connectionId: string, containerId: string, action: 'start' | 'stop' | 'restart' | 'remove' | 'pause' | 'unpause' | 'kill') => Promise<void>;
     dockerContainerLogs: (connectionId: string, containerId: string, tail?: number) => Promise<string>;
-    dockerImageAction: (connectionId: string, imageId: string, action: 'remove') => Promise<void>;
+    dockerImageAction: (connectionId: string, imageId: string, action: 'remove', engine?: 'docker' | 'wslc') => Promise<void>;
+    dockerImagePrune: (connectionId: string, engine?: 'docker' | 'wslc') => Promise<{ success: boolean; output?: string }>;
     dockerVolumeAction: (connectionId: string, volumeName: string, action: 'remove') => Promise<void>;
     dockerNetworkAction: (connectionId: string, networkId: string, action: 'remove') => Promise<void>;
     dockerDeployStack: (connectionId: string, stackName: string, composeContent: string, stacksDirectory: string) => Promise<void>;
     dockerConvertRun: (connectionId: string, dockerRunCommand: string) => Promise<string>;
     dockerExecTerminal: (connectionId: string, terminalId: string, containerId: string, cols?: number, rows?: number) => Promise<void>;
-    dockerStats: (connectionId: string) => Promise<DockerStatItem[]>;
+    dockerStats: (connectionId: string, engine?: 'docker' | 'wslc') => Promise<DockerStatItem[]>;
 
     // RDP
     rdpConnect: (options: RdpConnectOptions) => Promise<RdpConnectResponse>;

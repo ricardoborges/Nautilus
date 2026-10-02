@@ -15,6 +15,10 @@ interface ConnectionState {
     metrics: SystemMetrics | null;
     dockerAvailable: boolean;
     dockerVersion: string | null;
+    dockerEngine?: 'docker' | 'wslc' | null;
+    availableEngines?: Array<'docker' | 'wslc'>;
+    dockerCount?: number;
+    wslcCount?: number;
     isLoading: boolean;
 }
 
@@ -36,6 +40,7 @@ interface ConnectionContextType {
     focusConnection: (id: string) => void;
     refreshConnections: () => Promise<void>;
     refreshSnippets: () => Promise<void>;
+    checkDockerAvailability: (connectionId: string, engine?: 'docker' | 'wslc') => Promise<void>;
 
     // For backwards compatibility with components that need the focused connection
     activeConnectionId: string | null;
@@ -44,6 +49,10 @@ interface ConnectionContextType {
     metrics: SystemMetrics | null;
     dockerAvailable: boolean;
     dockerVersion: string | null;
+    dockerEngine: 'docker' | 'wslc' | null;
+    availableEngines: Array<'docker' | 'wslc'>;
+    dockerCount: number;
+    wslcCount: number;
 }
 
 const ConnectionContext = createContext<ConnectionContextType | null>(null);
@@ -102,19 +111,23 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     }, []);
 
     // Check Docker availability for a connection
-    const checkDockerAvailability = useCallback(async (connectionId: string) => {
+    const checkDockerAvailability = useCallback(async (connectionId: string, engine?: 'docker' | 'wslc') => {
         try {
-            console.log('[ConnectionContext] Checking Docker availability for:', connectionId);
-            const dockerInfo = await window.ssm.dockerCheckAvailable(connectionId);
+            console.log('[ConnectionContext] Checking Docker availability for:', connectionId, 'engine:', engine);
+            const dockerInfo = await window.ssm.dockerCheckAvailable(connectionId, engine);
             setConnectionStates(prev => ({
                 ...prev,
                 [connectionId]: {
                     ...prev[connectionId],
                     dockerAvailable: dockerInfo.available,
                     dockerVersion: dockerInfo.version || null,
+                    dockerEngine: dockerInfo.engine || null,
+                    availableEngines: dockerInfo.availableEngines || (dockerInfo.engine ? [dockerInfo.engine] : []),
+                    dockerCount: dockerInfo.dockerCount ?? 0,
+                    wslcCount: dockerInfo.wslcCount ?? 0,
                 }
             }));
-            console.log('[ConnectionContext] Docker available:', dockerInfo.available, 'version:', dockerInfo.version);
+            console.log('[ConnectionContext] Docker available:', dockerInfo.available, 'engine:', dockerInfo.engine, 'version:', dockerInfo.version);
         } catch (error) {
             console.error('Failed to check Docker availability:', error);
             setConnectionStates(prev => ({
@@ -123,6 +136,10 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
                     ...prev[connectionId],
                     dockerAvailable: false,
                     dockerVersion: null,
+                    dockerEngine: null,
+                    availableEngines: [],
+                    dockerCount: 0,
+                    wslcCount: 0,
                 }
             }));
         }
@@ -142,7 +159,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         // a few sockets per origin - asking before the tab exists keeps those
         // sockets free so the answer can get through.
         const connection = connections.find(c => c.id === id);
-        if (connection && connection.connectionType !== 'rdp') {
+        if (connection && connection.connectionType === 'ssh') {
             try {
                 const gate = await window.ssm.hostKeyEnsure(id);
                 if (!gate.trusted) {
@@ -297,6 +314,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         focusConnection,
         refreshConnections,
         refreshSnippets,
+        checkDockerAvailability,
         // Backwards compatibility - expose focused connection state
         activeConnectionId: focusedConnectionId,
         activeConnection,
@@ -304,6 +322,10 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         metrics: focusedState?.metrics ?? null,
         dockerAvailable: focusedState?.dockerAvailable ?? false,
         dockerVersion: focusedState?.dockerVersion ?? null,
+        dockerEngine: focusedState?.dockerEngine ?? null,
+        availableEngines: focusedState?.availableEngines ?? [],
+        dockerCount: focusedState?.dockerCount ?? 0,
+        wslcCount: focusedState?.wslcCount ?? 0,
     };
 
     return (

@@ -12,13 +12,26 @@ import {
     LinuxOutlined,
     WindowsOutlined,
     CloseOutlined,
+    CodeOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useConnection } from '../../context/ConnectionContext';
 import { useTheme } from '../../context/ThemeContext';
+import { WslIcon } from './WslIcon';
 import type { MenuProps } from 'antd';
 
 const { Text } = Typography;
+
+const getConnectionIcon = (type?: string) => {
+    switch (type) {
+        case 'rdp':
+            return <WindowsOutlined style={{ color: '#0078d4' }} />;
+        case 'wsl':
+            return <WslIcon size={14} />;
+        default:
+            return <LinuxOutlined style={{ color: '#f57c00' }} />;
+    }
+};
 
 export const ConnectionTabs: React.FC = () => {
     const { t } = useTranslation();
@@ -41,14 +54,12 @@ export const ConnectionTabs: React.FC = () => {
 
     // Build dropdown menu items for adding new connections
     const availableConnections = connections.filter(
-        c => !activeConnectionIds.includes(c.id) && c.connectionType === 'ssh'
+        c => !activeConnectionIds.includes(c.id) && c.connectionType !== 'rdp'
     );
 
     const dropdownItems: MenuProps['items'] = availableConnections.map(conn => ({
         key: conn.id,
-        icon: conn.connectionType === 'rdp'
-            ? <WindowsOutlined style={{ color: '#0078d4' }} />
-            : <LinuxOutlined style={{ color: '#f57c00' }} />,
+        icon: getConnectionIcon(conn.connectionType),
         label: conn.name,
         onClick: () => {
             openConnection(conn.id);
@@ -69,10 +80,7 @@ export const ConnectionTabs: React.FC = () => {
         key: conn!.id,
         label: (
             <Space size={4}>
-                {conn!.connectionType === 'rdp'
-                    ? <WindowsOutlined style={{ color: '#0078d4' }} />
-                    : <LinuxOutlined style={{ color: '#f57c00' }} />
-                }
+                {getConnectionIcon(conn!.connectionType)}
                 <span>{conn!.name}</span>
             </Space>
         ),

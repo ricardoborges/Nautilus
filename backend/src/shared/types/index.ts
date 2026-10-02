@@ -27,7 +27,7 @@ export interface ConnectionData {
     host: string;
     port?: number;
     user: string;
-    connectionType: 'ssh' | 'rdp';
+    connectionType: 'ssh' | 'rdp' | 'wsl';
     authMethod: 'password' | 'key';
     keyPath?: string | null;
     lastSeen?: string | null;
@@ -39,9 +39,13 @@ export interface ConnectionData {
     // RDP specific fields
     rdpAuthMethod?: 'credentials' | 'windows_auth';
     domain?: string;
+    // WSL specific fields
+    wslDistro?: string;
+    wslUser?: string;
+    containerEngine?: 'auto' | 'docker' | 'wslc';
 }
 
-export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen' | 'rdpAuthMethod' | 'domain' | 'description' | 'tags' | 'environment' | 'bastionConnectionId'>> {
+export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'lastSeen' | 'rdpAuthMethod' | 'domain' | 'description' | 'tags' | 'environment' | 'bastionConnectionId' | 'wslDistro' | 'wslUser' | 'containerEngine'>> {
     keyPath: string | null;
     lastSeen: string | null;
     rdpAuthMethod?: 'credentials' | 'windows_auth';
@@ -50,6 +54,9 @@ export interface Connection extends Required<Omit<ConnectionData, 'keyPath' | 'l
     tags?: string[];
     environment?: 'production' | 'staging' | 'development' | 'other';
     bastionConnectionId?: string | null;
+    wslDistro?: string;
+    wslUser?: string;
+    containerEngine?: 'auto' | 'docker' | 'wslc';
 }
 
 // ========================
